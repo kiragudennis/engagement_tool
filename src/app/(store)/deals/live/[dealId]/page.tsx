@@ -1,4 +1,4 @@
-// app/(store)/deals/live/[dealId]/page.tsx
+// app/(store)/deals/live/[dealId]/page.tsx (Optimized)
 
 "use client";
 
@@ -30,18 +30,7 @@ import {
   Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatDistanceToNowStrict } from "date-fns";
 import { Deal } from "@/types/deals";
-
-interface DealStatus {
-  is_active: boolean;
-  time_remaining_ms: number;
-  time_remaining_formatted: string;
-  urgency_level: { color: string; message: string; threshold_minutes: number };
-  stock_remaining: number | null;
-  stock_percentage: number;
-  can_claim: boolean;
-}
 
 interface TickerEntry {
   id: string;
@@ -56,130 +45,229 @@ export default function DealLivePage() {
   const { dealId } = useParams<{ dealId: string }>();
   const { supabase } = useAuth();
   const [deal, setDeal] = useState<Deal | null>(null);
-  const [status, setStatus] = useState<DealStatus | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState<string>("");
+  const [stockRemaining, setStockRemaining] = useState<number | null>(null);
+  const [stockPercentage, setStockPercentage] = useState<number>(0);
   const [ticker, setTicker] = useState<TickerEntry[]>([]);
   const [urgencyState, setUrgencyState] = useState<UrgencyState>("green");
+  const [urgencyMessage, setUrgencyMessage] = useState<string>("");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const [lastClaim, setLastClaim] = useState<TickerEntry | null>(null);
+  const [isActive, setIsActive] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const tickerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const dealsService = new DealsService(supabase);
 
+  // Single consolidated load function
   const loadData = useCallback(async () => {
     if (!dealId) return;
 
-    // Fetch deal details
-    const { data: dealData } = await supabase
-      .from("deals")
-      .select("*")
-      .eq("id", dealId)
-      .single();
-    setDeal(dealData);
+    try {
+      // Fetch deal details and status in ONE call using RPC
+      const { data: dealData, error: dealError } = await supabase
+        .from("deals")
+        .select("*")
+        .eq("id", dealId)
+        .single();
 
-    // Get deal status
-    const dealStatus = await dealsService.getDealStatus(dealId);
-    setStatus(dealStatus);
+      if (dealError) throw dealError;
+      if (!dealData) return;
 
-    // Update urgency state based on time remaining
-    if (dealStatus) {
-      const minutesLeft = dealStatus.time_remaining_ms / (1000 * 60);
-      if (minutesLeft <= 1) {
-        setUrgencyState("red");
-      } else if (minutesLeft <= 5) {
-        setUrgencyState("yellow");
+      setDeal(dealData);
+
+      const now = new Date();
+      const end = new Date(dealData.ends_at);
+      const start = new Date(dealData.starts_at);
+      const isLive = dealData.status === "active" && now >= start && now <= end;
+      setIsActive(isLive);
+
+      if (isLive) {
+        // Calculate time remaining
+        const msRemaining = end.getTime() - now.getTime();
+        const minutesLeft = msRemaining / (1000 * 60);
+
+        // Format time
+        const hours = Math.floor(msRemaining / (1000 * 60 * 60));
+        const minutes = Math.floor(
+          (msRemaining % (1000 * 60 * 60)) / (1000 * 60),
+        );
+        const seconds = Math.floor((msRemaining % (1000 * 60)) / 1000);
+
+        if (hours > 0) {
+          setTimeRemaining(`${hours}h ${minutes}m ${seconds}s`);
+        } else if (minutes > 0) {
+          setTimeRemaining(`${minutes}m ${seconds}s`);
+        } else {
+          setTimeRemaining(`${seconds}s`);
+        }
+
+        // Update urgency state
+        if (minutesLeft <= 1) {
+          setUrgencyState("red");
+          setUrgencyMessage("FINAL MINUTE!");
+        } else if (minutesLeft <= 5) {
+          setUrgencyState("yellow");
+          setUrgencyMessage("Ending soon!");
+        } else {
+          setUrgencyState("green");
+          setUrgencyMessage("Limited time offer");
+        }
+
+        // Stock calculations
+        const remaining = dealData.remaining_quantity;
+        const total = dealData.total_quantity;
+        setStockRemaining(remaining);
+        if (total && remaining !== null) {
+          const claimed = total - remaining;
+          const percent = (claimed / total) * 100;
+          setStockPercentage(percent);
+        }
       } else {
-        setUrgencyState("green");
+        setTimeRemaining("Ended");
+        setUrgencyState("red");
+        setUrgencyMessage(now < start ? "Not started yet" : "Deal ended");
       }
+    } catch (error) {
+      console.error("Error loading deal:", error);
     }
+  }, [dealId, supabase]);
 
-    // Get live ticker
-    const tickerData = await dealsService.getLiveTicker(dealId, 30);
-    setTicker(tickerData);
-  }, [dealId, supabase, dealsService]);
+  // Load ticker separately (less frequent)
+  const loadTicker = useCallback(async () => {
+    if (!dealId) return;
+    try {
+      const tickerData = await dealsService.getLiveTicker(dealId, 30);
+      setTicker(tickerData);
+    } catch (error) {
+      console.error("Error loading ticker:", error);
+    }
+  }, [dealId, dealsService]);
 
-  // Real-time subscriptions
+  // Real-time subscription - SINGLE channel for all updates
   useEffect(() => {
     if (!dealId) return;
 
-    // Subscribe to deal changes
-    const dealChannel = supabase
-      .channel(`deal-live-${dealId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "deals",
-          filter: `id=eq.${dealId}`,
-        },
-        () => {
-          loadData();
-        },
-      )
-      .subscribe();
+    let isMounted = true;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
 
-    // Subscribe to new claims
-    const claimsChannel = supabase
-      .channel(`deal-claims-${dealId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "deal_claims",
-          filter: `deal_id=eq.${dealId}`,
-        },
-        async (payload) => {
-          // Fetch user name
-          const { data: user } = await supabase
-            .from("users")
-            .select("full_name")
-            .eq("id", payload.new.user_id)
-            .single();
-
-          const newClaim = {
-            id: payload.new.id,
-            user_name: user?.full_name || "Someone",
-            quantity: payload.new.quantity,
-            claimed_at: payload.new.claimed_at,
-          };
-
-          setTicker((prev) => [newClaim, ...prev.slice(0, 49)]);
-          setLastClaim(newClaim);
-
-          // Play sound for new claim
-          if (isSoundEnabled && audioRef.current) {
-            audioRef.current.play().catch(() => {});
-          }
-
-          // Auto-hide last claim after 3 seconds
-          setTimeout(() => setLastClaim(null), 3000);
-
-          // Refresh status for stock update
-          loadData();
-        },
-      )
-      .subscribe();
-
+    // Initial load
     loadData();
+    loadTicker();
 
-    // Refresh every second for countdown
-    const interval = setInterval(loadData, 1000);
+    // Set up polling as fallback (slower interval)
+    const pollingInterval = setInterval(() => {
+      if (isMounted) {
+        loadData();
+      }
+    }, 3000); // Poll every 3 seconds instead of 1 second
 
-    // Refresh ticker every 5 seconds
-    const tickerInterval = setInterval(() => {
-      dealsService.getLiveTicker(dealId, 30).then(setTicker);
-    }, 5000);
+    const tickerPollingInterval = setInterval(() => {
+      if (isMounted) {
+        loadTicker();
+      }
+    }, 10000); // Ticker every 10 seconds
+
+    // Single real-time channel for all deal events
+    const setupRealtime = () => {
+      try {
+        const channel = supabase
+          .channel(`deal-live-${dealId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "deals",
+              filter: `id=eq.${dealId}`,
+            },
+            () => {
+              if (isMounted) loadData();
+            },
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "deal_claims",
+              filter: `deal_id=eq.${dealId}`,
+            },
+            async (payload) => {
+              if (!isMounted) return;
+
+              // Fetch user name - but don't wait for it to update ticker
+              supabase
+                .from("users")
+                .select("full_name")
+                .eq("id", payload.new.user_id)
+                .single()
+                .then(({ data: user }) => {
+                  if (!isMounted) return;
+                  const newClaim = {
+                    id: payload.new.id,
+                    user_name: user?.full_name || "Someone",
+                    quantity: payload.new.quantity,
+                    claimed_at: payload.new.claimed_at,
+                  };
+                  setTicker((prev) => [newClaim, ...prev.slice(0, 49)]);
+                  setLastClaim(newClaim);
+
+                  if (isSoundEnabled && audioRef.current) {
+                    audioRef.current.play().catch(() => {});
+                  }
+                  setTimeout(() => {
+                    if (isMounted) setLastClaim(null);
+                  }, 3000);
+                });
+
+              // Immediately refresh stock data
+              loadData();
+            },
+          )
+          .subscribe((status) => {
+            if (status === "SUBSCRIBED") {
+              console.log("✅ Deal live subscription active");
+              retryCount = 0;
+            } else if (
+              status === "CHANNEL_ERROR" &&
+              retryCount < MAX_RETRIES &&
+              isMounted
+            ) {
+              retryCount++;
+              console.warn(
+                `Subscription error, retrying (${retryCount}/${MAX_RETRIES})...`,
+              );
+              setTimeout(setupRealtime, 2000);
+            }
+          });
+
+        return channel;
+      } catch (error) {
+        console.warn("Failed to setup subscription:", error);
+        return null;
+      }
+    };
+
+    const channel = setupRealtime();
 
     return () => {
-      dealChannel.unsubscribe();
-      claimsChannel.unsubscribe();
-      clearInterval(interval);
-      clearInterval(tickerInterval);
+      isMounted = false;
+      clearInterval(pollingInterval);
+      clearInterval(tickerPollingInterval);
+      if (channel) {
+        try {
+          channel.unsubscribe();
+        } catch (e) {
+          console.warn("Error unsubscribing:", e);
+        }
+      }
     };
-  }, [dealId, supabase, dealsService, loadData, isSoundEnabled]);
+  }, [dealId, supabase, loadData, loadTicker, isSoundEnabled]);
 
   // Fullscreen handling
   const toggleFullscreen = useCallback(() => {
@@ -202,35 +290,6 @@ export default function DealLivePage() {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
-  const getUrgencyStyles = () => {
-    switch (urgencyState) {
-      case "red":
-        return {
-          timerColor: "text-red-500",
-          timerBg: "bg-red-500/20",
-          borderColor: "border-red-500",
-          glow: "shadow-red-500/50",
-          pulse: "animate-pulse",
-        };
-      case "yellow":
-        return {
-          timerColor: "text-yellow-500",
-          timerBg: "bg-yellow-500/20",
-          borderColor: "border-yellow-500",
-          glow: "shadow-yellow-500/30",
-          pulse: "",
-        };
-      default:
-        return {
-          timerColor: "text-green-500",
-          timerBg: "bg-green-500/20",
-          borderColor: "border-green-500/30",
-          glow: "",
-          pulse: "",
-        };
-    }
-  };
-
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("en-KE", {
       style: "currency",
@@ -239,18 +298,31 @@ export default function DealLivePage() {
     }).format(price);
   };
 
-  const getDealPrice = () => {
-    if (!deal) return 0;
-    if (deal.deal_price) return deal.deal_price;
-    return 0;
+  const urgencyStyles = {
+    timerColor:
+      urgencyState === "red"
+        ? "text-red-500"
+        : urgencyState === "yellow"
+          ? "text-yellow-500"
+          : "text-green-500",
+    timerBg:
+      urgencyState === "red"
+        ? "bg-red-500/20"
+        : urgencyState === "yellow"
+          ? "bg-yellow-500/20"
+          : "bg-green-500/20",
+    borderColor:
+      urgencyState === "red"
+        ? "border-red-500"
+        : urgencyState === "yellow"
+          ? "border-yellow-500"
+          : "border-green-500/30",
+    pulse: urgencyState === "red" ? "animate-pulse" : "",
   };
 
-  const urgencyStyles = getUrgencyStyles();
   const isLowStock =
-    status?.stock_remaining &&
-    status.stock_remaining <= 10 &&
-    status.stock_remaining > 0;
-  const isSoldOut = status?.stock_remaining === 0;
+    stockRemaining !== null && stockRemaining <= 10 && stockRemaining > 0;
+  const isSoldOut = stockRemaining === 0;
 
   if (!deal) {
     return (
@@ -276,7 +348,7 @@ export default function DealLivePage() {
         <div data-title={deal.name} />
         <div data-type={deal.deal_type} />
         <div data-status={deal.status} />
-        <div data-stock={status?.stock_remaining} />
+        <div data-stock={stockRemaining} />
         <div data-claims={ticker.length} />
       </div>
 
@@ -360,7 +432,6 @@ export default function DealLivePage() {
               className={cn(
                 "bg-gradient-to-br from-purple-900/50 to-pink-900/50 backdrop-blur border-2 transition-all duration-300",
                 urgencyStyles.borderColor,
-                urgencyStyles.glow,
               )}
             >
               <CardContent className="p-8 text-center">
@@ -411,13 +482,10 @@ export default function DealLivePage() {
                 </p>
 
                 {/* Price Display */}
-                {deal.deal_type === "discount" && getDealPrice() > 0 && (
+                {deal.deal_type === "discount" && deal.deal_price && (
                   <div className="mb-6">
                     <div className="text-5xl font-bold text-white">
-                      {formatPrice(getDealPrice())}
-                    </div>
-                    <div className="text-lg text-purple-300 line-through mt-1">
-                      Regular price
+                      {formatPrice(deal.deal_price)}
                     </div>
                   </div>
                 )}
@@ -445,21 +513,8 @@ export default function DealLivePage() {
                   </div>
                 )}
 
-                {deal.deal_type === "mystery" &&
-                  !deal.mystery_config?.revealed_at && (
-                    <div className="mb-6 p-4 rounded-lg bg-orange-500/20 animate-pulse">
-                      <Eye className="h-10 w-10 text-orange-400 mx-auto mb-2" />
-                      <p className="text-white text-xl font-bold">
-                        ??? MYSTERY DEAL ???
-                      </p>
-                      <p className="text-orange-300 text-sm mt-1">
-                        Product hidden until reveal
-                      </p>
-                    </div>
-                  )}
-
                 {/* Countdown Timer */}
-                {deal.show_countdown && status && (
+                {deal.show_countdown && isActive && (
                   <div
                     className={cn("mt-6 p-4 rounded-lg", urgencyStyles.timerBg)}
                   >
@@ -473,7 +528,7 @@ export default function DealLivePage() {
                           urgencyStyles.timerColor,
                         )}
                       >
-                        {status.urgency_level?.message || "Limited time offer"}
+                        {urgencyMessage}
                       </span>
                     </div>
                     <div
@@ -483,31 +538,31 @@ export default function DealLivePage() {
                         urgencyState === "red" && urgencyStyles.pulse,
                       )}
                     >
-                      {status.time_remaining_formatted}
+                      {timeRemaining}
                     </div>
                   </div>
                 )}
 
                 {/* Stock Meter */}
-                {deal.show_stock_counter && status?.stock_remaining && (
+                {deal.show_stock_counter && stockRemaining !== null && (
                   <div className="mt-6">
                     <div className="flex justify-between text-sm text-purple-300 mb-2">
                       <span>Stock Remaining</span>
                       <span
                         className={isLowStock ? "text-red-400 font-bold" : ""}
                       >
-                        {status.stock_remaining} / {deal.total_quantity}
+                        {stockRemaining} / {deal.total_quantity}
                       </span>
                     </div>
                     <Progress
-                      value={status.stock_percentage}
+                      value={stockPercentage}
                       className={cn("h-3", urgencyStyles.timerBg)}
                     />
                     {isLowStock && (
                       <div className="flex items-center justify-center gap-2 mt-3 text-red-400 animate-pulse">
                         <Flame className="h-4 w-4" />
                         <span className="text-sm font-bold">
-                          CRITICAL STOCK! ONLY {status.stock_remaining} LEFT!
+                          CRITICAL STOCK! ONLY {stockRemaining} LEFT!
                         </span>
                       </div>
                     )}
@@ -622,7 +677,7 @@ export default function DealLivePage() {
             </Card>
 
             {/* Urgency Message Card */}
-            {urgencyState === "red" && (
+            {urgencyState === "red" && isActive && (
               <Card className="bg-gradient-to-r from-red-600 to-orange-600 border-0 animate-pulse">
                 <CardContent className="p-4 text-center">
                   <AlertTriangle className="h-8 w-8 text-white mx-auto mb-2" />
@@ -689,7 +744,6 @@ export default function DealLivePage() {
                 {item.quantity === 1 ? "unit" : "units"}! 🎉
               </span>
             ))}
-            {/* Duplicate for seamless loop */}
             {ticker.slice(0, 30).map((item, idx) => (
               <span
                 key={`dup-${idx}`}

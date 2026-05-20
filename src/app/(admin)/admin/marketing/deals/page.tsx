@@ -719,26 +719,21 @@ function DealForm({
             </div>
           </div>
 
-          <div>
-            <Label>Product</Label>
-            <Select
+          <div className="space-y-2">
+            <Label htmlFor="product_id">Product ID (UUID)</Label>
+            <Input
+              id="product_id"
+              type="text"
               value={formData.product_id || ""}
-              onValueChange={(value) =>
-                setFormData({ ...formData, product_id: value || null })
+              onChange={(e) =>
+                setFormData({ ...formData, product_id: e.target.value || null })
               }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a product" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">None</SelectItem>
-                {products.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name} - KES {p.price.toLocaleString()}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="e.g., 123e4567-e89b-12d3-a456-426614174000"
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter the product UUID from your inventory. Leave empty if this
+              deal applies to all products or is a BOGO/free gift deal.
+            </p>
           </div>
 
           <div>
@@ -858,30 +853,24 @@ function DealForm({
           {dealType === "free_gift" && (
             <div className="space-y-4">
               <div>
-                <Label>Gift Product</Label>
-                <Select
+                <Label>Gift Product ID (UUID)</Label>
+                <Input
+                  type="text"
                   value={formData.free_gift_config?.gift_product_id || ""}
-                  onValueChange={(value) =>
+                  onChange={(e) =>
                     setFormData({
                       ...formData,
                       free_gift_config: {
                         ...formData.free_gift_config,
-                        gift_product_id: value || null,
+                        gift_product_id: e.target.value || null,
                       },
                     })
                   }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select gift product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="e.g., 123e4567-e89b-12d3-a456-426614174000"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  The product ID that will be given as a free gift
+                </p>
               </div>
               <div>
                 <Label>Minimum Purchase Amount (KES)</Label>
@@ -905,30 +894,24 @@ function DealForm({
           {dealType === "mystery" && (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Hidden Product</Label>
-                <Select
+                <Label>Hidden Product ID (UUID)</Label>
+                <Input
+                  type="text"
                   value={formData.mystery_config?.hidden_product_id || ""}
-                  onValueChange={(value) =>
+                  onChange={(e) =>
                     setFormData({
                       ...formData,
                       mystery_config: {
                         ...formData.mystery_config,
-                        hidden_product_id: value || null,
+                        hidden_product_id: e.target.value || null,
                       },
                     })
                   }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="e.g., 123e4567-e89b-12d3-a456-426614174000"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  The product that will be revealed
+                </p>
               </div>
               <div>
                 <Label>Hidden Price (KES)</Label>

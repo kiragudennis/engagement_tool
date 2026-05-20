@@ -130,3 +130,39 @@ CREATE INDEX idx_deal_claims_user ON deal_claims(user_id, deal_id);
 CREATE INDEX idx_deal_live_ticker_deal ON deal_live_ticker(deal_id, claimed_at DESC);
 CREATE INDEX idx_deal_early_access_deal ON deal_early_access(deal_id, access_granted_at);
 CREATE INDEX idx_deal_revivals_deal ON deal_revivals(deal_id, revived_until);
+
+-- Turn on RLS for all tables
+ALTER TABLE deals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE deal_claims ENABLE ROW LEVEL SECURITY;
+ALTER TABLE deal_live_ticker ENABLE ROW LEVEL SECURITY;
+ALTER TABLE deal_early_access ENABLE ROW LEVEL SECURITY;
+ALTER TABLE deal_revivals ENABLE ROW LEVEL SECURITY;
+
+-- RLS policies (using (public.is_admin()) Admin management);
+CREATE POLICY "Admins can manage all deals" ON deals
+    USING (public.is_admin());
+CREATE POLICY "Admins can manage all deal claims" ON deal_claims
+    USING (public.is_admin());
+CREATE POLICY "Admins can manage all live ticker entries" ON deal_live_ticker
+    USING (public.is_admin());
+CREATE POLICY "Admins can manage all early access entries" ON deal_early_access
+    USING (public.is_admin());
+CREATE POLICY "Admins can manage all deal revivals" ON deal_revivals
+    USING (public.is_admin());
+
+-- Users can view deals whether active, scheduled, draft,ended, paused, or cancelled (for transparency)
+CREATE POLICY "Users can view active deals" ON deals
+    USING (status IN ('active', 'scheduled', 'ended', 'paused', 'cancelled'));
+CREATE POLICY "Users can view their own deal claims" ON deal_claims
+    USING (user_id = auth.uid());
+CREATE POLICY "Users can view live ticker entries" ON deal_live_ticker
+    USING (true);
+CREATE POLICY "Users can view their own early access entries" ON deal_early_access
+    USING (user_id = auth.uid());
+CREATE POLICY "Users can view their own deal revivals" ON deal_revivals
+    USING (user_id = auth.uid());
+
+-- Turn REALTIME on for live ticker
+CREATE PUBLICATION deals_live_ticker_pub FOR TABLE deal_live_ticker;
+-- Note: For real-time updates, ensure your client subscribes to the 'deals_live_ticker_pub' publication.
+

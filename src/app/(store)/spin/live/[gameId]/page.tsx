@@ -9,7 +9,6 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Wheel } from "react-custom-roulette";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SpinningWheelClientService } from "@/lib/services/spining-wheel-service.client";
 import {
@@ -32,6 +31,19 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SpinGame } from "@/types/spinning_wheel";
+import dynamic from "next/dynamic";
+// Dynamically import the wheel component with no SSR
+const Wheel = dynamic(
+  () => import("react-custom-roulette").then((mod) => mod.Wheel),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-[300px] h-[300px] bg-white/10 rounded-full animate-pulse flex items-center justify-center">
+        <span className="text-white/50">Loading wheel...</span>
+      </div>
+    ),
+  },
+);
 
 interface Participant {
   id: string;
@@ -85,28 +97,9 @@ export default function SpinLivePage() {
   const [wheelSpinning, setWheelSpinning] = useState(false);
   const spinningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Queue System - Simplified
-  const [spinQueue, setSpinQueue] = useState<SpinEvent[]>([]);
-  const [currentSpin, setCurrentSpin] = useState<SpinEvent | null>(null);
-
   // Fullscreen State
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  // Use refs to track current state for the subscription
-  const currentSpinRef = useRef<SpinEvent | null>(null);
-  const spinQueueRef = useRef<SpinEvent[]>([]);
-
-  // Sync refs with state
-  useEffect(() => {
-    currentSpinRef.current = currentSpin;
-  }, [currentSpin]);
-
-  // This useEffect ensures that the spinQueueRef always has the latest value of spinQueue,
-  // which is crucial for the processNextSpin function to work correctly without stale closures.
-  useEffect(() => {
-    spinQueueRef.current = spinQueue;
-  }, [spinQueue]);
 
   // Fullscreen toggle function
   const toggleFullscreen = useCallback(() => {
@@ -151,52 +144,6 @@ export default function SpinLivePage() {
     }, 1000);
     return () => clearInterval(interval);
   }, [game?.ends_at]);
-
-  // Process next spin - using refs to avoid stale closures
-  const processNextSpin = useCallback(() => {
-    console.log(
-      "Processing next spin. Queue length:",
-      spinQueueRef.current.length,
-      "Current spin:",
-      currentSpinRef.current?.user_name,
-    );
-
-    if (currentSpinRef.current || spinQueueRef.current.length === 0) {
-      console.log("Cannot process - either current spin exists or queue empty");
-      return;
-    }
-
-    const nextSpin = spinQueueRef.current[0];
-    console.log("Starting spin for:", nextSpin.user_name);
-
-    // Update state
-    setCurrentSpin(nextSpin);
-    setSpinQueue((prev) => prev.slice(1));
-
-    // Show the spinner name
-    setCurrentSpinner({
-      user_name: nextSpin.user_name,
-      is_spinning: true,
-    });
-
-    // Start wheel animation
-    setWheelSpinning(true);
-    setMustSpin(true);
-
-    // Auto-stop after 3 seconds
-    if (spinningTimeoutRef.current) {
-      clearTimeout(spinningTimeoutRef.current);
-    }
-    spinningTimeoutRef.current = setTimeout(() => {
-      console.log("Auto-stopping spin for:", nextSpin.user_name);
-      setMustSpin(false);
-      setWheelSpinning(false);
-      setCurrentSpinner(null);
-      // Clear current spin and process next
-      setCurrentSpin(null);
-      setTimeout(() => processNextSpin(), 100);
-    }, 3000);
-  }, []);
 
   // Fetch game data
   const fetchGameData = useCallback(async () => {
@@ -255,50 +202,14 @@ export default function SpinLivePage() {
   }, [gameId, wheelService]);
 
   // Main real-time subscription with simplified queue
+  // Simplified with ONE channel
   useEffect(() => {
     if (!supabase || !gameId) return;
 
-    // Subscribe to new participants
-    const unsubscribeParticipants = wheelService.subscribeToParticipants(
-      gameId,
-      (newParticipant) => {
-        setParticipants((prev) => {
-          const exists = prev.some((p) => p.id === newParticipant.id);
-          if (!exists) {
-            return [newParticipant, ...prev.slice(0, 49)];
-          }
-          return prev.map((p) =>
-            p.id === newParticipant.id
-              ? { ...p, spin_count: p.spin_count + 1 }
-              : p,
-          );
-        });
-        setParticipantStats((prev) => ({
-          total_participants: prev.total_participants + 1,
-          total_spins: prev.total_spins + 1,
-        }));
-      },
-    );
-
-    // Presence channel for active viewers
-    const presenceChannel = supabase.channel(`live-viewers-${gameId}`);
-    presenceChannel
-      .on("presence", { event: "sync" }, () => {
-        const state = presenceChannel.presenceState();
-        setActiveViewers(Object.keys(state).length);
-      })
-      .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await presenceChannel.track({
-            user_id: "viewer",
-            online_at: new Date().toISOString(),
-          });
-        }
-      });
-
-    // In the subscription, use refs and call processNextSpin without dependencies
-    const liveTickerChannel = supabase
-      .channel(`spin-live-${gameId}`)
+    // SINGLE CHANNEL for everything
+    const mainChannel = supabase
+      .channel(`spin-live-main-${gameId}`)
+      // 1. Listen to spin_live_ticker for spin events
       .on(
         "postgres_changes",
         {
@@ -308,27 +219,29 @@ export default function SpinLivePage() {
           filter: `game_id=eq.${gameId}`,
         },
         (payload) => {
-          const event = payload.new as SpinEvent;
-          console.log("Received event:", event.action_type, event.user_name);
+          const event = payload.new;
+          console.log("Spin event:", event.action_type, event.user_name);
 
           if (event.action_type === "spin_start") {
-            // Add to queue using functional update
-            setSpinQueue((prev) => {
-              const newQueue = [...prev, event];
-              console.log("Queue updated, length:", newQueue.length);
-              return newQueue;
+            // Someone started spinning - show animation
+            setCurrentSpinner({
+              user_name: event.user_name,
+              is_spinning: true,
             });
-            // Process immediately - check using ref
-            if (!currentSpinRef.current) {
-              console.log("No active spin, processing now");
-              processNextSpin();
-            } else {
-              console.log("Active spin exists, queued");
-            }
-          } else if (event.action_type === "win") {
-            console.log("Win event received for:", event.user_name);
+            setWheelSpinning(true);
+            setMustSpin(true);
 
-            // Add winner to list
+            // Auto-stop after 3 seconds
+            if (spinningTimeoutRef.current) {
+              clearTimeout(spinningTimeoutRef.current);
+            }
+            spinningTimeoutRef.current = setTimeout(() => {
+              setMustSpin(false);
+              setWheelSpinning(false);
+              setCurrentSpinner(null);
+            }, 3000);
+          } else if (event.action_type === "win") {
+            // Someone won
             setRecentWins((prev) => [
               {
                 name: event.user_name,
@@ -338,48 +251,66 @@ export default function SpinLivePage() {
               ...prev.slice(0, 19),
             ]);
 
-            // Play sound
             if (winnerAudioRef.current) {
               winnerAudioRef.current.play().catch(() => {});
             }
 
-            // If this win matches the current spin, clear it
-            if (
-              currentSpinRef.current &&
-              currentSpinRef.current.user_id === event.user_id
-            ) {
-              console.log("Win matches current spin, clearing");
-
-              // Clear timeout
-              if (spinningTimeoutRef.current) {
-                clearTimeout(spinningTimeoutRef.current);
-                spinningTimeoutRef.current = null;
-              }
-
-              // Stop wheel animation
-              setMustSpin(false);
-              setWheelSpinning(false);
-              setCurrentSpinner(null);
-
-              // Clear current spin
-              setCurrentSpin(null);
-
-              // Process next spin
-              setTimeout(() => {
-                processNextSpin();
-              }, 500);
+            // Stop current animation
+            setMustSpin(false);
+            setWheelSpinning(false);
+            setCurrentSpinner(null);
+            if (spinningTimeoutRef.current) {
+              clearTimeout(spinningTimeoutRef.current);
             }
-
-            // Refresh stats
-            wheelService.getParticipantStats(gameId).then(setParticipantStats);
           }
         },
       )
-      .subscribe();
+      // 2. Listen to spin_attempts for participant updates
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "spin_attempts",
+          filter: `game_id=eq.${gameId}`,
+        },
+        async (payload) => {
+          // Fetch user details for the new participant
+          const { data: userData } = await supabase
+            .from("users")
+            .select("id, full_name")
+            .eq("id", payload.new.user_id)
+            .single();
 
-    // Game updates channel (for grand prize)
-    const gameChannel = supabase
-      .channel(`game-updates-${gameId}`)
+          if (userData) {
+            const newParticipant = {
+              id: userData.id,
+              name: userData.full_name || "Anonymous",
+              avatar: (userData.full_name?.charAt(0) || "?").toUpperCase(),
+              first_spin_at: payload.new.created_at,
+              spin_count: 1,
+            };
+
+            setParticipants((prev) => {
+              const exists = prev.some((p) => p.id === newParticipant.id);
+              if (!exists) {
+                return [newParticipant, ...prev.slice(0, 49)];
+              }
+              return prev.map((p) =>
+                p.id === newParticipant.id
+                  ? { ...p, spin_count: p.spin_count + 1 }
+                  : p,
+              );
+            });
+
+            setParticipantStats((prev) => ({
+              total_participants: prev.total_participants + 1,
+              total_spins: prev.total_spins + 1,
+            }));
+          }
+        },
+      )
+      // 3. Listen to spin_games for grand prize updates
       .on(
         "postgres_changes",
         {
@@ -405,18 +336,29 @@ export default function SpinLivePage() {
           }
         },
       )
-      .subscribe();
+      // 4. Presence for viewer count
+      .on("presence", { event: "sync" }, () => {
+        const state = mainChannel.presenceState();
+        setActiveViewers(Object.keys(state).length);
+      })
+      .subscribe(async (status) => {
+        console.log("Main channel status:", status);
+        if (status === "SUBSCRIBED") {
+          // Track this viewer
+          await mainChannel.track({
+            user_id: "viewer",
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
 
     return () => {
-      unsubscribeParticipants();
-      presenceChannel.unsubscribe();
-      liveTickerChannel.unsubscribe();
-      gameChannel.unsubscribe();
+      mainChannel.unsubscribe();
       if (spinningTimeoutRef.current) {
         clearTimeout(spinningTimeoutRef.current);
       }
     };
-  }, [supabase, gameId, wheelService, currentSpin, processNextSpin]);
+  }, [supabase, gameId]);
 
   // Initial data fetch
   useEffect(() => {
@@ -494,7 +436,6 @@ export default function SpinLivePage() {
 
   // Get top 3 participants for medal display
   const topParticipants = participants.slice(0, 3);
-  const queueLength = spinQueue.length;
 
   return (
     <div
@@ -669,16 +610,6 @@ export default function SpinLivePage() {
                         {currentSpinner.user_name} is spinning...
                       </span>
                     </div>
-                  </div>
-                )}
-
-                {/* Queue status indicator */}
-                {queueLength > 0 && (
-                  <div className="mb-4 text-center">
-                    <Badge className="bg-blue-500/20 text-blue-300 border-0">
-                      {queueLength} spin{queueLength !== 1 ? "s" : ""}{" "}
-                      waiting...
-                    </Badge>
                   </div>
                 )}
 

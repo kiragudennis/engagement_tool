@@ -5,7 +5,6 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Wheel } from "react-custom-roulette";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,6 +56,19 @@ import { Radio } from "lucide-react";
 import { SpinningWheelClientService } from "@/lib/services/spining-wheel-service.client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SpinGame, UserSpinState } from "@/types/spinning_wheel";
+import dynamic from "next/dynamic";
+// Dynamically import the wheel component with no SSR
+const Wheel = dynamic(
+  () => import("react-custom-roulette").then((mod) => mod.Wheel),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-[300px] h-[300px] bg-white/10 rounded-full animate-pulse flex items-center justify-center">
+        <span className="text-white/50">Loading wheel...</span>
+      </div>
+    ),
+  },
+);
 
 const GAME_TYPE_CONFIG = {
   standard: {
@@ -340,29 +352,52 @@ export default function SpinGamePage() {
       );
       return;
     }
+    // Check profile.loyalty.points if usePoints is true;
+    if (
+      usePoints &&
+      profile?.loyalty?.points &&
+      profile?.loyalty?.points < game.points_per_paid_spin
+    ) {
+      toast.error(
+        `You need at least ${game.points_per_paid_spin} points to spin with points. You currently have ${profile.loyalty.points} points.`,
+      );
+      return;
+    }
 
-    setSpinning(true);
-
-    // Random selection based on probabilities
-    const random = Math.random() * 100;
-    let cumulative = 0;
-    let selectedIndex = 0;
-    for (let i = 0; i < game.prize_config.length; i++) {
-      cumulative += game.prize_config[i].probability;
-      if (random <= cumulative) {
-        selectedIndex = i;
-        break;
+    // Check profile.loyalty.tier eligibility if game has tier restrictions
+    if (game.eligible_tiers.length > 0) {
+      const userTier = profile?.loyalty?.tier || "bronze";
+      if (!game.eligible_tiers.includes(userTier)) {
+        toast.error(
+          `Your loyalty tier (${userTier}) is not eligible for this game.`,
+        );
+        return;
       }
     }
 
-    setPrizeNumber(selectedIndex);
-    setMustSpin(true);
+    setSpinning(true);
+
+    // 1. Send spin_start event to live page
+    await supabase.rpc("record_spin_start", {
+      p_game_id: game.id,
+      p_user_id: profile.id,
+    });
 
     try {
+      // 2. Perform the actual spin
       const result = await wheelService.spin(
         game.id,
         usePoints ? "points" : "free",
       );
+
+      // 3. Set the winning segment (this is where the wheel will stop)
+      setPrizeNumber(result.segment_index);
+
+      // 4. Start spinning animation
+      setMustSpin(true);
+
+      // 5. When wheel stops, update UI
+      // The onStopSpinning callback will handle cleanup
 
       setLastWin({
         prize: result.prizeDisplay,
@@ -376,13 +411,12 @@ export default function SpinGamePage() {
         audio.play().catch(() => {});
       }
 
-      // Refresh user state
+      // Refresh data
       fetchGameData();
       fetchRecentWinners();
     } catch (error: any) {
-      toast.error("Error during spin:", error.message);
+      toast.error(error.message);
       setMustSpin(false);
-    } finally {
       setSpinning(false);
     }
   };
@@ -516,11 +550,8 @@ export default function SpinGamePage() {
                     data={getWheelData()}
                     onStopSpinning={() => {
                       setMustSpin(false);
-                      if (lastWin) {
-                        toast.success(`🎉 You won: ${lastWin.prize}! 🎉`, {
-                          duration: 5000,
-                        });
-                      }
+                      setSpinning(false);
+                      // The actual prize number is already set from the API result
                     }}
                     outerBorderColor="#e2e8f0"
                     outerBorderWidth={3}

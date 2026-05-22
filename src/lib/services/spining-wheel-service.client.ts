@@ -227,37 +227,43 @@ export class SpinningWheelClientService {
         .from("spin_attempts")
         .select(
           `
-        prize_type,
-        prize_value,
-        points_awarded,
-        created_at,
-        users!spin_attempts_user_id_fkey (
-          full_name
-        )
-      `,
+                prize_type,
+                prize_value,
+                points_awarded,
+                created_at,
+                users!spin_attempts_user_id_fkey (full_name)
+            `,
         )
         .eq("game_id", gameId)
         .not("prize_value", "is", null)
-        .gt("points_awarded", 0)
+        .neq("prize_value", "")
         .order("created_at", { ascending: false })
         .limit(limit);
 
-      if (error) {
-        console.error("Error fetching winners:", error);
-        return [];
-      }
+      if (error) return [];
 
-      return (data || []).map((item: any) => ({
-        name: item.users?.full_name || "Anonymous",
-        prize:
-          item.prize_type === "points"
-            ? `${item.points_awarded} Points`
-            : item.prize_value,
-        time: item.created_at,
-        timestamp: item.created_at,
-      }));
+      return (data || []).map((item: any) => {
+        let prizeDisplay = "";
+        if (item.prize_type === "points") {
+          prizeDisplay = `${item.points_awarded} Points`;
+        } else if (item.prize_type === "discount") {
+          prizeDisplay = `${item.prize_value}% OFF`;
+        } else if (item.prize_type === "free_shipping") {
+          prizeDisplay = "Free Shipping";
+        } else if (item.prize_type === "product") {
+          prizeDisplay = `Free ${item.prize_value}`;
+        } else {
+          prizeDisplay = item.prize_value;
+        }
+
+        return {
+          name: item.users?.full_name || "Anonymous",
+          prize: prizeDisplay,
+          time: item.created_at,
+          timestamp: item.created_at,
+        };
+      });
     } catch (error) {
-      console.error("Error in getRecentWinners:", error);
       return [];
     }
   }

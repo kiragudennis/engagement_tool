@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
+  Clipboard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,6 +63,19 @@ export default function AdminProductsPage() {
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]); // Add fetchProducts as dependency
+
+  // Copy UUID function to clipboard
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(
+      () => {
+        toast.success("Copied to clipboard");
+      },
+      (err) => {
+        toast.error("Failed to copy");
+        console.error("Clipboard error:", err);
+      },
+    );
+  };
 
   // Delete product
   const deleteProduct = async (id: string, name: string) => {
@@ -289,7 +303,8 @@ export default function AdminProductsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Product</TableHead>
+                <TableHead>Id</TableHead>
+                <TableHead>Name</TableHead>
                 <TableHead>SKU</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Stock</TableHead>
@@ -300,6 +315,11 @@ export default function AdminProductsPage() {
             <TableBody>
               {paginatedProducts.map((product) => (
                 <TableRow key={product.id}>
+                  <TableCell onClick={() => copyToClipboard(product.id)}>
+                    {product.id.slice(0, 8)}
+                    {"..."}
+                    <Clipboard className="inline-block h-3 w-3 text-muted-foreground" />
+                  </TableCell>
                   <TableCell className="font-medium">
                     <div className="truncate max-w-[200px]">
                       {product.title}

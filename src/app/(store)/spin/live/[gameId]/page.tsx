@@ -24,11 +24,11 @@ import {
   Loader2,
   Sparkles,
   Medal,
-  Star,
   Coins,
   ClockIcon,
   Minimize2,
   Maximize2,
+  Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SpinGame } from "@/types/spinning_wheel";
@@ -47,6 +47,15 @@ interface Winner {
   timestamp: string;
 }
 
+interface SpinEvent {
+  id: string;
+  user_name: string;
+  user_id: string;
+  created_at: string;
+  action_type: string;
+  prize_text?: string;
+}
+
 export default function SpinLivePage() {
   const { gameId } = useParams<{ gameId: string }>();
   const { supabase } = useAuth();
@@ -56,6 +65,7 @@ export default function SpinLivePage() {
 
   // Create service instance
   const wheelService = new SpinningWheelClientService(supabase);
+  const winnerAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Funnel States
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -73,11 +83,30 @@ export default function SpinLivePage() {
   const [prizeNumber, setPrizeNumber] = useState(0);
   const [mustSpin, setMustSpin] = useState(false);
   const [wheelSpinning, setWheelSpinning] = useState(false);
-  const spinningTimeoutRef = useRef<NodeJS.Timeout>(null);
+  const spinningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Queue System - Simplified
+  const [spinQueue, setSpinQueue] = useState<SpinEvent[]>([]);
+  const [currentSpin, setCurrentSpin] = useState<SpinEvent | null>(null);
 
   // Fullscreen State
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Use refs to track current state for the subscription
+  const currentSpinRef = useRef<SpinEvent | null>(null);
+  const spinQueueRef = useRef<SpinEvent[]>([]);
+
+  // Sync refs with state
+  useEffect(() => {
+    currentSpinRef.current = currentSpin;
+  }, [currentSpin]);
+
+  // This useEffect ensures that the spinQueueRef always has the latest value of spinQueue,
+  // which is crucial for the processNextSpin function to work correctly without stale closures.
+  useEffect(() => {
+    spinQueueRef.current = spinQueue;
+  }, [spinQueue]);
 
   // Fullscreen toggle function
   const toggleFullscreen = useCallback(() => {
@@ -122,6 +151,52 @@ export default function SpinLivePage() {
     }, 1000);
     return () => clearInterval(interval);
   }, [game?.ends_at]);
+
+  // Process next spin - using refs to avoid stale closures
+  const processNextSpin = useCallback(() => {
+    console.log(
+      "Processing next spin. Queue length:",
+      spinQueueRef.current.length,
+      "Current spin:",
+      currentSpinRef.current?.user_name,
+    );
+
+    if (currentSpinRef.current || spinQueueRef.current.length === 0) {
+      console.log("Cannot process - either current spin exists or queue empty");
+      return;
+    }
+
+    const nextSpin = spinQueueRef.current[0];
+    console.log("Starting spin for:", nextSpin.user_name);
+
+    // Update state
+    setCurrentSpin(nextSpin);
+    setSpinQueue((prev) => prev.slice(1));
+
+    // Show the spinner name
+    setCurrentSpinner({
+      user_name: nextSpin.user_name,
+      is_spinning: true,
+    });
+
+    // Start wheel animation
+    setWheelSpinning(true);
+    setMustSpin(true);
+
+    // Auto-stop after 3 seconds
+    if (spinningTimeoutRef.current) {
+      clearTimeout(spinningTimeoutRef.current);
+    }
+    spinningTimeoutRef.current = setTimeout(() => {
+      console.log("Auto-stopping spin for:", nextSpin.user_name);
+      setMustSpin(false);
+      setWheelSpinning(false);
+      setCurrentSpinner(null);
+      // Clear current spin and process next
+      setCurrentSpin(null);
+      setTimeout(() => processNextSpin(), 100);
+    }, 3000);
+  }, []);
 
   // Fetch game data
   const fetchGameData = useCallback(async () => {
@@ -179,7 +254,7 @@ export default function SpinLivePage() {
     }
   }, [gameId, wheelService]);
 
-  // Subscribe to real-time updates
+  // Main real-time subscription with simplified queue
   useEffect(() => {
     if (!supabase || !gameId) return;
 
@@ -187,21 +262,17 @@ export default function SpinLivePage() {
     const unsubscribeParticipants = wheelService.subscribeToParticipants(
       gameId,
       (newParticipant) => {
-        // Add to participants list if not already there
         setParticipants((prev) => {
           const exists = prev.some((p) => p.id === newParticipant.id);
           if (!exists) {
             return [newParticipant, ...prev.slice(0, 49)];
           }
-          // Update spin count for existing participant
           return prev.map((p) =>
             p.id === newParticipant.id
               ? { ...p, spin_count: p.spin_count + 1 }
               : p,
           );
         });
-
-        // Update stats
         setParticipantStats((prev) => ({
           total_participants: prev.total_participants + 1,
           total_spins: prev.total_spins + 1,
@@ -225,81 +296,83 @@ export default function SpinLivePage() {
         }
       });
 
-    // Spin attempts channel for wheel animation
-    const spinChannel = supabase
-      .channel(`spin-events-${gameId}`)
+    // In the subscription, use refs and call processNextSpin without dependencies
+    const liveTickerChannel = supabase
+      .channel(`spin-live-${gameId}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
-          table: "spin_attempts",
+          table: "spin_live_ticker",
           filter: `game_id=eq.${gameId}`,
         },
-        async (payload) => {
-          const newRecord = payload.new;
+        (payload) => {
+          const event = payload.new as SpinEvent;
+          console.log("Received event:", event.action_type, event.user_name);
 
-          // Fetch user name
-          const { data: userData } = await supabase
-            .from("users")
-            .select("full_name")
-            .eq("id", newRecord.user_id)
-            .single();
+          if (event.action_type === "spin_start") {
+            // Add to queue using functional update
+            setSpinQueue((prev) => {
+              const newQueue = [...prev, event];
+              console.log("Queue updated, length:", newQueue.length);
+              return newQueue;
+            });
+            // Process immediately - check using ref
+            if (!currentSpinRef.current) {
+              console.log("No active spin, processing now");
+              processNextSpin();
+            } else {
+              console.log("Active spin exists, queued");
+            }
+          } else if (event.action_type === "win") {
+            console.log("Win event received for:", event.user_name);
 
-          const userName = userData?.full_name || "Someone";
+            // Add winner to list
+            setRecentWins((prev) => [
+              {
+                name: event.user_name,
+                prize: event.prize_text || "Prize!",
+                timestamp: event.created_at,
+              },
+              ...prev.slice(0, 19),
+            ]);
 
-          // Set current spinner to trigger wheel animation
-          setCurrentSpinner({
-            id: newRecord.id,
-            user_id: newRecord.user_id,
-            user_name: userName,
-            is_spinning: true,
-            started_at: new Date().toISOString(),
-          });
-
-          // Trigger wheel animation
-          setWheelSpinning(true);
-
-          // Randomly select a prize index for animation
-          const randomIndex = Math.floor(
-            Math.random() * (game?.prize_config.length || 10),
-          );
-          setPrizeNumber(randomIndex);
-          setMustSpin(true);
-
-          // Clear any existing timeout
-          if (spinningTimeoutRef.current) {
-            clearTimeout(spinningTimeoutRef.current);
-          }
-
-          // Stop animation after spin duration
-          spinningTimeoutRef.current = setTimeout(async () => {
-            setMustSpin(false);
-            setWheelSpinning(false);
-
-            // If it's a winner, add to recent wins
-            if (newRecord.points_awarded > 0 || newRecord.prize_value) {
-              const prizeText =
-                newRecord.prize_type === "points"
-                  ? `${newRecord.points_awarded} Points`
-                  : newRecord.prize_value;
-
-              setRecentWins((prev) => [
-                {
-                  name: userName,
-                  prize: prizeText,
-                  timestamp: newRecord.created_at,
-                },
-                ...prev.slice(0, 19),
-              ]);
+            // Play sound
+            if (winnerAudioRef.current) {
+              winnerAudioRef.current.play().catch(() => {});
             }
 
-            setCurrentSpinner(null);
+            // If this win matches the current spin, clear it
+            if (
+              currentSpinRef.current &&
+              currentSpinRef.current.user_id === event.user_id
+            ) {
+              console.log("Win matches current spin, clearing");
+
+              // Clear timeout
+              if (spinningTimeoutRef.current) {
+                clearTimeout(spinningTimeoutRef.current);
+                spinningTimeoutRef.current = null;
+              }
+
+              // Stop wheel animation
+              setMustSpin(false);
+              setWheelSpinning(false);
+              setCurrentSpinner(null);
+
+              // Clear current spin
+              setCurrentSpin(null);
+
+              // Process next spin
+              setTimeout(() => {
+                processNextSpin();
+              }, 500);
+            }
 
             // Refresh stats
-            const stats = await wheelService.getParticipantStats(gameId);
-            setParticipantStats(stats);
-          }, 3000);
+            wheelService.getParticipantStats(gameId).then(setParticipantStats);
+          }
         },
       )
       .subscribe();
@@ -323,7 +396,7 @@ export default function SpinLivePage() {
             setGame(payload.new as SpinGame);
             setRecentWins((prev) => [
               {
-                name: "GRAND PRIZE WINNER! 🎉",
+                name: "🎉 GRAND PRIZE WINNER! 🎉",
                 prize: "Jackpot Winner!",
                 timestamp: new Date().toISOString(),
               },
@@ -337,13 +410,13 @@ export default function SpinLivePage() {
     return () => {
       unsubscribeParticipants();
       presenceChannel.unsubscribe();
-      spinChannel.unsubscribe();
+      liveTickerChannel.unsubscribe();
       gameChannel.unsubscribe();
       if (spinningTimeoutRef.current) {
         clearTimeout(spinningTimeoutRef.current);
       }
     };
-  }, [supabase, gameId, game?.prize_config.length, wheelService]);
+  }, [supabase, gameId, wheelService, currentSpin, processNextSpin]);
 
   // Initial data fetch
   useEffect(() => {
@@ -421,6 +494,7 @@ export default function SpinLivePage() {
 
   // Get top 3 participants for medal display
   const topParticipants = participants.slice(0, 3);
+  const queueLength = spinQueue.length;
 
   return (
     <div
@@ -442,7 +516,7 @@ export default function SpinLivePage() {
               <p className="text-sm text-purple-300">{game.description}</p>
             </div>
             <div className="flex items-center gap-3">
-              {/* OBS/Fullscreen Button - Added back */}
+              {/* OBS/Fullscreen Button */}
               <button
                 onClick={toggleFullscreen}
                 className="flex items-center gap-1 px-3 py-1 rounded-full bg-purple-500/20 hover:bg-purple-500/30 transition-colors"
@@ -598,6 +672,16 @@ export default function SpinLivePage() {
                   </div>
                 )}
 
+                {/* Queue status indicator */}
+                {queueLength > 0 && (
+                  <div className="mb-4 text-center">
+                    <Badge className="bg-blue-500/20 text-blue-300 border-0">
+                      {queueLength} spin{queueLength !== 1 ? "s" : ""}{" "}
+                      waiting...
+                    </Badge>
+                  </div>
+                )}
+
                 {/* Countdown for time-limited games */}
                 {game.ends_at && new Date(game.ends_at) > new Date() && (
                   <div className="absolute top-[-20px] left-1/2 transform -translate-x-1/2">
@@ -691,13 +775,22 @@ export default function SpinLivePage() {
                   ) : (
                     recentWins.map((win, idx) => (
                       <div
-                        key={idx}
+                        key={`${win.name}-${win.timestamp}-${idx}`}
                         className="flex items-center gap-3 p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all animate-in fade-in slide-in-from-right duration-300"
-                        style={{ animationDelay: `${idx * 20}ms` }}
+                        style={{
+                          animationDelay: `${Math.min(idx * 20, 300)}ms`,
+                        }}
                       >
+                        <audio
+                          ref={winnerAudioRef}
+                          src="/sounds/claim-chime.mp3"
+                          preload="auto"
+                        />
                         <div className="flex-shrink-0">
                           {win.prize.includes("Points") ? (
                             <Coins className="h-5 w-5 text-yellow-400" />
+                          ) : win.prize.includes("%") ? (
+                            <Tag className="h-5 w-5 text-blue-400" />
                           ) : (
                             <Sparkles className="h-5 w-5 text-yellow-400" />
                           )}
@@ -712,7 +805,10 @@ export default function SpinLivePage() {
                         </div>
                         <div className="text-right">
                           <div className="text-xs text-purple-300">
-                            {new Date(win.timestamp).toLocaleTimeString()}
+                            {new Date(win.timestamp).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
                           </div>
                         </div>
                       </div>

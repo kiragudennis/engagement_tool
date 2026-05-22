@@ -18,15 +18,18 @@ DECLARE
   v_user_referrals jsonb;
   v_traffic_sources jsonb;
 BEGIN
-  -- Bundles stats (updated to use unified bundles table)
+  -- Bundles stats
   SELECT jsonb_build_object(
     'total', COUNT(*),
     'active', COUNT(*) FILTER (WHERE status = 'active'),
     'by_type', (
-      SELECT jsonb_object_agg(bundle_type, COUNT(*))
-      FROM bundles
-      WHERE status = 'active'
-      GROUP BY bundle_type
+      SELECT jsonb_object_agg(bundle_type, total)
+      FROM (
+        SELECT bundle_type, COUNT(*) as total
+        FROM bundles
+        WHERE status = 'active' AND created_at BETWEEN p_time_range_start AND p_time_range_end
+        GROUP BY bundle_type
+      ) sub
     ),
     'mystery_active', COUNT(*) FILTER (WHERE bundle_type = 'mystery' AND status = 'active'),
     'curated_active', COUNT(*) FILTER (WHERE bundle_type = 'curated' AND status = 'active'),
@@ -95,25 +98,40 @@ BEGIN
   ) INTO v_deals
   FROM deals;
 
-  -- Loyalty stats
+  -- Loyalty stats - FIXED: Removed nested aggregate
+  WITH tier_stats AS (
+    SELECT 
+      tier,
+      COUNT(*) as tier_count
+    FROM loyalty_points
+    GROUP BY tier
+  )
   SELECT jsonb_build_object(
     'total_points', COALESCE(SUM(points), 0),
     'points_earned', COALESCE(SUM(points_earned), 0),
     'points_redeemed', COALESCE(SUM(points_redeemed), 0),
     'tier_distribution', (
       SELECT COALESCE(jsonb_agg(
-        jsonb_build_object(
-          'tier', tier,
-          'count', COUNT(*)
-        )
+        jsonb_build_object('tier', tier, 'count', tier_count)
       ), '[]'::jsonb)
-      FROM loyalty_points
-      GROUP BY tier
+      FROM tier_stats
     )
   ) INTO v_loyalty
   FROM loyalty_points;
 
-  -- USER REFERRALS (from your existing referrals table)
+  -- User referrals stats - FIXED: Removed nested aggregation
+  WITH referral_stats AS (
+    SELECT
+      referrer_id,
+      COUNT(*) AS referrals_count,
+      SUM(reward_points) AS points_earned
+    FROM referrals
+    WHERE status = 'completed'
+      AND completed_at BETWEEN p_time_range_start AND p_time_range_end
+    GROUP BY referrer_id
+    ORDER BY referrals_count DESC
+    LIMIT 5
+  )
   SELECT jsonb_build_object(
     'total', COUNT(*),
     'pending', COUNT(*) FILTER (WHERE status = 'pending'),
@@ -122,55 +140,45 @@ BEGIN
     'top_referrers', (
       SELECT COALESCE(jsonb_agg(
         jsonb_build_object(
-          'user_id', t.referrer_id,
-          'referrals_count', t.referrals_count,
-          'points_earned', t.points_earned
+          'user_id', referrer_id,
+          'referrals_count', referrals_count,
+          'points_earned', points_earned
         )
       ), '[]'::jsonb)
-      FROM (
-        SELECT
-          referrer_id,
-          COUNT(*) AS referrals_count,
-          SUM(reward_points) AS points_earned
-        FROM referrals
-        WHERE status = 'completed'
-          AND completed_at BETWEEN p_time_range_start AND p_time_range_end
-        GROUP BY referrer_id
-        ORDER BY referrals_count DESC
-        LIMIT 5
-      ) t
+      FROM referral_stats
     )
   ) INTO v_user_referrals
   FROM referrals
   WHERE created_at BETWEEN p_time_range_start AND p_time_range_end;
 
-  -- TRAFFIC SOURCES (from referrer_stats table)
-  SELECT COALESCE(jsonb_agg(
-    jsonb_build_object(
-      'source', t.source,
-      'type', t.source_type,
-      'clicks', t.total_clicks,
-      'conversions', t.total_conversions,
-      'revenue', t.total_revenue,
-      'conversion_rate',
-        CASE WHEN t.total_clicks > 0
-          THEN ROUND((t.total_conversions::numeric / t.total_clicks) * 100, 2)
-          ELSE 0
-        END
-    )
-  ), '[]'::jsonb) INTO v_traffic_sources
-  FROM (
+  -- Traffic sources stats - FIXED: Removed nested aggregation
+  WITH traffic_stats AS (
     SELECT
       source,
       source_type,
       total_clicks,
       total_conversions,
-      total_revenue
+      total_revenue,
+      CASE WHEN total_clicks > 0
+        THEN ROUND((total_conversions::numeric / total_clicks) * 100, 2)
+        ELSE 0
+      END as conversion_rate
     FROM referrer_stats
     WHERE last_click_at BETWEEN p_time_range_start AND p_time_range_end
     ORDER BY total_clicks DESC
     LIMIT 10
-  ) t;
+  )
+  SELECT COALESCE(jsonb_agg(
+    jsonb_build_object(
+      'source', source,
+      'type', source_type,
+      'clicks', total_clicks,
+      'conversions', total_conversions,
+      'revenue', total_revenue,
+      'conversion_rate', conversion_rate
+    )
+  ), '[]'::jsonb) INTO v_traffic_sources
+  FROM traffic_stats;
 
   -- Build final result
   result := jsonb_build_object(

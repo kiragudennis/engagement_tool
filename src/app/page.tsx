@@ -426,23 +426,29 @@ export default function HomePage() {
                         />
                         <span>All Products</span>
                       </label>
-                      {scrollableCategories.map((cat) => (
-                        <label
-                          key={cat.id}
-                          className="flex items-center gap-2 text-sm"
-                        >
-                          <input
-                            type="radio"
-                            name="category"
-                            checked={selectedCategory === cat.id}
-                            onChange={() => setSelectedCategory(cat.id)}
-                            className="w-3.5 h-3.5"
-                          />
-                          <span>
-                            {cat.icon} {cat.name}
-                          </span>
-                        </label>
-                      ))}
+                      {scrollableCategories.map((cat) => {
+                        const IconComponent = cat.icon;
+                        return (
+                          <label
+                            key={cat.id}
+                            className="flex items-center gap-2 text-sm"
+                          >
+                            <input
+                              type="radio"
+                              name="category"
+                              checked={selectedCategory === cat.id}
+                              onChange={() => setSelectedCategory(cat.id)}
+                              className="w-3.5 h-3.5"
+                            />
+                            <span>{cat.name}</span>
+                            {IconComponent && (
+                              <span className="ml-2">
+                                <IconComponent className="w-4 h-4" />
+                              </span>
+                            )}
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
                   <Separator />
@@ -545,30 +551,37 @@ export default function HomePage() {
               className="flex gap-3 overflow-x-auto scrollbar-hide px-8"
               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
             >
-              {scrollableCategories.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => setSelectedCategory(category.id)}
-                  className={cn(
-                    "flex-shrink-0 flex flex-col items-center gap-1.5 px-4 py-2 rounded-xl transition-all duration-200",
-                    selectedCategory === category.id
-                      ? "bg-amber-50 dark:bg-amber-950/50 ring-2 ring-amber-500"
-                      : "hover:bg-gray-50 dark:hover:bg-gray-800",
-                  )}
-                >
-                  <div
+              {scrollableCategories.map((category) => {
+                const IconComponent = category.icon;
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => setSelectedCategory(category.id)}
                     className={cn(
-                      "w-12 h-12 rounded-full flex items-center justify-center text-2xl",
-                      category.color,
+                      "flex-shrink-0 flex flex-col items-center gap-1.5 px-4 py-2 rounded-xl transition-all duration-200",
+                      selectedCategory === category.id
+                        ? "bg-amber-50 dark:bg-amber-950/50 ring-2 ring-amber-500"
+                        : "hover:bg-gray-50 dark:hover:bg-gray-800",
                     )}
                   >
-                    {category.icon}
-                  </div>
-                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                    {category.name}
-                  </span>
-                </button>
-              ))}
+                    <div
+                      className={cn(
+                        "w-12 h-12 rounded-full flex items-center justify-center text-2xl",
+                        category.color,
+                      )}
+                    >
+                      {IconComponent && (
+                        <span className="ml-2">
+                          <IconComponent className="w-4 h-4" />
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      {category.name}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             <button
               onClick={() => scrollCategories("right")}

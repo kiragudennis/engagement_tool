@@ -29,7 +29,7 @@ export async function proxy(request: NextRequest) {
   const isBot =
     /bot|crawler|spider|crawling/i.test(userAgent.ua ?? "") &&
     !/Googlebot|bingbot|slurp|DuckDuckBot|Baiduspider/i.test(
-      userAgent.ua ?? ""
+      userAgent.ua ?? "",
     );
 
   if (isBot) {
@@ -66,7 +66,7 @@ export async function proxy(request: NextRequest) {
       const userRole = userData?.role;
 
       if (userRole !== "admin") {
-        return NextResponse.redirect(new URL("/products", request.url));
+        return NextResponse.redirect(new URL("/", request.url));
       }
     }
 

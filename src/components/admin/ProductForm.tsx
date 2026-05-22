@@ -177,10 +177,10 @@ export default function ProductForm({
         description: values.description,
         slug: values.slug,
         images: values.images || [],
-        videoUrl: values.videoUrl,
+        video_url: values.videoUrl,
         sku: values.sku,
         price: Number(values.price),
-        originalPrice:
+        original_price:
           Number(values.originalPrice) > 0
             ? Number(values.originalPrice)
             : null,
@@ -193,17 +193,17 @@ export default function ProductForm({
         has_varieties: values.has_varieties,
         wattage: values.wattage || null,
         voltage: values.voltage,
-        colorTemperature: values.colorTemperature,
+        color_temperature: values.colorTemperature,
         lumens: values.lumens || null,
-        warrantyMonths: values.warrantyMonths,
-        batteryCapacity: values.batteryCapacity,
-        solarPanelWattage: values.solarPanelWattage || null,
+        warranty_months: values.warrantyMonths,
+        battery_capacity: values.batteryCapacity,
+        solar_panel_wattage: values.solarPanelWattage || null,
         dimensions: values.dimensions,
-        ipRating: values.ipRating,
-        dealOfTheDay: values.dealOfTheDay,
-        bestSeller: values.bestSeller,
-        energySaving: values.energySaving,
-        installationType: values.installationType,
+        ip_rating: values.ipRating,
+        deal_of_the_day: values.dealOfTheDay,
+        best_seller: values.bestSeller,
+        energy_saving: values.energySaving,
+        installation_type: values.installationType,
         referral_points: values.referral_points,
       };
 

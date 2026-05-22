@@ -12,7 +12,7 @@ CREATE TABLE spin_games (
     
     -- Eligibility rules
     eligible_tiers text[] DEFAULT '{}',
-    min_points_required integer DEFAULT 0,
+    min_points_required integer DEFAULT 0, -- For points-based spins
     requires_purchase_count integer DEFAULT 0,
     new_customer_only boolean DEFAULT false,
     
@@ -43,6 +43,11 @@ CREATE TABLE spin_games (
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz DEFAULT now()
 );
+
+-- Add theme_color and cover_image_url columns
+ALTER TABLE spin_games
+ADD COLUMN IF NOT EXISTS theme_color text DEFAULT '#000000',
+ADD COLUMN IF NOT EXISTS cover_image_url text;
 
 -- Track individual spins
 CREATE TABLE IF NOT EXISTS spin_attempts (
@@ -97,6 +102,16 @@ CREATE TABLE IF NOT EXISTS spin_live_ticker (
     created_at timestamptz DEFAULT now()
 );
 
+ALTER TABLE spin_live_ticker 
+ADD COLUMN IF NOT EXISTS action_type TEXT DEFAULT 'win' 
+CHECK (action_type IN ('spin_start', 'win'));
+
+ALTER TABLE spin_live_ticker 
+ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id);
+
+ALTER TABLE spin_live_ticker 
+ADD COLUMN IF NOT EXISTS is_spinning BOOLEAN DEFAULT FALSE;
+
 -- Indexes
 CREATE INDEX idx_spin_attempts_game_user ON spin_attempts(game_id, user_id);
 CREATE INDEX idx_spin_attempts_created ON spin_attempts(created_at DESC);
@@ -104,17 +119,127 @@ CREATE INDEX idx_spin_games_active ON spin_games(is_active, starts_at, ends_at);
 CREATE INDEX idx_spin_live_ticker_game_created ON spin_live_ticker(game_id, created_at DESC);
 
 -- RLS policies
--- spin_games: Admins can manage all, users can view active games
-CREATE POLICY "Allow admin access" ON spin_games FOR ALL 
-USING (public.is_admin());
-CREATE POLICY "Allow users to view active games" ON spin_games FOR SELECT
-USING (is_active AND starts_at <= now() AND ends_at >= now());
+-- ============================================
+-- SPIN GAMES - Read-only for all authenticated users
+-- ============================================
+ALTER TABLE spin_games ENABLE ROW LEVEL SECURITY;
 
--- spin_attempts: Users can see their own attempts, admins can see all
-CREATE POLICY "Allow admin access" ON spin_attempts FOR ALL
-USING (public.is_admin());
-CREATE POLICY "Allow users to see their own attempts" ON spin_attempts FOR SELECT
-USING (user_id = auth.uid());
+-- Anyone can view spin games (this is public data)
+CREATE POLICY "Anyone can view spin games" ON spin_games
+    FOR SELECT USING (true);
+
+
+-- ============================================
+-- SPIN ATTEMPTS - Users can only see and modify their own
+-- ============================================
+ALTER TABLE spin_attempts ENABLE ROW LEVEL SECURITY;
+
+-- Users can view their own spin attempts
+CREATE POLICY "Users can view own spin attempts" ON spin_attempts
+    FOR SELECT USING (auth.uid() = user_id);
+
+-- Users can insert their own spin attempts
+CREATE POLICY "Users can insert own spin attempts" ON spin_attempts
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Users cannot update spin attempts (historical record)
+CREATE POLICY "No updates to spin attempts" ON spin_attempts
+    FOR UPDATE USING (false);
+
+-- Users cannot delete spin attempts
+CREATE POLICY "No deletions of spin attempts" ON spin_attempts
+    FOR DELETE USING (false);
+
+-- ============================================
+-- USER SPIN ALLOCATIONS - Users can only see and modify their own
+-- ============================================
+ALTER TABLE user_spin_allocations ENABLE ROW LEVEL SECURITY;
+
+-- Users can view their own allocations
+CREATE POLICY "Users can view own allocations" ON user_spin_allocations
+    FOR SELECT USING (auth.uid() = user_id);
+
+-- Users can insert their own allocations (when first spin of day)
+CREATE POLICY "Users can insert own allocations" ON user_spin_allocations
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Users can update their own allocations (increment spin count)
+CREATE POLICY "Users can update own allocations" ON user_spin_allocations
+    FOR UPDATE USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+-- Users cannot delete allocations
+CREATE POLICY "No deletions of allocations" ON user_spin_allocations
+    FOR DELETE USING (false);
+
+-- ============================================
+-- SPIN LIVE TICKER - Anyone can view (public broadcast)
+-- ============================================
+ALTER TABLE spin_live_ticker ENABLE ROW LEVEL SECURITY;
+
+-- Anyone can view live ticker (public feed)
+CREATE POLICY "Anyone can view live ticker" ON spin_live_ticker
+    FOR SELECT USING (true);
+
+-- System can insert (via RPC functions)
+CREATE POLICY "System can insert into live ticker" ON spin_live_ticker
+    FOR INSERT WITH CHECK (true);
+
+-- Authenticated user can insert into spin_live_ticker
+CREATE POLICY "Users can insert spin events" ON spin_live_ticker
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- No updates or deletes
+CREATE POLICY "No updates to live ticker" ON spin_live_ticker
+    FOR UPDATE USING (false);
+
+CREATE POLICY "No deletions from live ticker" ON spin_live_ticker
+    FOR DELETE USING (false);
+
+-- Record spin start
+CREATE OR REPLACE FUNCTION record_spin_start(
+    p_game_id UUID,
+    p_user_id UUID
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_user_name TEXT;
+    v_ticker_id UUID;
+BEGIN
+    SELECT COALESCE(full_name, 'Customer') INTO v_user_name
+    FROM users WHERE id = p_user_id;
+    
+    INSERT INTO spin_live_ticker (game_id, user_name, user_id, action_type, is_spinning)
+    VALUES (p_game_id, v_user_name, p_user_id, 'spin_start', TRUE)
+    RETURNING id INTO v_ticker_id;
+    
+    RETURN v_ticker_id;
+END;
+$$;
+
+-- Record spin win
+CREATE OR REPLACE FUNCTION record_spin_win(
+    p_ticker_id UUID,
+    p_prize_text TEXT
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    UPDATE spin_live_ticker
+    SET action_type = 'win',
+        prize_text = p_prize_text,
+        is_spinning = FALSE
+    WHERE id = p_ticker_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION record_spin_start(UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION record_spin_win(UUID, TEXT) TO authenticated;
 
 
 CREATE OR REPLACE FUNCTION increment_spin_usage(
@@ -274,6 +399,7 @@ DECLARE
   v_prize_index INT := 0;
   v_prize_config JSONB;
   v_num_prizes INT;
+  v_user_name TEXT;
 BEGIN
   -- Get current user from auth
   v_user_id := auth.uid();
@@ -281,6 +407,11 @@ BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
   END IF;
+  
+  -- Get user name for live ticker
+  SELECT COALESCE(full_name, 'Customer') INTO v_user_name
+  FROM users
+  WHERE id = v_user_id;
   
   -- Get game details
   SELECT * INTO v_game
@@ -339,7 +470,7 @@ BEGIN
     WHERE user_id = v_user_id;
   END IF;
   
-  -- FIXED: Select prize based on probability using jsonb_array_length
+  -- Select prize based on probability using jsonb_array_length
   v_prize_config := v_game.prize_config;
   v_num_prizes := jsonb_array_length(v_prize_config);
   v_random := RANDOM() * 100;
@@ -380,7 +511,7 @@ BEGIN
       v_prize_display := 'Free ' || (v_selected_prize->>'value') || ' Bundle';
   END CASE;
   
-  -- Record spin attempt
+  -- FIRST: Record spin attempt
   INSERT INTO spin_attempts (
     game_id, user_id, spin_type, prize_type, prize_value,
     points_awarded, points_spent, segment_index, landed_at
@@ -392,7 +523,7 @@ BEGIN
   )
   RETURNING id INTO v_attempt_id;
   
-  -- Update allocation
+  -- SECOND: Update allocation
   UPDATE user_spin_allocations
   SET spins_used_today = spins_used_today + 1,
       spins_used_this_week = spins_used_this_week + 1,
@@ -400,7 +531,7 @@ BEGIN
       last_spin_at = NOW()
   WHERE user_id = v_user_id AND game_id = p_game_id AND date = v_today;
   
-  -- Update single prize if claimed
+  -- THIRD: Update single prize if claimed
   IF v_game.is_single_prize AND p_spin_type != 'points' THEN
     UPDATE spin_games
     SET single_prize_claimed = true,
@@ -408,13 +539,8 @@ BEGIN
     WHERE id = p_game_id;
   END IF;
   
-  -- Add to live ticker for big wins
-  IF v_points_awarded >= 100 OR v_selected_prize->>'type' IN ('product', 'bundle') THEN
-    INSERT INTO spin_live_ticker (game_id, user_name, prize_text)
-    SELECT p_game_id, COALESCE(full_name, 'Customer'), v_prize_display
-    FROM users
-    WHERE id = v_user_id;
-  END IF;
+  -- In perform_spin, replace the direct INSERT with:
+  PERFORM record_spin_win(v_attempt_id, v_prize_display);
   
   -- Return result
   SELECT json_build_object(
@@ -501,7 +627,154 @@ BEGIN
 END;
 $$;
 
--- Grant execute permissions
+-- Create RPC function to get all spin games with aggregated stats
+CREATE OR REPLACE FUNCTION get_spin_games_with_stats()
+RETURNS TABLE(
+  -- Game data
+  id UUID,
+  name TEXT,
+  description TEXT,
+  game_type TEXT,
+  is_active BOOLEAN,
+  starts_at TIMESTAMPTZ,
+  ends_at TIMESTAMPTZ,
+  free_spins_per_day INT,
+  free_spins_per_week INT,
+  free_spins_total INT,
+  points_per_paid_spin INT,
+  eligible_tiers TEXT[],
+  is_single_prize BOOLEAN,
+  single_prize_claimed BOOLEAN,
+  single_prize_winner_id UUID,
+  prize_config JSONB,
+  show_confetti BOOLEAN,
+  play_sounds BOOLEAN,
+  live_theme TEXT,
+  theme_color TEXT,
+  cover_image_url TEXT,
+  created_at TIMESTAMPTZ,
+
+  -- Aggregated stats
+  active_players BIGINT,
+  spins_today BIGINT,
+  recent_winners JSONB,
+  top_prize JSONB
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    g.id,
+    g.name,
+    g.description,
+    g.game_type,
+    g.is_active,
+    g.starts_at,
+    g.ends_at,
+    g.free_spins_per_day,
+    g.free_spins_per_week,
+    g.free_spins_total,
+    g.points_per_paid_spin,
+    g.eligible_tiers,
+    g.is_single_prize,
+    g.single_prize_claimed,
+    g.single_prize_winner_id,
+    g.prize_config,
+    g.show_confetti,
+    g.play_sounds,
+    g.live_theme,
+    g.theme_color,
+    g.cover_image_url,
+    g.created_at,
+
+    -- Active players (last 5 minutes)
+    COALESCE((
+      SELECT COUNT(DISTINCT sa.user_id)::BIGINT
+      FROM spin_attempts sa
+      WHERE sa.game_id = g.id
+        AND sa.created_at > NOW() - INTERVAL '5 minutes'
+    ), 0) AS active_players,
+
+    -- Spins today
+    COALESCE((
+      SELECT COUNT(*)::BIGINT
+      FROM spin_attempts sa
+      WHERE sa.game_id = g.id
+        AND sa.created_at::DATE = CURRENT_DATE
+    ), 0) AS spins_today,
+
+    -- Recent winners (last 5)
+    COALESCE((
+      SELECT jsonb_agg(
+        jsonb_build_object(
+          'user_name', COALESCE(u.full_name, 'Anonymous'),
+          'prize', CASE 
+            WHEN sa.prize_type = 'points' THEN sa.points_awarded::TEXT || ' Points'
+            ELSE sa.prize_value
+          END,
+          'created_at', sa.created_at
+        )
+      )
+      FROM (
+        SELECT sa2.user_id, sa2.prize_type, sa2.prize_value, sa2.points_awarded, sa2.created_at
+        FROM spin_attempts sa2
+        WHERE sa2.game_id = g.id
+          AND sa2.prize_value IS NOT NULL
+          AND sa2.points_awarded > 0
+        ORDER BY sa2.created_at DESC
+        LIMIT 5
+      ) sa
+      LEFT JOIN users u ON sa.user_id = u.id
+    ), '[]'::jsonb) AS recent_winners,
+
+    -- Top prize (first non-trivial prize)
+    (
+      SELECT jsonb_build_object(
+        'label', p->>'label',
+        'value', p->>'value',
+        'color', p->>'color'
+      )
+      FROM jsonb_array_elements(g.prize_config) p
+      WHERE 
+        (p->>'type' IN ('product', 'bundle'))
+        OR (p->>'type' = 'points' AND (p->>'value')::INT > 500)
+      LIMIT 1
+    ) AS top_prize
+
+  FROM spin_games g
+  ORDER BY g.is_active DESC, g.created_at DESC;
+END;
+$$;
+
+-- Create RPC function for global spin stats
+CREATE OR REPLACE FUNCTION get_global_spin_stats()
+RETURNS TABLE(
+  total_spins BIGINT,
+  active_players BIGINT,
+  total_winners BIGINT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    COUNT(*)::BIGINT as total_spins,
+    COUNT(DISTINCT user_id)::BIGINT as active_players,
+    COUNT(*)::BIGINT as total_winners
+  FROM spin_attempts
+  WHERE prize_value IS NOT NULL 
+    AND points_awarded > 0;
+END;
+$$;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION get_global_spin_stats() TO authenticated;
+GRANT EXECUTE ON FUNCTION get_global_spin_stats() TO anon;
+GRANT EXECUTE ON FUNCTION get_spin_games_with_stats() TO authenticated;
+GRANT EXECUTE ON FUNCTION get_spin_games_with_stats() TO anon;
 GRANT EXECUTE ON FUNCTION perform_spin(UUID, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_user_allocation(UUID, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_user_spin_state(UUID) TO authenticated;

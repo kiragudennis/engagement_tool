@@ -169,6 +169,11 @@ CREATE INDEX idx_purchases_status ON bundle_purchases(status);
 CREATE INDEX idx_purchases_subscription ON bundle_purchases(subscription_id);
 CREATE INDEX idx_bundle_purchases_created ON bundle_purchases(created_at DESC);
 
+ALTER TABLE bundle_purchases 
+ADD COLUMN IF NOT EXISTS is_simulated BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS simulated_name VARCHAR(255),
+ADD COLUMN IF NOT EXISTS simulated_location VARCHAR(255);
+
 -- Bundle subscriptions (for recurring bundles)
 CREATE TABLE bundle_subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -227,6 +232,51 @@ CREATE TABLE bundle_reveals (
 -- Indexes for performance
 CREATE INDEX idx_reveals_bundle ON bundle_reveals(bundle_id);
 
+-- Table for temporary bundle orders before payment confirmation
+CREATE TABLE bundle_pending_orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    bundle_id UUID REFERENCES bundles(id),
+    
+    -- Customer info
+    customer_name TEXT NOT NULL,
+    customer_email TEXT NOT NULL,
+    customer_phone TEXT NOT NULL,
+    
+    -- Shipping info
+    shipping_address TEXT,
+    shipping_city TEXT,
+    shipping_county TEXT,
+    shipping_postal_code TEXT,
+    shipping_method TEXT DEFAULT 'standard',
+    shipping_cost NUMERIC DEFAULT 0,
+    
+    -- Order totals
+    subtotal NUMERIC NOT NULL,
+    coupon_discount NUMERIC DEFAULT 0,
+    loyalty_points_used INTEGER DEFAULT 0,
+    loyalty_discount NUMERIC DEFAULT 0,
+    
+    -- Bundle specific
+    selected_items JSONB, -- For build-your-own
+    quantity INTEGER DEFAULT 1,
+    
+    -- Status
+    status TEXT DEFAULT 'pending',
+    payment_failure TEXT,
+    
+    -- Timestamps
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '1 hour'
+);
+
+CREATE INDEX idx_bundle_pending_orders_user ON bundle_pending_orders(user_id);
+CREATE INDEX idx_bundle_pending_orders_status ON bundle_pending_orders(status);
+
+-- add metadata to bundle_pending_orders
+ALTER TABLE bundle_pending_orders
+ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+
 
 -- Enable RLS
 ALTER TABLE bundles ENABLE ROW LEVEL SECURITY;
@@ -234,6 +284,7 @@ ALTER TABLE bundle_purchases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bundle_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bundle_live_ticker ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bundle_reveals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bundle_pending_orders ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 
@@ -261,11 +312,16 @@ CREATE POLICY "Admins can manage subscriptions" ON bundle_subscriptions
     FOR ALL USING (public.is_admin());
 CREATE POLICY "Admins can manage live ticker" ON bundle_live_ticker
     FOR ALL USING (public.is_admin());
+CREATE POLICY "Admins can manage reveals" ON bundle_reveals
+    FOR ALL USING (public.is_admin());
+CREATE POLICY "Admins can manage pending orders" ON bundle_pending_orders
+    FOR ALL USING (public.is_admin());
 
-
--- Function to update remaining count
+-- Update the trigger to handle simulated purchases
 CREATE OR REPLACE FUNCTION update_bundle_remaining_count()
 RETURNS TRIGGER AS $$
+DECLARE
+    v_user_name TEXT;
 BEGIN
     UPDATE bundles
     SET remaining_count = remaining_count - NEW.quantity,
@@ -274,15 +330,29 @@ BEGIN
         updated_at = NOW()
     WHERE id = NEW.bundle_id;
     
+    -- Get user name (handle simulated purchases)
+    IF NEW.is_simulated THEN
+        v_user_name := NEW.simulated_name;
+    ELSIF NEW.user_id IS NOT NULL THEN
+        SELECT COALESCE(full_name, 'Someone') INTO v_user_name
+        FROM users
+        WHERE id = NEW.user_id;
+    ELSE
+        v_user_name := 'Someone';
+    END IF;
+    
     -- Add to live ticker
-    INSERT INTO bundle_live_ticker (bundle_id, user_name, action, message)
-    SELECT 
+    INSERT INTO bundle_live_ticker (bundle_id, user_name, action, message, metadata)
+    VALUES (
         NEW.bundle_id,
-        COALESCE(u.full_name, 'Someone'),
+        v_user_name,
         'purchased',
-        NEW.bundle_id || ' purchased'
-    FROM users u
-    WHERE u.id = NEW.user_id;
+        CASE 
+            WHEN NEW.quantity > 1 THEN NEW.quantity || ' bundles claimed'
+            ELSE 'Bundle claimed'
+        END,
+        jsonb_build_object('is_simulated', COALESCE(NEW.is_simulated, false))
+    );
     
     RETURN NEW;
 END;

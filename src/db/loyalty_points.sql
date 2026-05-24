@@ -1199,6 +1199,33 @@ BEGIN
 END;
 $$;
 
+-- Create function to deduct loyalty points
+CREATE OR REPLACE FUNCTION deduct_loyalty_points(
+  p_user_id UUID,
+  p_points INT,
+  p_source TEXT,
+  p_source_id UUID
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_current_points INT;
+BEGIN
+  SELECT points INTO v_current_points FROM loyalty_points WHERE user_id = p_user_id;
+  
+  UPDATE loyalty_points
+  SET points = points - p_points,
+      points_redeemed = points_redeemed + p_points,
+      updated_at = NOW()
+  WHERE user_id = p_user_id;
+    
+  INSERT INTO loyalty_transactions (user_id, points_change, current_points, transaction_type, source_id)
+  VALUES (p_user_id, -p_points, v_current_points - p_points, p_source, p_source_id);
+END;
+$$;
+
 CREATE POLICY "Allow admin access" ON loyalty_points FOR ALL 
 USING (public.is_admin());
 

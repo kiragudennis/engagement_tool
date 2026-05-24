@@ -409,6 +409,49 @@ export const varietyOptions = [
   "type",
 ];
 
+export const SIMULATED_NAMES = [
+  "Sarah M.",
+  "John K.",
+  "Aisha W.",
+  "Peter O.",
+  "Mary N.",
+  "James G.",
+  "Grace A.",
+  "David K.",
+  "Mercy W.",
+  "Kevin O.",
+  "Lisa T.",
+  "Michael R.",
+  "Faith N.",
+  "Victor O.",
+  "Diana K.",
+  "Brian M.",
+  "Caroline W.",
+  "Stephen O.",
+  "Joyce A.",
+  "Daniel M.",
+];
+
+export const SIMULATED_LOCATIONS = [
+  "Nairobi",
+  "Githurai",
+  "Mombasa",
+  "Rui",
+  "Kisumu",
+  "Kinangop",
+  "Nakuru",
+  "Lamu",
+  "Eldoret",
+  "Thika",
+  "Luanda",
+  "Malindi",
+  "Chuka",
+  "Taita",
+  "Kitale",
+  "Garissa",
+  "Kakamega",
+];
+
 // Helper functions for the variety form
 export const getPlaceholderForType = (type: string): string => {
   const placeholders: Record<string, string> = {

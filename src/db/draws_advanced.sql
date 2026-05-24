@@ -51,6 +51,15 @@ CREATE TABLE draws (
     updated_at timestamptz DEFAULT now()
 );
 
+-- Add auto_redraw_days max_redraws and draw_group_id
+ALTER TABLE draws ADD COLUMN IF NOT EXISTS auto_redraw_days integer DEFAULT 7;
+ALTER TABLE draws ADD COLUMN IF NOT EXISTS max_redraws integer DEFAULT 1;
+ALTER TABLE draws ADD COLUMN IF NOT EXISTS draw_group_id uuid REFERENCES draw_groups(id) ON DELETE SET NULL;
+ALTER TABLE draws ADD COLUMN IF NOT EXISTS consolation_points_amount integer DEFAULT 50;
+-- Enhanced draws table with advanced features
+ALTER TABLE draws ADD COLUMN IF NOT EXISTS redraw_count INTEGER DEFAULT 0;
+ALTER TABLE draws ADD COLUMN IF NOT EXISTS winner_announcement_text TEXT;
+
 -- Draw entries
 CREATE TABLE IF NOT EXISTS draw_entries (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -126,14 +135,6 @@ CREATE INDEX idx_draw_tickets_user ON draw_tickets(draw_id, user_id);
 CREATE INDEX idx_draw_live_ticker_draw ON draw_live_ticker(draw_id, created_at DESC);
 CREATE INDEX idx_draw_winners_draw ON draw_winners(draw_id);
 CREATE INDEX idx_draw_winners_claim ON draw_winners(claim_status, expires_at);
-
--- Enhanced draws table with advanced features
-ALTER TABLE draws ADD COLUMN IF NOT EXISTS consolation_points_awarded BOOLEAN DEFAULT false;
-ALTER TABLE draws ADD COLUMN IF NOT EXISTS consolation_points_amount INTEGER DEFAULT 50;
-ALTER TABLE draws ADD COLUMN IF NOT EXISTS auto_redraw_days INTEGER DEFAULT 7;
-ALTER TABLE draws ADD COLUMN IF NOT EXISTS redraw_count INTEGER DEFAULT 0;
-ALTER TABLE draws ADD COLUMN IF NOT EXISTS max_redraws INTEGER DEFAULT 1;
-ALTER TABLE draws ADD COLUMN IF NOT EXISTS winner_announcement_text TEXT;
 
 -- Create multiple draws support (grouping related draws)
 CREATE TABLE draw_groups (
@@ -319,3 +320,120 @@ BEGIN
   LIMIT limit_count;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create RPC function to get all draws with aggregated stats
+CREATE OR REPLACE FUNCTION get_draws_with_stats(
+  p_group_id UUID DEFAULT NULL
+)
+RETURNS TABLE(
+  -- Draw data
+  id UUID,
+  name TEXT,
+  slug TEXT,
+  description TEXT,
+  prize_name TEXT,
+  prize_description TEXT,
+  prize_image_url TEXT,
+  prize_value NUMERIC,
+  entry_config JSONB,
+  max_entries_total INTEGER,
+  max_entries_per_user INTEGER,
+  entry_starts_at TIMESTAMPTZ,
+  entry_ends_at TIMESTAMPTZ,
+  draw_time TIMESTAMPTZ,
+  status TEXT,
+  winner_id UUID,
+  winner_name TEXT,
+  winner_announced_at TIMESTAMPTZ,
+  winner_claim_expires_at TIMESTAMPTZ,
+  consolation_points_awarded BOOLEAN,
+  consolation_points_amount INTEGER,
+  auto_redraw_days INTEGER,
+  redraw_count INTEGER,
+  max_redraws INTEGER,
+  theme_color TEXT,
+  show_entry_ticker BOOLEAN,
+  show_leaderboard BOOLEAN,
+  created_at TIMESTAMPTZ,
+  draw_group_id UUID,
+  
+  -- Aggregated stats
+  total_entries BIGINT,
+  total_participants BIGINT,
+  total_winners BIGINT,
+  total_claimed_winners BIGINT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    d.id,
+    d.name,
+    d.slug,
+    d.description,
+    d.prize_name,
+    d.prize_description,
+    d.prize_image_url,
+    d.prize_value,
+    d.entry_config,
+    d.max_entries_total,
+    d.max_entries_per_user,
+    d.entry_starts_at,
+    d.entry_ends_at,
+    d.draw_time,
+    d.status,
+    d.winner_id,
+    d.winner_name,
+    d.winner_announced_at,
+    d.winner_claim_expires_at,
+    d.consolation_points_awarded,
+    COALESCE(d.consolation_points_amount, 0) as consolation_points_amount,
+    COALESCE(d.auto_redraw_days, 7) as auto_redraw_days,
+    COALESCE(d.redraw_count, 0) as redraw_count,
+    COALESCE(d.max_redraws, 1) as max_redraws,
+    d.theme_color,
+    d.show_entry_ticker,
+    d.show_leaderboard,
+    d.created_at,
+    d.draw_group_id,
+    
+    -- Total entries count
+    COALESCE((
+      SELECT COUNT(*)::BIGINT
+      FROM draw_entries de
+      WHERE de.draw_id = d.id
+    ), 0) as total_entries,
+    
+    -- Total unique participants
+    COALESCE((
+      SELECT COUNT(DISTINCT de.user_id)::BIGINT
+      FROM draw_entries de
+      WHERE de.draw_id = d.id
+    ), 0) as total_participants,
+    
+    -- Total winners (all ranks)
+    COALESCE((
+      SELECT COUNT(*)::BIGINT
+      FROM draw_winners dw
+      WHERE dw.draw_id = d.id
+    ), 0) as total_winners,
+    
+    -- Claimed winners
+    COALESCE((
+      SELECT COUNT(*)::BIGINT
+      FROM draw_winners dw
+      WHERE dw.draw_id = d.id
+        AND dw.claim_status = 'claimed'
+    ), 0) as total_claimed_winners
+    
+  FROM draws d
+  WHERE (p_group_id IS NULL OR d.draw_group_id = p_group_id)
+  ORDER BY d.created_at DESC;
+END;
+$$;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION get_draws_with_stats(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_draws_with_stats(UUID) TO anon;

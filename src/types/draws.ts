@@ -30,6 +30,9 @@ export interface Draw {
   theme_color: string;
   show_entry_ticker: boolean;
   show_leaderboard: boolean;
+  auto_redraw_days: number;
+  max_redraws: number;
+  draw_group_id: string | null;
 }
 
 export interface EntryConfig {
@@ -66,6 +69,13 @@ export interface EntryConfig {
     gold: number;
     platinum: number;
   };
+}
+
+export interface DrawWithStats extends Draw {
+  total_entries: number;
+  total_participants: number;
+  total_winners: number;
+  total_claimed_winners: number;
 }
 
 export interface UserDrawStatus {

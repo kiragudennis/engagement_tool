@@ -51,7 +51,11 @@ import { Label } from "@/components/ui/label";
 import { Bundle } from "@/types/bundles";
 import { Product } from "@/types/store";
 import { motion, AnimatePresence } from "framer-motion";
-import { BUNDLE_CONFIG } from "@/lib/constants";
+import {
+  BUNDLE_CONFIG,
+  SIMULATED_LOCATIONS,
+  SIMULATED_NAMES,
+} from "@/lib/constants";
 
 export default function BundleDetailPage() {
   const { bundleId } = useParams<{ bundleId: string }>();
@@ -123,13 +127,74 @@ export default function BundleDetailPage() {
     bundle?.remaining_count,
     bundle?.total_available,
   ]);
-  // Real-time subscription for live updates
+
+  // Start dummy purchase simulation
+  const startDummyPurchaseSimulation = useCallback(() => {
+    if (!bundleId || !bundle) return;
+
+    let simulationInterval: NodeJS.Timeout | null = null;
+    let lastSimulatedTime = Date.now();
+
+    // Check if we need to simulate a purchase
+    const checkAndSimulate = async () => {
+      const now = Date.now();
+      const secondsSinceLastSimulated = (now - lastSimulatedTime) / 1000;
+
+      // Simulate every 30 seconds if no real purchases
+      if (secondsSinceLastSimulated > 30 && totalSold < 100) {
+        const randomName =
+          SIMULATED_NAMES[Math.floor(Math.random() * SIMULATED_NAMES.length)];
+        const randomLocation =
+          SIMULATED_LOCATIONS[
+            Math.floor(Math.random() * SIMULATED_LOCATIONS.length)
+          ];
+        const randomQuantity = Math.floor(Math.random() * 2) + 1;
+
+        // Create simulated purchase in bundle_purchases
+        const { error } = await supabase.from("bundle_purchases").insert({
+          bundle_id: bundleId,
+          user_id: null,
+          quantity: randomQuantity,
+          final_price: bundle.discounted_price || bundle.base_price,
+          original_price: bundle.base_price,
+          discount_amount:
+            bundle.base_price - (bundle.discounted_price || bundle.base_price),
+          status: "completed",
+          is_simulated: true,
+          simulated_name: randomName,
+          simulated_location: randomLocation,
+          created_at: new Date().toISOString(),
+        });
+
+        if (!error) {
+          lastSimulatedTime = now;
+          console.log(
+            `🎭 SIMULATED: ${randomName} from ${randomLocation} claimed bundle`,
+          );
+        }
+      }
+    };
+
+    // Check every 10 seconds
+    simulationInterval = setInterval(checkAndSimulate, 10000);
+
+    // Return cleanup function
+    return () => {
+      if (simulationInterval) {
+        clearInterval(simulationInterval);
+        simulationInterval = null;
+      }
+    };
+  }, [bundleId, bundle, supabase, totalSold]);
+
   // Real-time subscription for live updates - SINGLE CHANNEL
   useEffect(() => {
     if (!bundleId) return;
 
     let isMounted = true;
     let mainChannel: any = null;
+    let lastRealPurchaseTime = Date.now();
+    let cleanupSimulation: (() => void) | undefined = undefined;
 
     const setupChannel = async () => {
       // Create ONE channel for everything
@@ -148,6 +213,11 @@ export default function BundleDetailPage() {
           },
           async (payload: { new: any }) => {
             if (!isMounted) return;
+
+            // Track real purchase time (not simulated)
+            if (!payload.new.is_simulated) {
+              lastRealPurchaseTime = Date.now();
+            }
 
             const { data: user } = await supabase
               .from("users")
@@ -277,6 +347,24 @@ export default function BundleDetailPage() {
       }, 60000);
     }
 
+    // Start simulation after 20 seconds of no activity
+    const simulationCheck = setInterval(() => {
+      const secondsSinceRealPurchase =
+        (Date.now() - lastRealPurchaseTime) / 1000;
+      if (secondsSinceRealPurchase > 20 && !cleanupSimulation) {
+        console.log(
+          "Starting dummy purchase simulation (no activity for 20 seconds)",
+        );
+        cleanupSimulation = startDummyPurchaseSimulation();
+      } else if (secondsSinceRealPurchase < 20 && cleanupSimulation) {
+        console.log(
+          "Stopping dummy purchase simulation (real activity detected)",
+        );
+        cleanupSimulation();
+        cleanupSimulation = undefined;
+      }
+    }, 10000);
+
     fetchLiveData();
 
     // Cleanup - unsubscribe the single channel
@@ -286,8 +374,17 @@ export default function BundleDetailPage() {
       if (mainChannel) {
         mainChannel.unsubscribe();
       }
+      clearInterval(simulationCheck);
+      if (cleanupSimulation) cleanupSimulation();
     };
-  }, [bundleId, supabase, fetchLiveData, bundle?.ends_at, profile?.id]);
+  }, [
+    bundleId,
+    supabase,
+    fetchLiveData,
+    startDummyPurchaseSimulation,
+    bundle?.ends_at,
+    profile?.id,
+  ]);
 
   // Load bundle and product details
   useEffect(() => {

@@ -51,6 +51,19 @@ export function calculateShipping({
   return cost;
 }
 
+export function formatPhoneNumber(phone: string): string {
+  // Remove non-digit characters
+  const digits = phone.replace(/\D/g, "");
+  // Format as +2547XXXXXXXX
+  if (digits.startsWith("254")) {
+    return "+" + digits;
+  } else if (digits.startsWith("0")) {
+    return "+254" + digits.slice(1);
+  } else {
+    return "+" + digits; // Assume it's already in international format
+  }
+}
+
 export function calculateOrderTotals(
   cartItems: CartItem[],
   country: string,

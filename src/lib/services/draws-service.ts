@@ -1,5 +1,10 @@
 // src/lib/services/draws-service.ts (Enhanced Version)
-import { Draw, EntryConfig, UserDrawStatus } from "@/types/draws";
+import {
+  Draw,
+  DrawWithStats,
+  EntryConfig,
+  UserDrawStatus,
+} from "@/types/draws";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 export interface EntryMethod {
@@ -335,6 +340,18 @@ export class DrawsService {
     });
 
     return { entries, userCreated, userId: userId! };
+  }
+
+  /**
+   * Get all draws with aggregated stats in one query
+   */
+  async getDrawsWithStats(groupId?: string): Promise<DrawWithStats[]> {
+    const { data, error } = await this.supabase.rpc("get_draws_with_stats", {
+      p_group_id: groupId || null,
+    });
+
+    if (error) throw error;
+    return data || [];
   }
 
   /**

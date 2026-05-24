@@ -1,5 +1,5 @@
-// app/admin/marketing/draws/page.tsx (Enhanced Unified Admin Panel)
-// This page lists all draws with key stats and quick actions for admins to manage and perform draws.
+// app/admin/marketing/draws/page.tsx - Complete Enhanced Version
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -19,6 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import {
   Plus,
   Eye,
@@ -36,41 +39,11 @@ import {
   X,
   LayoutGrid,
   List,
+  Coins,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { format, formatDistanceToNow } from "date-fns";
-
-interface Draw {
-  id: string;
-  name: string;
-  slug: string;
-  description: string;
-  prize_name: string;
-  prize_description: string;
-  prize_value: number;
-  prize_image_url: string;
-  entry_config: any;
-  max_entries_total: number | null;
-  max_entries_per_user: number | null;
-  entry_starts_at: string;
-  entry_ends_at: string;
-  draw_time: string;
-  status: string;
-  winner_id: string | null;
-  winner_announced_at: string | null;
-  winner_claim_expires_at: string | null;
-  consolation_points_awarded: boolean;
-  consolation_points_amount: number;
-  auto_redraw_days: number;
-  redraw_count: number;
-  max_redraws: number;
-  theme_color: string;
-  show_entry_ticker: boolean;
-  show_leaderboard: boolean;
-  created_at: string;
-  draw_group_id: string | null;
-}
+import { format } from "date-fns";
 
 export default function AdminDrawsPage() {
   const { supabase } = useAuth();
@@ -80,39 +53,48 @@ export default function AdminDrawsPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [drawStats, setDrawStats] = useState<Record<string, any>>({});
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingDraw, setEditingDraw] = useState<Draw | null>(null);
 
   const drawsService = new DrawsService(supabase);
 
   const fetchData = useCallback(async () => {
     try {
-      const [drawsData, groupsData] = await Promise.all([
-        drawsService.getDraws({ groupId: selectedGroup || undefined }),
-        drawsService.getDrawGroups(),
-      ]);
+      setLoading(true);
+
+      // Single RPC call for all draws with stats
+      const drawsWithStats = await drawsService.getDrawsWithStats(
+        selectedGroup || undefined,
+      );
+
+      // Extract draws and groups
+      const drawsData = drawsWithStats.map((item: any) => {
+        const {
+          total_entries,
+          total_participants,
+          total_winners,
+          total_claimed_winners,
+          ...draw
+        } = item;
+        return draw;
+      });
+
+      // Build stats object
+      const stats: Record<string, any> = {};
+      drawsWithStats.forEach((draw: any) => {
+        stats[draw.id] = {
+          entries: draw.total_entries,
+          participants: draw.total_participants,
+          winners: draw.total_winners,
+          claimed_winners: draw.total_claimed_winners,
+        };
+      });
+
+      // Get draw groups separately
+      const groupsData = await drawsService.getDrawGroups();
+
       setDraws(drawsData);
       setGroups(groupsData);
-
-      // Fetch stats for each draw
-      const stats: Record<string, any> = {};
-      for (const draw of drawsData) {
-        const [entriesCount, participantsCount, winnersCount] =
-          await Promise.all([
-            drawsService.getTotalEntries(draw.id),
-            supabase
-              .from("draw_entries")
-              .select("user_id", { count: "exact" })
-              .eq("draw_id", draw.id),
-            supabase
-              .from("draw_winners")
-              .select("id", { count: "exact" })
-              .eq("draw_id", draw.id),
-          ]);
-        stats[draw.id] = {
-          entries: entriesCount,
-          participants: participantsCount.count || 0,
-          winners: winnersCount.count || 0,
-        };
-      }
       setDrawStats(stats);
     } catch (error) {
       console.error("Error fetching draws:", error);
@@ -140,44 +122,12 @@ export default function AdminDrawsPage() {
     try {
       const result = await drawsService.performDraw(drawId);
       toast.success(
-        `Draw completed! ${result.winners.length} winners selected from ${result.totalTickets} entries`,
+        `Draw completed! ${result.winners.length} winners selected`,
       );
       fetchData();
     } catch (error: any) {
       toast.error(error.message);
     }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const config: Record<
-      string,
-      {
-        label: string;
-        variant: "default" | "secondary" | "destructive" | "outline";
-        icon: any;
-      }
-    > = {
-      draft: { label: "Draft", variant: "secondary", icon: FileText },
-      open: { label: "Open", variant: "default", icon: Ticket },
-      closed: { label: "Entries Closed", variant: "secondary", icon: Clock },
-      drawing: { label: "Drawing...", variant: "secondary", icon: Loader2 },
-      completed: { label: "Completed", variant: "outline", icon: Trophy },
-      cancelled: { label: "Cancelled", variant: "destructive", icon: X },
-    };
-    const c = config[status] || config.draft;
-    const Icon = c.icon;
-    return (
-      <Badge variant={c.variant} className="gap-1">
-        <Icon className="h-3 w-3" />
-        {c.label}
-      </Badge>
-    );
-  };
-
-  const getEntryProgress = (draw: Draw) => {
-    const totalEntries = drawStats[draw.id]?.entries || 0;
-    if (!draw.max_entries_total) return null;
-    return (totalEntries / draw.max_entries_total) * 100;
   };
 
   if (loading) {
@@ -209,18 +159,33 @@ export default function AdminDrawsPage() {
               <LayoutGrid className="h-4 w-4" />
             )}
           </Button>
-          <Dialog>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button onClick={() => setEditingDraw(null)}>
                 <Plus className="h-4 w-4 mr-2" />
                 New Draw
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Create New Draw</DialogTitle>
+                <DialogTitle>
+                  {editingDraw ? "Edit Draw" : "Create New Draw"}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingDraw
+                    ? "Update the details of your draw and save to apply changes"
+                    : "Fill in the details of your new draw and save to create it"}
+                </DialogDescription>
               </DialogHeader>
-              <DrawForm onSave={fetchData} groups={groups} />
+              <DrawForm
+                initialDraw={editingDraw}
+                groups={groups}
+                onSave={() => {
+                  fetchData();
+                  setDialogOpen(false);
+                  setEditingDraw(null);
+                }}
+              />
             </DialogContent>
           </Dialog>
         </div>
@@ -259,6 +224,10 @@ export default function AdminDrawsPage() {
               stats={drawStats[draw.id]}
               onUpdateStatus={updateDrawStatus}
               onPerformDraw={performDraw}
+              onEdit={() => {
+                setEditingDraw(draw);
+                setDialogOpen(true);
+              }}
             />
           ))}
         </div>
@@ -271,6 +240,10 @@ export default function AdminDrawsPage() {
               stats={drawStats[draw.id]}
               onUpdateStatus={updateDrawStatus}
               onPerformDraw={performDraw}
+              onEdit={() => {
+                setEditingDraw(draw);
+                setDialogOpen(true);
+              }}
             />
           ))}
         </div>
@@ -285,7 +258,7 @@ export default function AdminDrawsPage() {
           </p>
           <Dialog>
             <DialogTrigger asChild>
-              <Button>
+              <Button onClick={() => setDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Draw
               </Button>
@@ -298,7 +271,7 @@ export default function AdminDrawsPage() {
 }
 
 // Draw Card Component
-function DrawCard({ draw, stats, onUpdateStatus, onPerformDraw }: any) {
+function DrawCard({ draw, stats, onUpdateStatus, onPerformDraw, onEdit }: any) {
   const isEntryOpen =
     new Date(draw.entry_starts_at) <= new Date() &&
     new Date(draw.entry_ends_at) >= new Date();
@@ -306,10 +279,11 @@ function DrawCard({ draw, stats, onUpdateStatus, onPerformDraw }: any) {
   const progress = draw.max_entries_total
     ? (stats?.entries / draw.max_entries_total) * 100
     : null;
+  const isExpiringSoon =
+    new Date(draw.entry_ends_at).getTime() - Date.now() < 24 * 60 * 60 * 1000;
 
   return (
-    <Card className="relative overflow-hidden">
-      {/* Progress bar at top */}
+    <Card className="relative overflow-hidden hover:shadow-lg transition-all duration-300">
       {progress !== null && (
         <div className="absolute top-0 left-0 right-0">
           <Progress value={progress} className="h-1 rounded-none" />
@@ -319,9 +293,18 @@ function DrawCard({ draw, stats, onUpdateStatus, onPerformDraw }: any) {
       <CardHeader>
         <div className="flex justify-between items-start">
           <div>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 flex-wrap">
               {draw.name}
               {getStatusBadge(draw.status)}
+              {isExpiringSoon && draw.status === "open" && (
+                <Badge
+                  variant="outline"
+                  className="bg-orange-500/10 text-orange-500 border-orange-500/30"
+                >
+                  <Clock className="h-3 w-3 mr-1" />
+                  Ending Soon
+                </Badge>
+              )}
             </CardTitle>
             <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
               {draw.description}
@@ -332,7 +315,7 @@ function DrawCard({ draw, stats, onUpdateStatus, onPerformDraw }: any) {
 
       <CardContent className="space-y-4">
         {/* Prize Info */}
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5">
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-gradient-to-r from-primary/5 to-primary/10">
           <Gift className="h-5 w-5 text-primary" />
           <div className="flex-1">
             <p className="font-medium">{draw.prize_name}</p>
@@ -342,6 +325,12 @@ function DrawCard({ draw, stats, onUpdateStatus, onPerformDraw }: any) {
               </p>
             )}
           </div>
+          {draw.consolation_points_amount > 0 && (
+            <Badge variant="outline" className="gap-1">
+              <Coins className="h-3 w-3" />
+              {draw.consolation_points_amount} pts consolation
+            </Badge>
+          )}
         </div>
 
         {/* Stats */}
@@ -404,7 +393,11 @@ function DrawCard({ draw, stats, onUpdateStatus, onPerformDraw }: any) {
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Entries Close:</span>
-            <span>{format(new Date(draw.entry_ends_at), "MMM d, HH:mm")}</span>
+            <span
+              className={isExpiringSoon ? "text-orange-500 font-medium" : ""}
+            >
+              {format(new Date(draw.entry_ends_at), "MMM d, HH:mm")}
+            </span>
           </div>
           <div className="flex justify-between font-medium">
             <span className="text-muted-foreground">Draw Time:</span>
@@ -463,7 +456,7 @@ function DrawCard({ draw, stats, onUpdateStatus, onPerformDraw }: any) {
 
         {draw.status === "completed" && draw.winner_id && (
           <Button variant="outline" className="w-full" asChild>
-            <Link href={`/admin/draws/${draw.id}/winners`}>
+            <Link href={`/admin/marketing/draws/${draw.id}/winners`}>
               <Trophy className="h-4 w-4 mr-2" />
               View Winners
             </Link>
@@ -475,14 +468,20 @@ function DrawCard({ draw, stats, onUpdateStatus, onPerformDraw }: any) {
 }
 
 // Draw List Item Component
-function DrawListItem({ draw, stats, onUpdateStatus, onPerformDraw }: any) {
+function DrawListItem({
+  draw,
+  stats,
+  onUpdateStatus,
+  onPerformDraw,
+  onEdit,
+}: any) {
   const isDrawTime = new Date(draw.draw_time) <= new Date();
   return (
     <Card>
       <CardContent className="p-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <h3 className="font-semibold">{draw.name}</h3>
               {getStatusBadge(draw.status)}
             </div>
@@ -507,8 +506,11 @@ function DrawListItem({ draw, stats, onUpdateStatus, onPerformDraw }: any) {
                 <Eye className="h-4 w-4" />
               </Link>
             </Button>
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              <Edit className="h-4 w-4" />
+            </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/admin/draws/${draw.id}/control`}>
+              <Link href={`/admin/marketing/draws/${draw.id}/control`}>
                 <Trophy className="h-4 w-4" />
               </Link>
             </Button>
@@ -527,8 +529,11 @@ function DrawListItem({ draw, stats, onUpdateStatus, onPerformDraw }: any) {
 // Draw Form Component
 function DrawForm({ onSave, initialDraw, groups }: any) {
   const { supabase } = useAuth();
-  const [formData, setFormData] = useState(
-    initialDraw || {
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("basic");
+  const [formData, setFormData] = useState(() => {
+    if (initialDraw) return initialDraw;
+    return {
       name: "",
       description: "",
       prize_name: "",
@@ -555,23 +560,22 @@ function DrawForm({ onSave, initialDraw, groups }: any) {
       theme_color: "#8B5CF6",
       show_entry_ticker: true,
       show_leaderboard: false,
-      consolation_points_amount: 50,
+      consolation_points_amount: 0,
       auto_redraw_days: 7,
       max_redraws: 1,
       draw_group_id: "",
-    },
-  );
-
-  const [loading, setLoading] = useState(false);
+    };
+  });
 
   const handleSubmit = async () => {
     setLoading(true);
     try {
+      const slug = formData.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
       const { error } = await supabase
         .from("draws")
         .upsert({
           ...formData,
-          slug: formData.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+          slug,
           prize_value: formData.prize_value
             ? parseFloat(formData.prize_value)
             : null,
@@ -596,227 +600,368 @@ function DrawForm({ onSave, initialDraw, groups }: any) {
 
   return (
     <div className="space-y-6 py-4">
-      {/* Basic Info */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label>Draw Name</Label>
-          <Input
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          />
-        </div>
-        <div>
-          <Label>Draw Group (optional)</Label>
-          <select
-            className="w-full border rounded-lg p-2"
-            value={formData.draw_group_id}
-            onChange={(e) =>
-              setFormData({ ...formData, draw_group_id: e.target.value })
-            }
-          >
-            <option value="">No Group</option>
-            {groups?.map((group: any) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="basic">Basic</TabsTrigger>
+          <TabsTrigger value="prize">Prize</TabsTrigger>
+          <TabsTrigger value="entries">Entries</TabsTrigger>
+          <TabsTrigger value="schedule">Schedule</TabsTrigger>
+          <TabsTrigger value="advanced">Advanced</TabsTrigger>
+        </TabsList>
 
-      <div>
-        <Label>Description</Label>
-        <Textarea
-          value={formData.description}
-          onChange={(e) =>
-            setFormData({ ...formData, description: e.target.value })
-          }
-          rows={3}
-        />
-      </div>
-
-      {/* Prize Info */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold border-b pb-2">Prize Details</h3>
-        <div className="grid grid-cols-2 gap-4">
+        <TabsContent value="basic" className="space-y-4 mt-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Draw Name *</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label>Draw Group</Label>
+              <select
+                className="w-full border rounded-lg p-2"
+                value={formData.draw_group_id}
+                onChange={(e) =>
+                  setFormData({ ...formData, draw_group_id: e.target.value })
+                }
+              >
+                <option value="">No Group</option>
+                {groups?.map((group: any) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <div>
-            <Label>Prize Name *</Label>
-            <Input
-              value={formData.prize_name}
+            <Label>Description</Label>
+            <Textarea
+              value={formData.description}
               onChange={(e) =>
-                setFormData({ ...formData, prize_name: e.target.value })
+                setFormData({ ...formData, description: e.target.value })
+              }
+              rows={3}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Status</Label>
+              <select
+                className="w-full border rounded-lg p-2"
+                value={formData.status}
+                onChange={(e) =>
+                  setFormData({ ...formData, status: e.target.value })
+                }
+              >
+                <option value="draft">Draft</option>
+                <option value="open">Open</option>
+                <option value="closed">Closed</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            <div>
+              <Label>Theme Color</Label>
+              <Input
+                type="color"
+                value={formData.theme_color}
+                onChange={(e) =>
+                  setFormData({ ...formData, theme_color: e.target.value })
+                }
+                className="w-20 h-10"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={formData.show_entry_ticker}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, show_entry_ticker: checked })
+                }
+              />
+              <Label>Show Entry Ticker</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={formData.show_leaderboard}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, show_leaderboard: checked })
+                }
+              />
+              <Label>Show Leaderboard</Label>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="prize" className="space-y-4 mt-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Prize Name *</Label>
+              <Input
+                value={formData.prize_name}
+                onChange={(e) =>
+                  setFormData({ ...formData, prize_name: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label>Prize Value (KES)</Label>
+              <Input
+                type="number"
+                value={formData.prize_value}
+                onChange={(e) =>
+                  setFormData({ ...formData, prize_value: e.target.value })
+                }
+              />
+            </div>
+          </div>
+          <div>
+            <Label>Prize Description</Label>
+            <Input
+              value={formData.prize_description}
+              onChange={(e) =>
+                setFormData({ ...formData, prize_description: e.target.value })
               }
             />
           </div>
           <div>
-            <Label>Prize Value (KES)</Label>
+            <Label>Prize Image URL</Label>
+            <Input
+              value={formData.prize_image_url}
+              onChange={(e) =>
+                setFormData({ ...formData, prize_image_url: e.target.value })
+              }
+              placeholder="https://..."
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="entries" className="space-y-4 mt-4">
+          <div className="space-y-4">
+            <h3 className="font-semibold">Entry Methods</h3>
+
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={!!formData.entry_config.purchase}
+                onCheckedChange={(checked) => {
+                  const newConfig = { ...formData.entry_config };
+                  if (checked)
+                    newConfig.purchase = {
+                      min_amount: 1000,
+                      entries_per_ksh: 1,
+                    };
+                  else delete newConfig.purchase;
+                  setFormData({ ...formData, entry_config: newConfig });
+                }}
+              />
+              <Label>Purchase-based entries</Label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={!!formData.entry_config.referral}
+                onCheckedChange={(checked) => {
+                  const newConfig = { ...formData.entry_config };
+                  if (checked)
+                    newConfig.referral = {
+                      entries_per_referral: 5,
+                      bonus_for_first_referral: 5,
+                    };
+                  else delete newConfig.referral;
+                  setFormData({ ...formData, entry_config: newConfig });
+                }}
+              />
+              <Label>Referral-based entries</Label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={!!formData.entry_config.social_share}
+                onCheckedChange={(checked) => {
+                  const newConfig = { ...formData.entry_config };
+                  if (checked)
+                    newConfig.social_share = {
+                      entries_per_share: 2,
+                      max_entries_per_day: 10,
+                    };
+                  else delete newConfig.social_share;
+                  setFormData({ ...formData, entry_config: newConfig });
+                }}
+              />
+              <Label>Social share entries</Label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={!!formData.entry_config.live_stream}
+                onCheckedChange={(checked) => {
+                  const newConfig = { ...formData.entry_config };
+                  if (checked) newConfig.live_stream = { entries_per_email: 1 };
+                  else delete newConfig.live_stream;
+                  setFormData({ ...formData, entry_config: newConfig });
+                }}
+              />
+              <Label>Live stream entries</Label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={!!formData.entry_config.loyalty_tier}
+                onCheckedChange={(checked) => {
+                  const newConfig = { ...formData.entry_config };
+                  if (checked)
+                    newConfig.loyalty_tier = {
+                      bronze: 1,
+                      silver: 2,
+                      gold: 5,
+                      platinum: 10,
+                    };
+                  else delete newConfig.loyalty_tier;
+                  setFormData({ ...formData, entry_config: newConfig });
+                }}
+              />
+              <Label>Loyalty tier bonus entries</Label>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+            <div>
+              <Label>Max Entries Per User</Label>
+              <Input
+                type="number"
+                value={formData.max_entries_per_user}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    max_entries_per_user: e.target.value,
+                  })
+                }
+                placeholder="Unlimited"
+              />
+            </div>
+            <div>
+              <Label>Max Total Entries</Label>
+              <Input
+                type="number"
+                value={formData.max_entries_total}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    max_entries_total: e.target.value,
+                  })
+                }
+                placeholder="Unlimited"
+              />
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="schedule" className="space-y-4 mt-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label>Entries Open</Label>
+              <Input
+                type="datetime-local"
+                value={formData.entry_starts_at}
+                onChange={(e) =>
+                  setFormData({ ...formData, entry_starts_at: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label>Entries Close</Label>
+              <Input
+                type="datetime-local"
+                value={formData.entry_ends_at}
+                onChange={(e) =>
+                  setFormData({ ...formData, entry_ends_at: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label>Draw Time</Label>
+              <Input
+                type="datetime-local"
+                value={formData.draw_time}
+                onChange={(e) =>
+                  setFormData({ ...formData, draw_time: e.target.value })
+                }
+              />
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="advanced" className="space-y-4 mt-4">
+          <div>
+            <Label>Consolation Points</Label>
             <Input
               type="number"
-              value={formData.prize_value}
-              onChange={(e) =>
-                setFormData({ ...formData, prize_value: e.target.value })
-              }
-            />
-          </div>
-        </div>
-        <div>
-          <Label>Prize Description</Label>
-          <Input
-            value={formData.prize_description}
-            onChange={(e) =>
-              setFormData({ ...formData, prize_description: e.target.value })
-            }
-          />
-        </div>
-        <div>
-          <Label>Prize Image URL</Label>
-          <Input
-            value={formData.prize_image_url}
-            onChange={(e) =>
-              setFormData({ ...formData, prize_image_url: e.target.value })
-            }
-            placeholder="https://..."
-          />
-        </div>
-      </div>
-
-      {/* Timing */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold border-b pb-2">Schedule</h3>
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <Label>Entries Open</Label>
-            <Input
-              type="datetime-local"
-              value={formData.entry_starts_at}
-              onChange={(e) =>
-                setFormData({ ...formData, entry_starts_at: e.target.value })
-              }
-            />
-          </div>
-          <div>
-            <Label>Entries Close</Label>
-            <Input
-              type="datetime-local"
-              value={formData.entry_ends_at}
-              onChange={(e) =>
-                setFormData({ ...formData, entry_ends_at: e.target.value })
-              }
-            />
-          </div>
-          <div>
-            <Label>Draw Time</Label>
-            <Input
-              type="datetime-local"
-              value={formData.draw_time}
-              onChange={(e) =>
-                setFormData({ ...formData, draw_time: e.target.value })
-              }
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Limits */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold border-b pb-2">Entry Limits</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label>Max Entries Per User</Label>
-            <Input
-              type="number"
-              value={formData.max_entries_per_user}
+              value={formData.consolation_points_amount}
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  max_entries_per_user: e.target.value,
-                })
-              }
-              placeholder="Unlimited"
-            />
-          </div>
-          <div>
-            <Label>Max Total Entries</Label>
-            <Input
-              type="number"
-              value={formData.max_entries_total}
-              onChange={(e) =>
-                setFormData({ ...formData, max_entries_total: e.target.value })
-              }
-              placeholder="Unlimited"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Winner Management */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold border-b pb-2">
-          Winner Management
-        </h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label>Auto Redraw Days</Label>
-            <Input
-              type="number"
-              value={formData.auto_redraw_days}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  auto_redraw_days: parseInt(e.target.value),
+                  consolation_points_amount: parseInt(e.target.value),
                 })
               }
             />
             <p className="text-xs text-muted-foreground">
-              Days after which unclaimed prizes are redrawn
+              Points awarded to all non-winners
             </p>
           </div>
-          <div>
-            <Label>Max Redraws</Label>
-            <Input
-              type="number"
-              value={formData.max_redraws}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  max_redraws: parseInt(e.target.value),
-                })
-              }
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Auto Redraw Days</Label>
+              <Input
+                type="number"
+                value={formData.auto_redraw_days}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    auto_redraw_days: parseInt(e.target.value),
+                  })
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                Days after which unclaimed prizes are redrawn
+              </p>
+            </div>
+            <div>
+              <Label>Max Redraws</Label>
+              <Input
+                type="number"
+                value={formData.max_redraws}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    max_redraws: parseInt(e.target.value),
+                  })
+                }
+              />
+            </div>
           </div>
-        </div>
-        <div>
-          <Label>Consolation Points</Label>
-          <Input
-            type="number"
-            value={formData.consolation_points_amount}
-            onChange={(e) =>
-              setFormData({
-                ...formData,
-                consolation_points_amount: parseInt(e.target.value),
-              })
-            }
-          />
-          <p className="text-xs text-muted-foreground">
-            Points awarded to all non-winners
-          </p>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
 
-      {/* Actions */}
       <div className="flex justify-end gap-2 pt-4 border-t">
         <Button variant="outline" onClick={() => onSave()}>
           Cancel
         </Button>
         <Button onClick={handleSubmit} disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Draw"}
+          {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+          {initialDraw ? "Update" : "Create"} Draw
         </Button>
       </div>
     </div>
   );
 }
 
-// Helper function for status badge
+// Helper functions
 function getStatusBadge(status: string) {
   const config: Record<string, any> = {
     draft: { label: "Draft", variant: "secondary", icon: FileText },
@@ -837,5 +982,6 @@ function getStatusBadge(status: string) {
 }
 
 // Missing imports
-import { FileText } from "lucide-react";
+import { FileText, Edit } from "lucide-react";
 import { Radio } from "lucide-react";
+import { Draw } from "@/types/draws";

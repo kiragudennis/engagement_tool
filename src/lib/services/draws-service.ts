@@ -341,17 +341,26 @@ export class DrawsService {
 
     return { entries, userCreated, userId: userId! };
   }
+  // src/lib/services/draws-service.ts - Add this method
 
   /**
    * Get all draws with aggregated stats in one query
    */
-  async getDrawsWithStats(groupId?: string): Promise<DrawWithStats[]> {
-    const { data, error } = await this.supabase.rpc("get_draws_with_stats", {
-      p_group_id: groupId || null,
-    });
+  async getDrawsWithStats(groupId?: string): Promise<any[]> {
+    try {
+      const { data, error } = await this.supabase.rpc("get_draws_with_stats", {
+        p_group_id: groupId || null,
+      });
 
-    if (error) throw error;
-    return data || [];
+      if (error) {
+        console.error("Error in getDrawsWithStats:", error);
+        return [];
+      }
+      return data || [];
+    } catch (error) {
+      console.error("Exception in getDrawsWithStats:", error);
+      return [];
+    }
   }
 
   /**

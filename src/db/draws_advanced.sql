@@ -322,11 +322,11 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Create RPC function to get all draws with aggregated stats
+-- Create RPC function to get all draws with aggregated stats
 CREATE OR REPLACE FUNCTION get_draws_with_stats(
   p_group_id UUID DEFAULT NULL
 )
 RETURNS TABLE(
-  -- Draw data
   id UUID,
   name TEXT,
   slug TEXT,
@@ -343,21 +343,19 @@ RETURNS TABLE(
   draw_time TIMESTAMPTZ,
   status TEXT,
   winner_id UUID,
-  winner_name TEXT,
   winner_announced_at TIMESTAMPTZ,
   winner_claim_expires_at TIMESTAMPTZ,
   consolation_points_awarded BOOLEAN,
-  consolation_points_amount INTEGER,
-  auto_redraw_days INTEGER,
-  redraw_count INTEGER,
-  max_redraws INTEGER,
   theme_color TEXT,
   show_entry_ticker BOOLEAN,
   show_leaderboard BOOLEAN,
   created_at TIMESTAMPTZ,
   draw_group_id UUID,
-  
-  -- Aggregated stats
+  consolation_points_amount INTEGER,
+  auto_redraw_days INTEGER,
+  redraw_count INTEGER,
+  max_redraws INTEGER,
+  winner_announcement_text TEXT,
   total_entries BIGINT,
   total_participants BIGINT,
   total_winners BIGINT,
@@ -385,49 +383,23 @@ BEGIN
     d.draw_time,
     d.status,
     d.winner_id,
-    d.winner_name,
     d.winner_announced_at,
     d.winner_claim_expires_at,
-    d.consolation_points_awarded,
+    COALESCE(d.consolation_points_awarded, false) as consolation_points_awarded,
+    d.theme_color,
+    COALESCE(d.show_entry_ticker, true) as show_entry_ticker,
+    COALESCE(d.show_leaderboard, false) as show_leaderboard,
+    d.created_at,
+    d.draw_group_id,
     COALESCE(d.consolation_points_amount, 0) as consolation_points_amount,
     COALESCE(d.auto_redraw_days, 7) as auto_redraw_days,
     COALESCE(d.redraw_count, 0) as redraw_count,
     COALESCE(d.max_redraws, 1) as max_redraws,
-    d.theme_color,
-    d.show_entry_ticker,
-    d.show_leaderboard,
-    d.created_at,
-    d.draw_group_id,
-    
-    -- Total entries count
-    COALESCE((
-      SELECT COUNT(*)::BIGINT
-      FROM draw_entries de
-      WHERE de.draw_id = d.id
-    ), 0) as total_entries,
-    
-    -- Total unique participants
-    COALESCE((
-      SELECT COUNT(DISTINCT de.user_id)::BIGINT
-      FROM draw_entries de
-      WHERE de.draw_id = d.id
-    ), 0) as total_participants,
-    
-    -- Total winners (all ranks)
-    COALESCE((
-      SELECT COUNT(*)::BIGINT
-      FROM draw_winners dw
-      WHERE dw.draw_id = d.id
-    ), 0) as total_winners,
-    
-    -- Claimed winners
-    COALESCE((
-      SELECT COUNT(*)::BIGINT
-      FROM draw_winners dw
-      WHERE dw.draw_id = d.id
-        AND dw.claim_status = 'claimed'
-    ), 0) as total_claimed_winners
-    
+    d.winner_announcement_text,
+    COALESCE((SELECT COUNT(*)::BIGINT FROM draw_entries de WHERE de.draw_id = d.id), 0) as total_entries,
+    COALESCE((SELECT COUNT(DISTINCT de.user_id)::BIGINT FROM draw_entries de WHERE de.draw_id = d.id), 0) as total_participants,
+    COALESCE((SELECT COUNT(*)::BIGINT FROM draw_winners dw WHERE dw.draw_id = d.id), 0) as total_winners,
+    COALESCE((SELECT COUNT(*)::BIGINT FROM draw_winners dw WHERE dw.draw_id = d.id AND dw.claim_status = 'claimed'), 0) as total_claimed_winners
   FROM draws d
   WHERE (p_group_id IS NULL OR d.draw_group_id = p_group_id)
   ORDER BY d.created_at DESC;

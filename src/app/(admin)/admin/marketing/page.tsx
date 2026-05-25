@@ -536,10 +536,11 @@ export default function AdminMarketingPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col justify-center items-center h-96 space-y-4">
-          <Loader2 className="h-12 w-12 animate-spin text-amber-500" />
+      <div className="container mx-auto px-2 py-8">
+        <div className="flex flex-col justify-center items-center h-64 space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           <p className="text-muted-foreground">
+            {" "}
             Loading marketing dashboard...
           </p>
         </div>

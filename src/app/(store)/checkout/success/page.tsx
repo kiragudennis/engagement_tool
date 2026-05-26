@@ -28,6 +28,7 @@ import {
   Coins,
   Layers,
   Tag,
+  Ticket,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import confetti from "canvas-confetti";
@@ -39,6 +40,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { format } from "date-fns";
 
 export default function SuccessPage({
   searchParams,
@@ -508,6 +510,67 @@ export default function SuccessPage({
                           </div>
                         </div>
                       )}
+
+                      {/* Draw Entry Information - NEW */}
+                      {orderDetails.draw_entries_awarded > 0 && (
+                        <div className="bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Ticket className="h-5 w-5 text-purple-600" />
+                            <h3 className="font-semibold text-purple-700 dark:text-purple-300">
+                              Draw Entry Details
+                            </h3>
+                          </div>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">
+                                Draw Name:
+                              </span>
+                              <span className="font-medium">
+                                {orderDetails.draw_entry_details?.draw_name ||
+                                  "Lucky Draw"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">
+                                Entries Awarded:
+                              </span>
+                              <span className="font-bold text-purple-600">
+                                {orderDetails.draw_entries_awarded}
+                              </span>
+                            </div>
+                            {orderDetails.draw_entry_details?.calculation && (
+                              <>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">
+                                    Calculation:
+                                  </span>
+                                  <span>
+                                    {formatCurrency(
+                                      orderDetails.total_amount,
+                                      orderDetails.currency,
+                                    )}{" "}
+                                    ×{" "}
+                                    {
+                                      orderDetails.draw_entry_details
+                                        .calculation.entries_per_ksh
+                                    }{" "}
+                                    entries/KSH
+                                  </span>
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-2">
+                                  🎯 Draw Date:{" "}
+                                  {format(
+                                    new Date(
+                                      orderDetails.draw_entry_details.draw_time,
+                                    ),
+                                    "PPP",
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -706,6 +769,174 @@ export default function SuccessPage({
                       </div>
                     </div>
                   )}
+
+                  <Separator />
+
+                  {/* Points & Draw Entries Section - NEW */}
+                  <div className="space-y-4">
+                    {/* Points Earned Card */}
+                    {isOrderPaid && orderDetails.loyalty_points_earned > 0 && (
+                      <div className="bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border border-yellow-500/30 rounded-lg p-4">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                            <Coins className="h-5 w-5 text-yellow-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold">Points Earned! 🎉</h3>
+                            <p className="text-sm text-muted-foreground">
+                              You've earned loyalty points from this order
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-3xl font-bold text-yellow-600">
+                              +
+                              {orderDetails.loyalty_points_earned?.toLocaleString()}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Loyalty Points
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              router.push(
+                                `/accounts/${orderDetails.user_id}/loyalty`,
+                              )
+                            }
+                          >
+                            <TrendingUp className="h-4 w-4 mr-2" />
+                            View Points
+                          </Button>
+                        </div>
+
+                        <div className="mt-3 pt-2 border-t border-yellow-500/30 text-xs text-muted-foreground">
+                          <p>
+                            💡 Use your points to get discounts on future
+                            purchases!
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Draw Entries Awarded Card */}
+                    {isOrderPaid && orderDetails.draw_entries_awarded > 0 && (
+                      <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-lg p-4">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                            <Ticket className="h-5 w-5 text-purple-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold">
+                              Draw Entries Earned! 🎟️
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              You've been entered into our lucky draw
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-3xl font-bold text-purple-600">
+                              +
+                              {orderDetails.draw_entries_awarded?.toLocaleString()}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Draw Entries
+                            </p>
+                          </div>
+                          {orderDetails.draw_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                router.push(`/draws/${orderDetails.draw_id}`)
+                              }
+                            >
+                              <Gift className="h-4 w-4 mr-2" />
+                              View Draw
+                            </Button>
+                          )}
+                        </div>
+
+                        {orderDetails.draw_entry_details && (
+                          <div className="mt-3 pt-2 border-t border-purple-500/30">
+                            <div className="text-xs text-muted-foreground space-y-1">
+                              <p>📊 Entry calculation:</p>
+                              <div className="flex justify-between">
+                                <span>Order Amount:</span>
+                                <span className="font-medium">
+                                  {formatCurrency(
+                                    orderDetails.total_amount,
+                                    orderDetails.currency,
+                                  )}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Entries per KSH:</span>
+                                <span className="font-medium">
+                                  {
+                                    orderDetails.draw_entry_details?.calculation
+                                      ?.entries_per_ksh
+                                  }
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-purple-600 font-medium">
+                                <span>Total Entries:</span>
+                                <span>{orderDetails.draw_entries_awarded}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Pending Points/Entries Message */}
+                    {!isOrderPaid && (
+                      <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-lg p-4">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Clock className="h-5 w-5 text-amber-600" />
+                          <div>
+                            <h3 className="font-semibold">
+                              Complete Payment to Earn Rewards!
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              Once payment is confirmed, you'll receive:
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 mt-3">
+                          <div className="text-center p-2 rounded-lg bg-white/50 dark:bg-black/20">
+                            <Coins className="h-5 w-5 text-yellow-500 mx-auto mb-1" />
+                            <p className="text-lg font-bold text-yellow-600">
+                              ~{Math.floor(orderDetails.total_amount * 0.01)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Points
+                            </p>
+                          </div>
+                          <div className="text-center p-2 rounded-lg bg-white/50 dark:bg-black/20">
+                            <Ticket className="h-5 w-5 text-purple-500 mx-auto mb-1" />
+                            <p className="text-lg font-bold text-purple-600">
+                              ~{Math.floor(orderDetails.total_amount * 0.05)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Draw Entries
+                            </p>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-amber-600 text-center mt-2">
+                          ⚠️ Complete your payment to claim these rewards!
+                        </p>
+                      </div>
+                    )}
+                  </div>
 
                   <Separator />
 
@@ -1199,6 +1430,21 @@ export default function SuccessPage({
             >
               {/* 🚚 Sidebar Next Steps */}
               <div className="bg-background rounded-lg border p-4 sm:p-6 space-y-6 h-fit">
+                {/* Pending Rewards Message in Sidebar */}
+                {!isOrderPaid && (
+                  <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="h-5 w-5 text-amber-600" />
+                      <span className="font-medium text-amber-700">
+                        Rewards Pending
+                      </span>
+                    </div>
+                    <p className="text-sm text-amber-600">
+                      Complete your payment to earn loyalty points and draw
+                      entries!
+                    </p>
+                  </div>
+                )}
                 {/* Payment Status Messages */}
                 {paymentStatus === "processing" && (
                   <div className="mb-6 p-4 bg-blue-50 text-blue-700 rounded-lg flex items-center">

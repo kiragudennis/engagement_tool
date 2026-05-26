@@ -842,24 +842,37 @@ END;
 $$;
 
 -- Function to award loyalty points after order completion
+-- Drop and recreate the function to handle both points and draw entries
+DROP FUNCTION IF EXISTS award_loyalty_points() CASCADE;
+
 CREATE OR REPLACE FUNCTION award_loyalty_points()
 RETURNS trigger
 LANGUAGE plpgsql
+SECURITY DEFINER
 AS $$
 DECLARE
     user_tier loyalty_tiers%ROWTYPE;
     points_to_award integer;
     current_points integer;
     new_tier text;
+    -- Draw entry variables
+    v_draw RECORD;
+    v_entry_count INTEGER := 0;
+    v_entries_awarded INTEGER := 0;
+    v_entry_id UUID;
 BEGIN
     -- Only award points when order is marked as completed and paid
-    IF NEW.status = 'completed' AND NEW.payment_status = 'paid' 
-       AND (OLD.status != 'completed' OR OLD.payment_status != 'paid') THEN
+    IF NEW.status = 'completed' AND NEW.payment_status = 'completed' 
+       AND (OLD.status != 'completed' OR OLD.payment_status != 'completed') THEN
 
-       -- Skip if this is a referral order (let the RPC handle it)
+        -- Skip if this is a referral order (let the separate RPC handle it)
         IF NEW.referred_by IS NOT NULL THEN
             RETURN NEW;
         END IF;
+        
+        -- ============================================
+        -- PART 1: AWARD LOYALTY POINTS
+        -- ============================================
         
         -- Get user's current tier
         SELECT lt.* INTO user_tier
@@ -906,7 +919,7 @@ BEGIN
             current_points,
             'earned',
             'Points earned for order #' || NEW.order_number,
-            NOW() + INTERVAL '365 days' -- Points expire in 1 year
+            NOW() + INTERVAL '365 days'
         );
         
         -- Update order with points earned
@@ -923,12 +936,101 @@ BEGIN
         SET tier = new_tier, updated_at = NOW()
         WHERE user_id = NEW.user_id AND tier != new_tier;
         
+        -- ============================================
+        -- PART 2: AWARD DRAW ENTRIES
+        -- ============================================
+        
+        -- Skip if draw entries already awarded
+        IF NEW.draw_entries_awarded > 0 THEN
+            RAISE NOTICE 'Draw entries already awarded for order %', NEW.id;
+        ELSE
+            -- Find the best draw for this user
+            SELECT d.* INTO v_draw
+            FROM draws d
+            WHERE d.status = 'open'
+              AND d.entry_starts_at <= NOW()
+              AND d.entry_ends_at >= NOW()
+              AND (d.entry_calculation->'purchase'->>'enabled')::boolean = true
+            ORDER BY 
+                CASE WHEN EXISTS (
+                    SELECT 1 FROM draw_entries de WHERE de.draw_id = d.id AND de.user_id = NEW.user_id
+                ) THEN 1 ELSE 2 END,
+                d.entry_ends_at ASC
+            LIMIT 1;
+            
+            IF FOUND THEN
+                -- Calculate entries based on order amount
+                v_entry_count := FLOOR(
+                    NEW.total_amount * (v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric
+                );
+                
+                -- Apply minimum purchase requirement
+                IF NEW.total_amount >= (v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric THEN
+                    -- Apply max entries per order
+                    v_entry_count := LEAST(
+                        v_entry_count,
+                        (v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer
+                    );
+                    
+                    IF v_entry_count > 0 THEN
+                        -- Add entries to draw
+                        INSERT INTO draw_entries (draw_id, user_id, entry_count, entry_method, source_id, metadata)
+                        VALUES (v_draw.id, NEW.user_id, v_entry_count, 'purchase', NEW.id::text, jsonb_build_object(
+                            'order_id', NEW.id,
+                            'order_amount', NEW.total_amount,
+                            'order_number', NEW.order_number,
+                            'awarded_at', NOW()
+                        ))
+                        RETURNING id INTO v_entry_id;
+                        
+                        -- Create individual tickets
+                        FOR i IN 1..v_entry_count LOOP
+                            INSERT INTO draw_tickets (draw_id, user_id, entry_id, ticket_number)
+                            VALUES (v_draw.id, NEW.user_id, v_entry_id, i);
+                        END LOOP;
+                        
+                        -- Add to live ticker
+                        INSERT INTO draw_live_ticker (draw_id, user_name, entry_count, entry_method)
+                        SELECT v_draw.id, COALESCE(u.full_name, 'Customer'), v_entry_count, 'purchase'
+                        FROM users u WHERE u.id = NEW.user_id;
+                        
+                        v_entries_awarded := v_entry_count;
+                        
+                        -- Update order with draw entry information
+                        UPDATE orders
+                        SET 
+                            draw_entries_awarded = v_entries_awarded,
+                            draw_id = v_draw.id,
+                            draw_entry_details = jsonb_build_object(
+                                'draw_name', v_draw.name,
+                                'draw_id', v_draw.id,
+                                'draw_time', v_draw.draw_time,
+                                'entries_awarded', v_entries_awarded,
+                                'calculation', jsonb_build_object(
+                                    'order_amount', NEW.total_amount,
+                                    'entries_per_ksh', (v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric,
+                                    'min_purchase', (v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric,
+                                    'max_entries', (v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer
+                                ),
+                                'awarded_at', NOW()
+                            )
+                        WHERE id = NEW.id;
+                        
+                        RAISE NOTICE 'Awarded % draw entries for order % to draw %', v_entries_awarded, NEW.id, v_draw.name;
+                    END IF;
+                END IF;
+            ELSE
+                RAISE NOTICE 'No active draw found for order %', NEW.id;
+            END IF;
+        END IF;
     END IF;
     
     RETURN NEW;
 END;
 $$;
 
+-- Recreate the trigger
+DROP TRIGGER IF EXISTS orders_award_points ON orders;
 CREATE TRIGGER orders_award_points
     AFTER UPDATE ON orders
     FOR EACH ROW

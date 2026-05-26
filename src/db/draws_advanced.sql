@@ -217,10 +217,6 @@ ALTER TABLE draw_entries DROP CONSTRAINT IF EXISTS draw_entries_entry_method_che
 ALTER TABLE draw_entries ADD CONSTRAINT draw_entries_entry_method_check 
     CHECK (entry_method IN ('purchase', 'referral', 'social_share', 'live_stream_entry', 'loyalty_bonus', 'manual', 'points_redeem', 'product_review', 'newsletter_signup'));
 -- Add columns to track draw entries from this order
-ALTER TABLE orders 
-ADD COLUMN IF NOT EXISTS draw_entries_awarded INTEGER DEFAULT 0,
-ADD COLUMN IF NOT EXISTS draw_id UUID REFERENCES draws(id),
-ADD COLUMN IF NOT EXISTS draw_entry_details JSONB DEFAULT '{}'::jsonb;
 
 -- Social share tracking table
 CREATE TABLE draw_social_shares (

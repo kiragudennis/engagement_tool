@@ -89,6 +89,13 @@ CREATE TABLE orders (
     total_amount = GREATEST(0, ((subtotal - coupon_discount - loyalty_discount) + shipping_total + installation_cost)))
 );
 
+-- Add columns to track draw entries from this order
+ALTER TABLE orders 
+ADD COLUMN IF NOT EXISTS loyalty_points_earned INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS draw_entries_awarded INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS draw_id UUID REFERENCES draws(id),
+ADD COLUMN IF NOT EXISTS draw_entry_details JSONB DEFAULT '{}'::jsonb;
+
 -- Create indexes for performance
 CREATE INDEX idx_orders_user_id ON orders(user_id);
 CREATE INDEX idx_orders_status ON orders(status);

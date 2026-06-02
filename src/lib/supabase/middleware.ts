@@ -19,7 +19,13 @@ export async function createMiddlewareSupabaseClient(request: Request) {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(
+          cookiesToSet: {
+            name: string;
+            value: string;
+            options: Record<string, any>;
+          }[],
+        ) {
           cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, {
               ...options,
@@ -35,6 +41,6 @@ export async function createMiddlewareSupabaseClient(request: Request) {
         persistSession: true,
         detectSessionInUrl: false,
       },
-    }
+    },
   );
 }

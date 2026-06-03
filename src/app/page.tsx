@@ -602,7 +602,7 @@ export default function HomePage() {
       {/* ============================================ */}
       {/* LANDSCAPE SLIDESHOW BANNERS */}
       {/* ============================================ */}
-      <div className="py-4">
+      <div className="container mx-auto py-4">
         <div className="relative overflow-hidden h-[240px] md:h-[300px] lg:h-[360px]">
           {banners.map((banner, index) => (
             <div

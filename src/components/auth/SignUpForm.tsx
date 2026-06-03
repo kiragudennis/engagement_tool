@@ -212,7 +212,7 @@ export default function SignUpForm({ onSuccess, ref }: SignUpFormProps) {
                 </FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="0727 833 691"
+                    placeholder="0113 062 599"
                     {...field}
                     className="bg-white dark:bg-gray-800"
                   />
@@ -270,7 +270,7 @@ export default function SignUpForm({ onSuccess, ref }: SignUpFormProps) {
               </FormLabel>
               <FormControl>
                 <Input
-                  placeholder="e.g., Duruma Road, House No. 123"
+                  placeholder="e.g., Thika Road, House No. 123"
                   {...field}
                   className="bg-white dark:bg-gray-800"
                 />
@@ -491,14 +491,11 @@ export default function SignUpForm({ onSuccess, ref }: SignUpFormProps) {
                 <div className="space-y-0 leading-none">
                   <FormLabel className="flex flex-wrap font-normal text-sm w-full">
                     I agree to the{" "}
-                    <a href="/terms" className="text-amber-600 hover:underline">
+                    <a href="#" className="text-amber-600 hover:underline">
                       Terms of Service
                     </a>{" "}
                     and{" "}
-                    <a
-                      href="/privacy"
-                      className="text-amber-600 hover:underline"
-                    >
+                    <a href="#" className="text-amber-600 hover:underline">
                       Privacy Policy
                     </a>
                   </FormLabel>

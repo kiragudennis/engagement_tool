@@ -3,32 +3,37 @@ import { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: {
-    default: "Blessed Two Electricals - Quality Lighting Solutions Nairobi",
-    template: "%s | Blessed Two Electricals Nairobi",
+    default: "Northwind Systems - Enterprise E-commerce + Engagement System",
+    template: "%s | Northwind Systems",
   },
   description:
-    "Leading lighting solutions provider in Nairobi offering LED bulbs, solar lighting, security lights, smart lighting systems, and professional installation services. Shop quality electrical products with 2-year warranty and same-day delivery.",
+    "Complete e-commerce system with 5 gamified engagement modules. Build customer loyalty with Spin Wheel, Live Challenges, Lucky Draws, Mystery Bundles, and Flash Deals — all integrated with real-time broadcast displays and unified points economy.",
   keywords: [
-    "LED bulbs Nairobi",
-    "solar lighting Kenya",
-    "security lights",
-    "smart lighting systems",
-    "electrical products Nairobi",
-    "lighting solutions",
-    "Duruma Road Electricals",
-    "professional installation",
-    "energy saving lights",
-    "commercial lighting",
+    "Northwind Systems",
+    "e-commerce engagement system",
+    "customer retention software",
+    "gamified e-commerce",
+    "live shopping platform",
+    "loyalty program software",
+    "customer engagement modules",
+    "spin to win ecommerce",
+    "live trivia shopping",
+    "mystery bundles ecommerce",
+    "flash deals platform",
+    "points loyalty system",
+    "community building platform",
+    "customer acquisition tools",
+    "enterprise e-commerce",
   ],
-  authors: [{ name: "Blessed Two Electricals" }],
-  creator: "Blessed Two Electricals",
-  publisher: "Blessed Two Electricals",
+  authors: [{ name: "Northwind Systems" }],
+  creator: "Northwind Systems",
+  publisher: "Northwind Systems",
   formatDetection: {
     email: false,
     address: false,
     telephone: true,
   },
-  metadataBase: new URL("https://www.blessedtwoElectricals.com"),
+  metadataBase: new URL("https://ns.yunobase.com"),
   alternates: {
     canonical: "/",
     languages: {
@@ -38,27 +43,27 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_KE",
-    url: "https://www.blessedtwoelectricals.com",
-    title: "Blessed Two Electricals - Premium Lighting Solutions",
+    url: "https://ns.yunobase.com",
+    title: "Northwind Systems - Build Customer Community Through Engagement",
     description:
-      "Your trusted partner for quality lighting solutions in Nairobi. LED bulbs, solar systems, security lights, and professional installation.",
-    siteName: "Blessed Two Electricals",
+      "Complete e-commerce system with 5 engagement modules that transform casual buyers into loyal brand advocates. Real-time broadcasts, points economy, and live community building.",
+    siteName: "Northwind Systems",
     images: [
       {
         url: "/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "Blessed Two Electricals - Lighting Solutions",
+        alt: "Northwind Systems - Enterprise Engagement System",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Blessed Two Electricals - Quality Lighting Nairobi",
+    title: "Northwind Systems | Engagement-First E-commerce",
     description:
-      "LED bulbs, solar lighting, security systems & professional installation in Nairobi.",
+      "Spin wheels, live challenges, lucky draws, mystery bundles, and flash deals. All integrated with your checkout and loyalty points system.",
     images: ["/twitter-image.jpg"],
-    creator: "@blessedtwoElectricals",
+    creator: "@northwind",
   },
   robots: {
     index: true,
@@ -71,7 +76,7 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  category: "Electricals",
+  category: "E-commerce Software",
 };
 
 export default function StoreLayout({
@@ -81,79 +86,59 @@ export default function StoreLayout({
 }) {
   return (
     <main>
-      {/* Structured Data for Local Business */}
+      {/* Structured Data for Software Application */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             "@context": "https://schema.org",
-            "@type": "LocalBusiness",
-            name: "Blessed Two Electricals",
-            image: "https://www.blessedtwoelectricals.com/logo.jpg",
-            "@id": "https://www.blessedtwoelectricals.com",
-            url: "https://www.blessedtwoelectricals.com",
-            telephone: "+254727833691",
-            address: {
-              "@type": "PostalAddress",
-              streetAddress: "Duruma Road",
-              addressLocality: "Nairobi",
-              addressRegion: "Nairobi",
-              addressCountry: "KE",
-            },
-            geo: {
-              "@type": "GeoCoordinates",
-              latitude: -1.286389,
-              longitude: 36.817223,
-            },
-            openingHoursSpecification: [
-              {
-                "@type": "OpeningHoursSpecification",
-                dayOfWeek: [
-                  "Monday",
-                  "Tuesday",
-                  "Wednesday",
-                  "Thursday",
-                  "Friday",
-                  "Saturday",
-                ],
-                opens: "08:00",
-                closes: "18:00",
-              },
-              {
-                "@type": "OpeningHoursSpecification",
-                dayOfWeek: "Sunday",
-                opens: "10:00",
-                closes: "16:00",
-              },
-            ],
-            priceRange: "KES 200 - KES 500,000",
+            "@type": "SoftwareApplication",
+            name: "Northwind Systems",
+            applicationCategory: "E-commerce Software",
+            operatingSystem: "Web",
             description:
-              "Leading lighting solutions provider in Nairobi offering LED bulbs, solar lighting, security lights, and professional installation services.",
+              "Complete e-commerce platform with 5 gamified engagement modules for customer retention and community building.",
+            offers: {
+              "@type": "Offer",
+              price: "250000",
+              priceCurrency: "KES",
+              description: "Per module pricing with complete bundle available",
+            },
+            featureList: [
+              "Spin Wheel with live broadcast",
+              "Live Challenges & Trivia",
+              "Lucky Draws with winner management",
+              "Mystery Bundles",
+              "Flash Deals with urgency mechanics",
+              "Unified Points Economy",
+              "Real-time WebSocket infrastructure",
+              "OBS-ready broadcast displays",
+              "Admin live controls",
+              "Fraud prevention suite",
+            ],
+            url: "https://ns.yunobase.com",
             sameAs: [
-              "https://www.tiktok.com/@blessed_2_electricals",
-              "https://www.facebook.com/blessedtwoelectricals",
-              "https://www.instagram.com/blessedtwoelectricals",
-              "https://twitter.com/blessedtwoelectricals",
+              "https://www.tiktok.com/@northwind",
+              "https://www.instagram.com/northwind",
             ],
           }),
         }}
       />
 
-      {/* Structured Data for Website */}
+      {/* Structured Data for WebSite */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "WebSite",
-            name: "Blessed Two Electricals",
-            url: "https://blessedtwoelectricals.com",
+            name: "Northwind Systems",
+            url: "https://ns.yunobase.com",
             potentialAction: {
               "@type": "SearchAction",
               target: {
                 "@type": "EntryPoint",
-                urlTemplate:
-                  "https://blessedtwoelectricals.com/search?q={search_term_string}",
+                urlTemplate: "https://ns.yunobase.com/?q={search_term_string}",
               },
               "query-input": "required name=search_term_string",
             },

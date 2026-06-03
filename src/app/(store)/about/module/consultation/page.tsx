@@ -5,26 +5,17 @@
 import Link from "next/link";
 import {
   Calendar,
-  Clock,
-  Coins,
-  CreditCard,
-  FileSearch,
-  Heart,
   MessageCircle,
-  Phone,
   Shield,
-  Zap,
   CheckCircle,
   RefreshCw,
   Users,
   Globe,
   Lock,
-  BarChart,
   Mail,
   Star,
   Cpu,
   Server,
-  Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,18 +45,18 @@ import {
 
 export default function ConsultationPage() {
   return (
-    <div className="container mx-auto px-4 py-12 max-w-6xl">
+    <div className="container mx-auto px-2 sm:px-4 py-12 max-w-6xl">
       {/* Hero Section */}
       <section className="text-center mb-16">
         <Badge className="mb-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white">
           Enterprise Engagement Suite
         </Badge>
-        <h1 className="text-4xl md:text-5xl font-bold mb-6">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6">
           <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
             Build a Community, Not Just a Store
           </span>
         </h1>
-        <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+        <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
           What we deliver isn't a plugin - it's a live engagement ecosystem.
           Real-time WebSocket infrastructure, shared points economy, OBS-ready
           broadcast displays, and admin controls. This is enterprise-grade
@@ -101,7 +92,7 @@ export default function ConsultationPage() {
             return (
               <div
                 key={feature.title}
-                className="flex gap-3 p-4 rounded-xl border border-gray-200 dark:border-gray-700"
+                className="flex gap-3 p-2 sm:p-4 rounded-xl border border-gray-200 dark:border-gray-700"
               >
                 <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center flex-shrink-0">
                   <Icon className="w-5 h-5 text-blue-600" />
@@ -137,9 +128,9 @@ export default function ConsultationPage() {
                   <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
                     <div className="flex items-center gap-3">
                       <div
-                        className={`w-12 h-12 rounded-lg bg-gradient-to-r ${mod.color} flex items-center justify-center`}
+                        className={`w-12 h-12 p-2 flex items-center justify-center`}
                       >
-                        <Icon className="w-6 h-6 text-white" />
+                        <Icon className="w-6 h-6" />
                       </div>
                       <div>
                         <h3 className="text-xl font-bold">{mod.module}</h3>
@@ -246,7 +237,7 @@ export default function ConsultationPage() {
             return (
               <div
                 key={point.title}
-                className="flex gap-3 p-4 rounded-xl border border-gray-200 dark:border-gray-700"
+                className="flex gap-3 p-2 sm:p-4 rounded-xl border border-gray-200 dark:border-gray-700"
               >
                 <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center flex-shrink-0">
                   <Icon className="w-5 h-5 text-blue-600" />
@@ -316,7 +307,7 @@ export default function ConsultationPage() {
         <h2 className="text-3xl font-bold text-center mb-12">
           Frequently Asked Questions
         </h2>
-        <Accordion type="single" collapsible className="max-w-3xl mx-auto">
+        <Accordion type="single" collapsible className="max-w-3xl mx-auto p-2">
           {faqs.map((faq, index) => (
             <AccordionItem key={index} value={`item-${index}`}>
               <AccordionTrigger className="text-left">
@@ -416,10 +407,10 @@ export default function ConsultationPage() {
             <Button
               size="lg"
               variant="outline"
-              className="border-white text-white hover:bg-white/10"
+              className="border-white text-black hover:bg-white/10"
               asChild
             >
-              <Link href="mailto:hello@northwind.com?subject=Consultation%20Request">
+              <Link href="mailto:hello@noreply.yunobase.com?subject=Consultation%20Request">
                 <Mail className="mr-2 h-5 w-5" />
                 Email Us
               </Link>

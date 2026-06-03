@@ -189,40 +189,42 @@ async function sendVerificationEmail(email: string, name: string) {
 
     verificationLink = url.toString();
 
+    // Send email
     await resend.emails.send({
-      from: `Blessed Two Electronics <${process.env.RESEND_FROM_EMAIL}>`,
+      from: `Northwind Systems <${process.env.RESEND_FROM_EMAIL}>`,
       to: email,
-      subject: `✨ Welcome to Blessed Two Electronics - Verify Your Email`,
+      subject: `✨ Welcome to Northwind Systems - Verify Your Email`,
       html: `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Verify Your Email - Blessed Two Electronics</title>
+          <title>Verify Your Email - Northwind Systems</title>
         </head>
         <body style="font-family: 'Inter', Arial, sans-serif; background: #fefefe; padding: 40px; color: #333; max-width: 600px; margin: auto;">
-          <div style="background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+          <div style="background: linear-gradient(135deg, #2563eb 0%, #06b6d4 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
             <div style="background: white; width: 80px; height: 80px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px;">
-              <div style="font-size: 40px; color: #f59e0b;">💡</div>
+              <div style="font-size: 40px; color: #2563eb;">🎡</div>
             </div>
-            <h1 style="color: white; font-size: 28px; font-weight: bold; margin: 0;">Welcome to Blessed Two Electronics!</h1>
+            <h1 style="color: white; font-size: 28px; font-weight: bold; margin: 0;">Welcome to Northwind Systems!</h1>
           </div>
           
           <div style="background: white; padding: 40px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
             <p style="font-size: 16px; line-height: 1.6; color: #4b5563; margin-bottom: 30px;">
               Hi <strong>${name}</strong>,<br><br>
-              Thank you for joining Nairobi's premier lighting destination! We're excited to have you as part of our community.
+              Thank you for joining Northwind Systems — the complete e-commerce platform with 5 gamified engagement modules!
             </p>
             
-            <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 20px; margin-bottom: 30px; border-radius: 4px;">
-              <h3 style="color: #92400e; margin-top: 0;">🎁 Your Welcome Gift:</h3>
-              <p style="margin-bottom: 10px; color: #92400e;">Use code <strong style="background: #fef3c7; padding: 4px 8px; border-radius: 4px; font-size: 18px;">WELCOME15</strong> to get 15% off your first order!</p>
+            <div style="background: #eff6ff; border-left: 4px solid #2563eb; padding: 20px; margin-bottom: 30px; border-radius: 4px;">
+              <h3 style="color: #1e40af; margin-top: 0;">🎁 Your Welcome Bonus:</h3>
+              <p style="margin-bottom: 10px; color: #1e40af;">Use code <strong style="background: #dbeafe; padding: 4px 8px; border-radius: 4px; font-size: 18px;">WELCOME15</strong> to get 15% off your first order!</p>
+              <p style="margin-bottom: 0; color: #1e40af; font-size: 14px;">+ 100 bonus loyalty points to start!</p>
             </div>
             
             <div style="text-align: center; margin: 40px 0;">
               <a href="${verificationLink}" 
-                 style="background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: white; padding: 18px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 18px; display: inline-block; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
+                 style="background: linear-gradient(135deg, #2563eb 0%, #06b6d4 100%); color: white; padding: 18px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 18px; display: inline-block; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);">
                 ✅ Verify My Email Address
               </a>
             </div>
@@ -232,22 +234,21 @@ async function sendVerificationEmail(email: string, name: string) {
             </p>
             
             <div style="border-top: 1px solid #e5e7eb; padding-top: 30px; margin-top: 30px;">
-              <h4 style="color: #1f2937; margin-bottom: 15px;">💡 What You Get as a Member:</h4>
+              <h4 style="color: #1f2937; margin-bottom: 15px;">🎮 What You Get as a Member:</h4>
               <ul style="color: #4b5563; padding-left: 20px; margin-bottom: 30px;">
-                <li style="margin-bottom: 8px;">🎯 Exclusive member-only discounts & early access to sales</li>
-                <li style="margin-bottom: 8px;">🚚 Free same-day delivery in Nairobi (orders over KES 3,000)</li>
-                <li style="margin-bottom: 8px;">⭐ Priority customer support from our lighting experts</li>
-                <li style="margin-bottom: 8px;">📦 Order tracking and easy reordering</li>
-                <li style="margin-bottom: 8px;">🔧 Free installation consultation for complex lighting projects</li>
+                <li style="margin-bottom: 8px;">🎡 <strong>Spin to Win</strong> - Daily free spins for points and prizes</li>
+                <li style="margin-bottom: 8px;">🏆 <strong>Live Challenges</strong> - Compete in real-time trivia and competitions</li>
+                <li style="margin-bottom: 8px;">🎫 <strong>Lucky Draws</strong> - Enter giveaways with multiple entry methods</li>
+                <li style="margin-bottom: 8px;">🎁 <strong>Mystery Bundles</strong> - Curated products with surprise reveals</li>
+                <li style="margin-bottom: 8px;">⚡ <strong>Flash Deals</strong> - Limited-time offers with live countdowns</li>
+                <li style="margin-bottom: 8px;">💰 <strong>Loyalty Points</strong> - Earn points on every purchase, redeem for discounts</li>
+                <li style="margin-bottom: 8px;">👑 <strong>Tier Benefits</strong> - Unlock Silver, Gold, and Platinum rewards</li>
               </ul>
               
               <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin-top: 20px;">
-                <h4 style="color: #1f2937; margin-top: 0; margin-bottom: 10px;">🏢 Visit Our Store:</h4>
+                <h4 style="color: #1f2937; margin-top: 0; margin-bottom: 10px;">📺 Live Broadcast Ready:</h4>
                 <p style="margin: 0; color: #4b5563;">
-                  <strong>Blessed Two Electronics</strong><br>
-                  Duruma Road, Nairobi<br>
-                  📞 0727 833 691<br>
-                  🕗 Mon-Sat: 8AM-6PM | Sun: 10AM-4PM
+                  Every module includes OBS-friendly displays. Host live streams on TikTok, Instagram, or YouTube while the system handles the heavy lifting — stock updates, payments, and winner selection automatically.
                 </p>
               </div>
             </div>
@@ -255,16 +256,12 @@ async function sendVerificationEmail(email: string, name: string) {
           
           <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
             <p style="color: #9ca3af; font-size: 12px; margin-bottom: 5px;">
-              © ${new Date().getFullYear()} Blessed Two Electronics. All rights reserved.
+              © ${new Date().getFullYear()} Northwind Systems. All rights reserved.
             </p>
             <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-              Duruma Road, Nairobi, Kenya | 
-              <a href="${
-                process.env.NEXT_PUBLIC_SITE_URL
-              }/contact" style="color: #f59e0b; text-decoration: none;">Contact Us</a> | 
-              <a href="${
-                process.env.NEXT_PUBLIC_SITE_URL
-              }/privacy" style="color: #f59e0b; text-decoration: none;">Privacy Policy</a>
+              <a href="${process.env.NEXT_PUBLIC_SITE_URL}/about" style="color: #2563eb; text-decoration: none;">About Us</a> | 
+              <a href="${process.env.NEXT_PUBLIC_SITE_URL}/about/module/consultation" style="color: #2563eb; text-decoration: none;">Enterprise Consultation</a> | 
+              <a href="${process.env.NEXT_PUBLIC_SITE_URL}/about/module" style="color: #2563eb; text-decoration: none;">Learn More of Our Modules</a>
             </p>
           </div>
         </body>

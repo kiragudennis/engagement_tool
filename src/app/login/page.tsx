@@ -1,4 +1,5 @@
-// app/login/page.tsx - Updated for Blessed Two Electricals
+// app/login/page.tsx
+
 "use client";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,19 +18,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Lightbulb,
+  Target,
   Zap,
   Shield,
-  Truck,
+  Gift,
   Award,
   Star,
-  Clock,
-  MapPin,
-  Phone,
-  Percent,
-  Package,
   Users,
+  Coins,
+  Trophy,
+  Ticket,
+  Sparkles,
   CheckCircle,
+  Crown,
+  TrendingUp,
+  Heart,
 } from "lucide-react";
 import { useStore } from "@/lib/context/StoreContext";
 
@@ -67,9 +70,9 @@ export default function LoginPage({
   const getMessage = () => {
     switch (message) {
       case "verified":
-        return "🎉 Email verified successfully! You can now log in.";
+        return "🎉 Email verified successfully! You can now log in and start earning points.";
       case "already-verified":
-        return "✅ Your email is already verified. Please log in.";
+        return "✅ Your email is already verified. Welcome back!";
       case "verification-expired":
         return "⏰ Verification link expired. Please sign up again.";
       default:
@@ -77,27 +80,88 @@ export default function LoginPage({
     }
   };
 
+  // Engagement features for the right column
+  const engagementFeatures = [
+    {
+      icon: Target,
+      title: "Spin to Win",
+      description: "Daily free spins for points and prizes",
+      color: "from-purple-500 to-pink-500",
+    },
+    {
+      icon: Trophy,
+      title: "Live Challenges",
+      description: "Compete in real-time trivia",
+      color: "from-orange-500 to-red-500",
+    },
+    {
+      icon: Ticket,
+      title: "Lucky Draws",
+      description: "Enter giveaways with multiple methods",
+      color: "from-blue-500 to-cyan-500",
+    },
+    {
+      icon: Gift,
+      title: "Mystery Bundles",
+      description: "Curated products with surprise reveals",
+      color: "from-green-500 to-emerald-500",
+    },
+    {
+      icon: Zap,
+      title: "Flash Deals",
+      description: "Limited-time offers with live countdowns",
+      color: "from-amber-500 to-yellow-500",
+    },
+  ];
+
+  const benefits = [
+    {
+      icon: Coins,
+      title: "Earn Loyalty Points",
+      description: "Every purchase earns points redeemable for discounts",
+    },
+    {
+      icon: Crown,
+      title: "Tier Benefits",
+      description: "Unlock Silver, Gold, and Platinum rewards",
+    },
+    {
+      icon: TrendingUp,
+      title: "Engagement Stats",
+      description: "Track your activity across all modules",
+    },
+    {
+      icon: Heart,
+      title: "Community Access",
+      description: "Join live events and compete with others",
+    },
+  ];
+
   return (
-    <div className="min-h-screen dark:from-gray-900 dark:to-amber-950 py-8">
-      <div className="container max-w-6xl mx-auto px-2">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 py-8">
+      <div className="container max-w-6xl mx-auto px-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
           {/* Left Column - Auth Forms */}
           <div className="w-full max-w-md mx-auto">
-            <Card className="shadow-xl border-amber-200 dark:bg-gray-800 dark:border-amber-800">
+            <Card className="shadow-xl border-purple-200 dark:border-purple-900/50">
               <CardHeader className="text-center space-y-4">
                 <div className="flex justify-center items-center space-x-3">
-                  <div className="w-12 h-12 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-lg flex items-center justify-center">
-                    <Lightbulb className="w-8 h-8 text-white" />
+                  <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-lg flex items-center justify-center">
+                    <img
+                      src="/favicon-32x32.png"
+                      alt="Northwind Systems"
+                      className="h-12 w-12"
+                    />
                   </div>
-                  <div className="h-8 w-px bg-amber-300 dark:bg-amber-700"></div>
-                  <Zap className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                  <div className="h-8 w-px bg-gray-300 dark:bg-gray-700"></div>
+                  <Users className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                 </div>
-                <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white">
-                  Blessed Two Electricals
+                <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
+                  Northwind Systems
                 </CardTitle>
                 <CardDescription className="text-gray-600 dark:text-gray-400">
-                  Login for faster checkout, order tracking, and exclusive
-                  lighting deals
+                  Sign in to access all 5 engagement modules and earn loyalty
+                  points
                 </CardDescription>
 
                 {message && (
@@ -119,16 +183,16 @@ export default function LoginPage({
                   defaultValue={panel}
                   className="w-full"
                 >
-                  <TabsList className="grid w-full grid-cols-2 bg-amber-100 dark:bg-amber-900/30">
+                  <TabsList className="grid w-full grid-cols-2 bg-gray-100 dark:bg-gray-800">
                     <TabsTrigger
                       value="signin"
-                      className="data-[state=active]:bg-white data-[state=active]:text-amber-600 dark:data-[state=active]:bg-gray-600 dark:data-[state=active]:text-amber-400"
+                      className="data-[state=active]:bg-white data-[state=active]:text-blue-600 dark:data-[state=active]:bg-gray-700 dark:data-[state=active]:text-blue-400"
                     >
                       Login
                     </TabsTrigger>
                     <TabsTrigger
                       value="signup"
-                      className="data-[state=active]:bg-white data-[state=active]:text-amber-600 dark:data-[state=active]:bg-gray-600 dark:data-[state=active]:text-amber-400"
+                      className="data-[state=active]:bg-white data-[state=active]:text-blue-600 dark:data-[state=active]:bg-gray-700 dark:data-[state=active]:text-blue-400"
                     >
                       Create Account
                     </TabsTrigger>
@@ -140,15 +204,15 @@ export default function LoginPage({
 
                   <TabsContent value="signup" className="space-y-6">
                     <div className="text-center space-y-4">
-                      <div className="w-16 h-16 bg-gradient-to-r from-amber-100 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/30 rounded-full flex items-center justify-center mx-auto">
-                        <Users className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                      <div className="w-16 h-16 bg-gradient-to-r from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 rounded-full flex items-center justify-center mx-auto">
+                        <Users className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                       </div>
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        Join Blessed Two Electricals
+                        Join the Community
                       </h3>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Create your account for the best lighting shopping
-                        experience
+                        Create your account to start earning points and
+                        participating in engagement modules
                       </p>
                     </div>
 
@@ -160,39 +224,36 @@ export default function LoginPage({
                 </Tabs>
 
                 {/* Guest Checkout Option */}
-                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
-                  <p className="text-sm text-amber-800 dark:text-amber-200 text-center mb-3">
+                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-3">
                     Want to shop without an account?
                   </p>
                   <Button
                     asChild
                     variant="outline"
-                    className="w-full border-amber-300 dark:border-amber-600 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30"
+                    className="w-full border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300"
                   >
-                    <Link href="/products">
-                      Continue as Guest
-                      <Package className="w-4 h-4 ml-2" />
-                    </Link>
+                    <Link href="/">Continue as Guest</Link>
                   </Button>
-                  <p className="text-xs text-amber-600 dark:text-amber-300 text-center mt-2">
-                    You can create an account later to save your order history
+                  <p className="text-xs text-gray-500 dark:text-gray-500 text-center mt-2">
+                    Create an account later to earn points on your purchase
                   </p>
                 </div>
 
                 {/* Support Links */}
-                <div className="text-center pt-4 border-t border-amber-200 dark:border-amber-800">
+                <div className="text-center pt-4 border-t border-gray-200 dark:border-gray-700">
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     By signing in, you agree to our{" "}
                     <Link
-                      href="/terms"
-                      className="text-amber-600 dark:text-amber-400 hover:underline"
+                      href="#"
+                      className="text-blue-600 dark:text-blue-400 hover:underline"
                     >
                       Terms
                     </Link>{" "}
                     and{" "}
                     <Link
-                      href="/privacy"
-                      className="text-amber-600 dark:text-amber-400 hover:underline"
+                      href="#"
+                      className="text-blue-600 dark:text-blue-400 hover:underline"
                     >
                       Privacy Policy
                     </Link>
@@ -200,8 +261,8 @@ export default function LoginPage({
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                     Need help?{" "}
                     <a
-                      href="mailto:support@blessedtwo.co.ke"
-                      className="text-amber-600 dark:text-amber-400 hover:underline"
+                      href="mailto:hello@noreply.yunobase.com"
+                      className="text-blue-600 dark:text-blue-400 hover:underline"
                     >
                       Contact Support
                     </a>
@@ -211,218 +272,131 @@ export default function LoginPage({
             </Card>
           </div>
 
-          {/* Right Column - Benefits & Features */}
+          {/* Right Column - Engagement Features */}
           <div className="space-y-6">
             <div className="text-center lg:text-left">
-              <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-4 py-2 rounded-full text-sm font-medium mb-4">
-                <Shield className="w-4 h-4" />
-                <span>Nairobi&apos;s Trusted Lighting Partner</span>
+              <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 py-2 rounded-full text-sm font-medium mb-4">
+                <Sparkles className="w-4 h-4" />
+                <span>5 Engagement Modules • Enterprise Platform</span>
               </div>
-              <h1 className="text-xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
-                Illuminate Your World with Blessed Two
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                Welcome to the Future of E-commerce
               </h1>
-              <p className="text-xl text-gray-600 dark:text-gray-400 mb-8">
-                Join thousands of satisfied customers for premium lighting
-                solutions
+              <p className="text-lg text-gray-600 dark:text-gray-400 mb-8">
+                Access all 5 engagement modules, earn loyalty points, and become
+                part of a community-driven shopping experience.
               </p>
             </div>
 
-            {/* Benefits Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="flex items-start space-x-3 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-amber-100 dark:border-gray-700">
-                <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-400 rounded-full flex items-center justify-center">
-                  <Percent className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">
-                    Exclusive Member Discounts
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Get 15% off your first order plus ongoing member-only deals
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-3 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-amber-100 dark:border-gray-700">
-                <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full flex items-center justify-center">
-                  <Truck className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">
-                    Same-Day Nairobi Delivery
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Order by 2PM, get it today. Free delivery over KES 3,000
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-3 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-amber-100 dark:border-gray-700">
-                <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-r from-amber-500 to-orange-400 rounded-full flex items-center justify-center">
-                  <Award className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">
-                    Expert Installation Support
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Free consultation and professional installation services
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-3 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-amber-100 dark:border-gray-700">
-                <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-400 rounded-full flex items-center justify-center">
-                  <Star className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">
-                    Priority Customer Support
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    24/7 access to our lighting experts for advice and support
-                  </p>
-                </div>
-              </div>
+            {/* Engagement Modules Grid */}
+            <div className="grid grid-cols-1 gap-3">
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+                Engagement Modules
+              </h3>
+              {engagementFeatures.map((feature) => {
+                const Icon = feature.icon;
+                return (
+                  <div
+                    key={feature.title}
+                    className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                  >
+                    <div
+                      className={`w-10 h-10 rounded-lg bg-gradient-to-r ${feature.color} flex items-center justify-center flex-shrink-0`}
+                    >
+                      <Icon className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900 dark:text-white">
+                        {feature.title}
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {feature.description}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
-            {/* For Business Customers */}
-            <div className="bg-gradient-to-r from-amber-600 to-yellow-600 text-white rounded-xl p-4 sm:p-6">
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 w-12 h-12 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center">
-                  <Building className="w-6 h-6" />
+            {/* Benefits Grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {benefits.map((benefit) => {
+                const Icon = benefit.icon;
+                return (
+                  <div
+                    key={benefit.title}
+                    className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                  >
+                    <Icon className="w-5 h-5 text-blue-500 mb-2" />
+                    <h4 className="font-medium text-sm text-gray-900 dark:text-white">
+                      {benefit.title}
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {benefit.description}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Business Account CTA */}
+            <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                  <Users className="w-5 h-5" />
                 </div>
-                <div>
-                  <h3 className="font-bold text-lg mb-2">
-                    Special Benefits for Business Customers
-                  </h3>
-                  <ul className="text-sm opacity-95 space-y-2">
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="w-3 h-3" />
-                      Dedicated account manager for bulk orders
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="w-3 h-3" />
-                      Special wholesale pricing for contractors & businesses
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="w-3 h-3" />
-                      Consolidated shipping and billing
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="w-3 h-3" />
-                      Priority technical support and installation
-                    </li>
-                  </ul>
+                <div className="flex-1">
+                  <h3 className="font-bold mb-1">Enterprise Solutions</h3>
+                  <p className="text-sm opacity-90 mb-3">
+                    Custom deployments, white-label solutions, and dedicated
+                    support for businesses.
+                  </p>
                   <Button
                     asChild
                     variant="outline"
-                    className="border-white text-black hover:bg-white/20 mt-4"
+                    size="sm"
+                    className="border-white/30 text-black"
                   >
-                    <Link href="/business">
-                      Learn about business accounts →
+                    <Link href="/about/module/consultation">
+                      Schedule Consultation →
                     </Link>
                   </Button>
                 </div>
               </div>
             </div>
 
-            {/* Customer Testimonial */}
-            <div className="bg-white dark:bg-gray-800 border border-amber-200 dark:border-gray-700 rounded-xl p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">JM</span>
+            {/* Testimonial */}
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">JD</span>
                 </div>
                 <div>
                   <h4 className="font-semibold text-gray-900 dark:text-white">
-                    James M., Commercial Client
+                    Jane D., Store Owner
                   </h4>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Restaurant Owner in Westlands
+                    Using all 5 modules • 3 months
                   </p>
                 </div>
               </div>
               <p className="text-gray-600 dark:text-gray-300 text-sm italic">
-                "As a restaurant owner, lighting is everything. Blessed Two's
-                business account made outfitting my entire space seamless. Their
-                expert advice on commercial lighting and reliable same-day
-                delivery has made them my go-to supplier for all lighting
-                needs."
+                "The spin wheel alone increased our daily active users by 65%.
+                Adding challenges and draws created a community around our
+                brand. Best investment we've made."
               </p>
               <div className="flex mt-2">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Star
                     key={star}
-                    className="w-4 h-4 fill-yellow-400 text-yellow-400"
+                    className="w-3 h-3 fill-yellow-400 text-yellow-400"
                   />
                 ))}
               </div>
-            </div>
-
-            {/* Store Info */}
-            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-6">
-              <h4 className="font-bold text-lg text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-amber-600" />
-                Visit Our Nairobi Store
-              </h4>
-              <div className="space-y-3">
-                <p className="text-gray-700 dark:text-gray-300">
-                  <strong>Blessed Two Electricals</strong>
-                  <br />
-                  Duruma Road, Nairobi, Kenya
-                </p>
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className="w-4 h-4 text-amber-600" />
-                  <span className="text-gray-600 dark:text-gray-400">
-                    Mon-Sat: 8:00 AM - 6:00 PM | Sun: 10:00 AM - 4:00 PM
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="w-4 h-4 text-amber-600" />
-                  <a
-                    href="tel:0727833691"
-                    className="text-amber-700 dark:text-amber-400 hover:underline"
-                  >
-                    0727 833 691
-                  </a>
-                </div>
-              </div>
-              <Button
-                asChild
-                variant="outline"
-                className="w-full mt-4 border-amber-300 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
-              >
-                <a
-                  href="https://maps.google.com/?q=Duruma+Road+Nairobi"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Get Directions
-                </a>
-              </Button>
             </div>
           </div>
         </div>
       </div>
     </div>
-  );
-}
-
-// Add Building icon component
-function Building({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-      />
-    </svg>
   );
 }

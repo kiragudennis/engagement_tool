@@ -155,7 +155,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="/loyalty"
+                  href="/accounts"
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
                 >
                   <Award className="h-3 w-3 text-purple-500" />
@@ -230,13 +230,13 @@ export default function Footer() {
               About Us
             </Link>
             <Link
-              href="/about/modules"
+              href="/about/module"
               className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               How It Works
             </Link>
             <Link
-              href="/about/modules/consultation"
+              href="/about/module/consultation"
               className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               Consultation

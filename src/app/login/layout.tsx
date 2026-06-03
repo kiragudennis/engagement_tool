@@ -1,31 +1,34 @@
+// app/login/layout.tsx
+
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Login | Blessed Two Electricals Nairobi",
+  title: "Login | Northwind Systems",
   description:
-    "Sign in to access your account, enjoy exclusive coupons, loyalty rewards, daily deals, and premium lighting offers.",
+    "Sign in to access your account, earn loyalty points, participate in spin games, join live challenges, and unlock exclusive deals.",
   keywords: [
-    "login blessed two",
-    "account access Nairobi",
-    "lighting coupons Kenya",
-    "loyalty program lighting",
-    "daily lighting deals",
-    "exclusive offers lighting",
-    "member discounts Nairobi",
-    "premium lighting account",
+    "northwind login",
+    "customer engagement platform",
+    "loyalty program access",
+    "spin to win login",
+    "live challenges signin",
+    "lucky draws entry",
+    "flash deals access",
+    "points redemption login",
+    "community shopping login",
   ],
   openGraph: {
-    title: "Login | Blessed Two Electricals Nairobi",
+    title: "Login | Northwind Systems",
     description:
-      "Sign in to access exclusive coupons, loyalty rewards, daily deals, and premium lighting offers with 2-year warranty.",
-    url: "https://www.blessedtwoelectricals.com/login",
-    siteName: "Blessed Two Electricals",
+      "Sign in to access exclusive engagement modules, loyalty rewards, live challenges, and flash deals.",
+    url: "https://ns.yunobase.com/login",
+    siteName: "Northwind Systems",
     images: [
       {
-        url: "/og-login.jpg", // You should create this image
+        url: "/og-login.jpg",
         width: 1200,
         height: 630,
-        alt: "Login to Blessed Two Electricals - Exclusive Lighting Offers",
+        alt: "Login to Northwind Systems - Engagement Strategy for E-commerce",
       },
     ],
     type: "website",
@@ -33,13 +36,13 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Login | Blessed Two Electricals",
+    title: "Login | Northwind Systems",
     description:
-      "Access exclusive coupons, loyalty rewards & daily lighting deals. Sign in to your account.",
-    images: ["/twitter-login.jpg"], // Create this image
+      "Access your engagement dashboard, loyalty points, and exclusive deals. Sign in to your account.",
+    images: ["/twitter-login.jpg"],
   },
   robots: {
-    index: true, // Typically login pages shouldn't be indexed
+    index: false, // Login pages shouldn't be indexed
     follow: false,
   },
   alternates: {

@@ -4,10 +4,12 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 import {
   Brain,
   CheckCircle,
@@ -21,128 +23,120 @@ import {
   Flame,
   Trophy,
   Loader2,
+  User,
+  Crown,
+  ChevronRight,
+  Send,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-
-interface TriviaQuestion {
-  id: string;
-  question: string;
-  options: string[];
-  correct_answer_index: number;
-  difficulty: string;
-  points_value: number;
-  time_limit_seconds: number;
-  category: string;
-  explanation: string;
-  display_order: number;
-}
-
-interface TriviaSelection {
-  id: string;
-  challenge_id: string;
-  question_id: string;
-  user_id: string;
-  participant_id: string;
-  ticket_number: number;
-  queue_position: number;
-  attempt_number: number;
-  selected_answer: number | null;
-  is_correct: boolean | null;
-  points_earned: number;
-  question_shown_at: string;
-  answer_submitted_at: string | null;
-  response_time_ms: number | null;
-  status:
-    | "queued"
-    | "current"
-    | "answered"
-    | "timeout"
-    | "passed"
-    | "skipped"
-    | "eliminated";
-}
-
-interface TriviaScore {
-  total_score: number;
-  correct_answers: number;
-  questions_answered: number;
-  current_streak: number;
-  best_streak: number;
-  accuracy: number;
-}
-
-interface QueueStatus {
-  ticket_number: number;
-  user_name: string;
-  queue_position: number;
-  is_active: boolean;
-  total_score: number;
-  questions_answered: number;
-  correct_answers: number;
-  current_status: "answering" | "eliminated" | "waiting";
-}
+import {
+  QueueStatus,
+  TriviaQuestion,
+  TriviaScore,
+  TriviaSelection,
+} from "@/types/challenges";
 
 export default function TriviaChallengePage() {
   const { challengeId } = useParams<{ challengeId: string }>();
   const { supabase, profile } = useAuth();
-  const router = useRouter();
 
-  // Game state
-  const [gamePhase, setGamePhase] = useState<
-    "loading" | "waiting" | "answering" | "result" | "eliminated"
-  >("loading");
-  const [currentSelection, setCurrentSelection] =
-    useState<TriviaSelection | null>(null);
+  // Game state - use a single status-based approach instead of gamePhase
+  const [mySelection, setMySelection] = useState<TriviaSelection | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<TriviaQuestion | null>(
     null,
   );
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [textAnswer, setTextAnswer] = useState("");
   const [answerResult, setAnswerResult] = useState<any>(null);
+  const [isEliminated, setIsEliminated] = useState(false);
 
   // Timer
   const [timeLeft, setTimeLeft] = useState<number>(0);
+  const [timerActive, setTimerActive] = useState(false);
   const timerRef = useRef<NodeJS.Timeout>(null);
   const questionShownAtRef = useRef<number | null>(null);
 
   // Score and queue
   const [myScore, setMyScore] = useState<TriviaScore | null>(null);
-  const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [queueParticipants, setQueueParticipants] = useState<QueueStatus[]>([]);
+  const [currentAnsweringUser, setCurrentAnsweringUser] = useState<{
+    user_id: string;
+    user_name: string;
+    ticket_number: number;
+  } | null>(null);
 
-  // Loading states
+  // Loading
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
 
-  // Load initial data
-  const loadInitialData = useCallback(async () => {
+  // Derived state - no more gamePhase!
+  const isMyTurn = mySelection?.status === "current";
+  const hasAnswered =
+    mySelection?.status === "answered" || mySelection?.status === "timeout";
+
+  const loadQuestion = async (questionId: string) => {
+    const { data } = await supabase
+      .from("challenge_trivia_questions")
+      .select("*")
+      .eq("id", questionId)
+      .single();
+    if (data) setCurrentQuestion(data);
+    return data;
+  };
+
+  const loadLeaderboard = async () => {
+    const { data } = await supabase.rpc("get_trivia_leaderboard", {
+      p_challenge_id: challengeId,
+      p_limit: 20,
+    });
+    setLeaderboard(data || []);
+  };
+
+  const loadMyScore = async () => {
+    if (!profile?.id) return;
+    const { data } = await supabase
+      .from("challenge_trivia_scores")
+      .select("*")
+      .eq("challenge_id", challengeId)
+      .eq("user_id", profile.id)
+      .maybeSingle();
+    if (data) setMyScore(data);
+  };
+
+  const loadQueueStatus = async () => {
+    if (!profile?.id) return;
+    const { data } = await supabase.rpc("get_trivia_queue_status", {
+      p_challenge_id: challengeId,
+    });
+    if (data) {
+      setQueueParticipants(data);
+      // Find who's currently answering
+      const answering = data.find(
+        (p: QueueStatus) => p.current_status === "answering",
+      );
+      if (answering) {
+        setCurrentAnsweringUser({
+          user_id: "", // We don't have user_id from queue status
+          user_name: answering.user_name,
+          ticket_number: answering.ticket_number,
+        });
+      } else {
+        setCurrentAnsweringUser(null);
+      }
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
     if (!profile?.id || !challengeId) return;
 
-    try {
-      // Load my score
-      const { data: scoreData } = await supabase
-        .from("challenge_trivia_scores")
-        .select("*")
-        .eq("challenge_id", challengeId)
-        .eq("user_id", profile.id)
-        .maybeSingle();
+    const init = async () => {
+      setInitialLoading(true);
 
-      if (scoreData) {
-        setMyScore(scoreData);
-      } else {
-        // Set default score
-        setMyScore({
-          total_score: 0,
-          correct_answers: 0,
-          questions_answered: 0,
-          current_streak: 0,
-          best_streak: 0,
-          accuracy: 0,
-        });
-      }
-
-      // Check if I'm eliminated
-      const { data: eliminationCheck } = await supabase
+      // Check elimination
+      const { data: elimCheck } = await supabase
         .from("challenge_trivia_selections")
         .select("status")
         .eq("challenge_id", challengeId)
@@ -150,278 +144,192 @@ export default function TriviaChallengePage() {
         .eq("status", "eliminated")
         .limit(1);
 
-      if (eliminationCheck && eliminationCheck.length > 0) {
-        setGamePhase("eliminated");
+      if (elimCheck && elimCheck.length > 0) {
+        setIsEliminated(true);
+        setInitialLoading(false);
         return;
       }
 
-      // Check if I have a current selection (currently answering)
-      const { data: currentSelectionData } = await supabase
+      // Check for active selection
+      const { data: activeSelection } = await supabase
         .from("challenge_trivia_selections")
         .select("*")
         .eq("challenge_id", challengeId)
         .eq("user_id", profile.id)
-        .in("status", ["current", "answered"])
+        .in("status", ["current", "answered", "timeout"])
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (currentSelectionData) {
-        setCurrentSelection(currentSelectionData);
+      if (activeSelection) {
+        setMySelection(activeSelection);
+        const qData = await loadQuestion(activeSelection.question_id);
 
-        if (currentSelectionData.status === "current") {
-          // I'm currently answering - load the question
-          await loadQuestion(currentSelectionData.question_id);
-          setGamePhase("answering");
-
-          // Calculate remaining time
-          if (currentSelectionData.question_shown_at) {
-            const shownAt = new Date(
-              currentSelectionData.question_shown_at,
-            ).getTime();
-            const timeLimit = (currentQuestion?.time_limit_seconds || 5) * 1000;
-            const elapsed = Date.now() - shownAt;
-            const remaining = Math.max(
-              0,
-              Math.ceil((timeLimit - elapsed) / 1000),
-            );
-
-            if (remaining > 0) {
-              startTimer(remaining);
-            } else {
-              // Time already expired
-              setGamePhase("result");
-              setAnswerResult({
-                is_correct: false,
-                points_earned: 0,
-                message: "Time's up! ⏰",
-              });
-            }
-          }
-        } else if (currentSelectionData.status === "answered") {
-          // I already answered - show result
-          await loadQuestion(currentSelectionData.question_id);
-          setGamePhase("result");
-          setSelectedAnswer(currentSelectionData.selected_answer);
+        if (activeSelection.status === "current") {
+          setTimerActive(true);
+          const shownAt = new Date(activeSelection.question_shown_at).getTime();
+          const timeLimit = (qData?.time_limit_seconds || 5) * 1000;
+          const elapsed = Date.now() - shownAt;
+          const remaining = Math.max(
+            0,
+            Math.ceil((timeLimit - elapsed) / 1000),
+          );
+          setTimeLeft(remaining);
+          questionShownAtRef.current = shownAt;
+        } else {
+          // Already answered or timeout
+          setSelectedAnswer(activeSelection.selected_answer);
           setAnswerResult({
-            is_correct: currentSelectionData.is_correct,
-            points_earned: currentSelectionData.points_earned,
-            message: currentSelectionData.is_correct
+            is_correct: activeSelection.is_correct,
+            points_earned: activeSelection.points_earned,
+            message: activeSelection.is_correct
               ? "Correct! 🎉"
-              : "Wrong! 😔",
+              : activeSelection.status === "timeout"
+                ? "Time's up! ⏰"
+                : "Wrong! 😔",
           });
         }
-      } else {
-        // No current selection - waiting for host to call me
-        setGamePhase("waiting");
-
-        // Load queue position
-        await loadQueueStatus();
       }
 
-      // Load leaderboard
-      await loadLeaderboard();
-    } catch (error) {
-      console.error("Error loading initial data:", error);
-      toast.error("Failed to load game data");
-      setGamePhase("loading");
-    }
-  }, [challengeId, profile?.id, supabase]);
+      await Promise.all([loadLeaderboard(), loadQueueStatus(), loadMyScore()]);
+      setInitialLoading(false);
+    };
 
-  // Load question details
-  const loadQuestion = async (questionId: string) => {
-    const { data } = await supabase
-      .from("challenge_trivia_questions")
-      .select("*")
-      .eq("id", questionId)
-      .single();
+    init();
+  }, [challengeId, profile?.id]);
 
-    if (data) {
-      setCurrentQuestion(data);
-    }
-  };
-
-  // Load leaderboard
-  const loadLeaderboard = async () => {
-    const { data } = await supabase.rpc("get_trivia_leaderboard", {
-      p_challenge_id: challengeId,
-      p_limit: 20,
-    });
-
-    setLeaderboard(data || []);
-  };
-
-  // Load queue status for this user
-  const loadQueueStatus = async () => {
-    if (!profile?.id) return;
-
-    try {
-      const { data } = await supabase.rpc("get_trivia_queue_status", {
-        p_challenge_id: challengeId,
-      });
-
-      if (data) {
-        setQueueParticipants(data);
-
-        // Find my position
-        const myStatus = data.find(
-          (p: QueueStatus) =>
-            p.user_name === profile.full_name || p.user_name === profile.email,
-        );
-
-        if (myStatus) {
-          setQueueStatus(myStatus);
-        }
-      }
-    } catch (error) {
-      console.error("Error loading queue status:", error);
-    }
-  };
-
-  // Subscribe to real-time updates
+  // Real-time subscription - THIS IS THE KEY FIX
   useEffect(() => {
-    if (!profile?.id || !challengeId) return;
+    if (!profile?.id || !challengeId || initialLoading) return;
 
-    loadInitialData();
+    console.log("🔌 Setting up real-time for user:", profile.id);
 
-    // Subscribe to my selections
-    const selectionChannel = supabase
-      .channel(`trivia-player-${challengeId}-${profile.id}`)
+    const channel = supabase
+      .channel(`trivia-${challengeId}`)
       .on(
         "postgres_changes",
         {
-          event: "*",
+          event: "INSERT",
           schema: "public",
           table: "challenge_trivia_selections",
-          filter: `challenge_id=eq.${challengeId} AND user_id=eq.${profile.id}`,
+          filter: `challenge_id=eq.${challengeId}`,
         },
         async (payload) => {
           const selection = payload.new as TriviaSelection;
+          console.log(
+            "📨 INSERT event:",
+            selection.user_id,
+            "My ID:",
+            profile.id,
+          );
 
-          if (payload.eventType === "INSERT") {
-            if (selection.status === "current") {
-              // Host selected me!
-              setCurrentSelection(selection);
-              await loadQuestion(selection.question_id);
-              setGamePhase("answering");
-              setSelectedAnswer(null);
-              setAnswerResult(null);
-              questionShownAtRef.current = Date.now();
+          // Always refresh queue
+          loadQueueStatus();
 
-              // Start timer with question's time limit
-              if (currentQuestion?.time_limit_seconds) {
-                startTimer(currentQuestion.time_limit_seconds);
-              } else {
-                // Load question first then start timer
-                const { data: questionData } = await supabase
-                  .from("challenge_trivia_questions")
-                  .select("time_limit_seconds")
-                  .eq("id", selection.question_id)
-                  .single();
+          if (selection.user_id === profile.id) {
+            console.log("✅ This is MY selection! Loading question...");
+            setMySelection(selection);
+            const qData = await loadQuestion(selection.question_id);
 
-                startTimer(questionData?.time_limit_seconds || 5);
-              }
-            }
-          } else if (payload.eventType === "UPDATE") {
-            setCurrentSelection(selection);
+            setSelectedAnswer(null);
+            setTextAnswer("");
+            setAnswerResult(null);
+            setTimerActive(true);
+
+            const timeLimit = qData?.time_limit_seconds || 5;
+            setTimeLeft(timeLimit);
+            questionShownAtRef.current = Date.now();
+
+            toast.success("You've been selected! Answer quickly!");
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "challenge_trivia_selections",
+          filter: `challenge_id=eq.${challengeId}`,
+        },
+        async (payload) => {
+          const selection = payload.new as TriviaSelection;
+          console.log("🔄 UPDATE event:", selection.user_id, selection.status);
+
+          // Always refresh queue
+          loadQueueStatus();
+          loadLeaderboard();
+
+          if (selection.user_id === profile.id) {
+            console.log("✅ My selection updated:", selection.status);
+            setMySelection(selection);
 
             if (selection.status === "answered") {
-              // My answer was processed
-              setGamePhase("result");
-              if (timerRef.current) clearInterval(timerRef.current);
+              setTimerActive(false);
               setSelectedAnswer(selection.selected_answer);
               setAnswerResult({
                 is_correct: selection.is_correct,
                 points_earned: selection.points_earned,
                 message: selection.is_correct ? "Correct! 🎉" : "Wrong! 😔",
               });
-
-              // Reload score
-              await loadInitialData();
-
+              loadMyScore();
               if (selection.is_correct) {
-                toast.success(`Correct! +${selection.points_earned} points`);
-              } else {
-                toast.error("Wrong answer!");
+                toast.success(`+${selection.points_earned} points!`);
               }
             } else if (selection.status === "timeout") {
-              // Time ran out
-              setGamePhase("result");
-              if (timerRef.current) clearInterval(timerRef.current);
+              setTimerActive(false);
               setAnswerResult({
                 is_correct: false,
                 points_earned: 0,
                 message: "Time's up! ⏰",
               });
             } else if (selection.status === "passed") {
-              // Host passed to next player
-              setGamePhase("waiting");
-              if (timerRef.current) clearInterval(timerRef.current);
+              setTimerActive(false);
+              setMySelection(null);
+              setCurrentQuestion(null);
               toast.info("Question passed to next player");
-              await loadQueueStatus();
             } else if (selection.status === "eliminated") {
-              // I was eliminated
-              setGamePhase("eliminated");
-              toast.error("You've been eliminated from the game");
+              setIsEliminated(true);
+              toast.error("You've been eliminated");
             }
           }
         },
       )
-      .subscribe();
-
-    // Subscribe to leaderboard updates
-    const leaderboardChannel = supabase
-      .channel(`trivia-leaderboard-${challengeId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "challenge_trivia_scores",
-          filter: `challenge_id=eq.${challengeId}`,
-        },
-        () => {
-          loadLeaderboard();
-          loadQueueStatus();
-        },
-      )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("📡 Channel status:", status);
+      });
 
     return () => {
-      selectionChannel.unsubscribe();
-      leaderboardChannel.unsubscribe();
-      if (timerRef.current) clearInterval(timerRef.current);
+      console.log("🔌 Cleaning up channel");
+      channel.unsubscribe();
     };
-  }, [challengeId, profile?.id, supabase, loadInitialData]);
+  }, [challengeId, profile?.id, initialLoading]);
 
-  // Timer logic
-  const startTimer = (seconds: number) => {
-    setTimeLeft(seconds);
-
-    if (timerRef.current) clearInterval(timerRef.current);
+  // Timer effect
+  useEffect(() => {
+    if (!timerActive || timeLeft <= 0) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      return;
+    }
 
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          // Don't auto-submit - the host will handle timeout via real-time
+          setTimerActive(false);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
-  };
 
-  // Handle answer submission
-  const handleAnswer = async (answerIndex: number) => {
-    if (
-      gamePhase !== "answering" ||
-      selectedAnswer !== null ||
-      !currentSelection ||
-      isSubmitting
-    ) {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [timerActive, timeLeft]);
+
+  const handleMultipleChoiceAnswer = async (answerIndex: number) => {
+    if (!isMyTurn || selectedAnswer !== null || isSubmitting || !mySelection)
       return;
-    }
 
     setSelectedAnswer(answerIndex);
     setIsSubmitting(true);
@@ -430,243 +338,486 @@ export default function TriviaChallengePage() {
       const responseTimeMs = questionShownAtRef.current
         ? Date.now() - questionShownAtRef.current
         : 0;
-
-      // Submit answer via RPC
-      const { data, error } = await supabase.rpc("submit_trivia_answer", {
-        p_selection_id: currentSelection.id,
+      const { error } = await supabase.rpc("submit_trivia_answer", {
+        p_selection_id: mySelection.id,
         p_answer_index: answerIndex,
         p_response_time_ms: responseTimeMs,
       });
-
       if (error) throw error;
-
-      // The real-time subscription will handle the result display
       toast.success("Answer submitted!");
     } catch (error: any) {
-      console.error("Error submitting answer:", error);
-      toast.error(error.message || "Failed to submit answer");
+      toast.error(error.message);
       setSelectedAnswer(null);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Loading state
-  if (gamePhase === "loading") {
+  const handleOpenEndedAnswer = async () => {
+    if (!isMyTurn || isSubmitting || !mySelection || !textAnswer.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      const responseTimeMs = questionShownAtRef.current
+        ? Date.now() - questionShownAtRef.current
+        : 0;
+      const { error } = await supabase.rpc("submit_trivia_answer", {
+        p_selection_id: mySelection.id,
+        p_text_answer: textAnswer.trim(),
+        p_response_time_ms: responseTimeMs,
+      });
+      if (error) throw error;
+      toast.success("Answer submitted!");
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Loading
+  if (initialLoading) {
     return (
-      <div className="container mx-auto px-4 py-12">
-        <Card className="max-w-2xl mx-auto">
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <Brain className="h-20 w-20 text-yellow-500 mx-auto mb-6 animate-bounce" />
+          <Loader2 className="h-8 w-8 animate-spin text-purple-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white">Loading Game</h2>
+        </div>
+      </div>
+    );
+  }
+
+  // Eliminated
+  if (isEliminated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 flex items-center justify-center">
+        <Card className="bg-red-950/30 border-red-500/30 max-w-md mx-auto">
           <CardContent className="p-12 text-center">
-            <Loader2 className="h-16 w-16 text-yellow-500 mx-auto mb-4 animate-spin" />
-            <h2 className="text-2xl font-bold mb-2">Loading Game</h2>
-            <p className="text-muted-foreground">
-              Setting up your trivia experience...
-            </p>
+            <XCircle className="h-20 w-20 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-2">Eliminated</h2>
+            <p className="text-red-300">Better luck next time!</p>
+            {myScore && (
+              <p className="text-yellow-400 mt-4 text-xl font-bold">
+                Final Score: {myScore.total_score}
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  // Eliminated state
-  if (gamePhase === "eliminated") {
-    return (
-      <div className="container mx-auto px-4 py-12">
-        <Card className="max-w-2xl mx-auto">
-          <CardContent className="p-12 text-center">
-            <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Eliminated</h2>
-            <p className="text-muted-foreground mb-6">
-              You've been eliminated from this round. Better luck next time!
-            </p>
+  const userRank = leaderboard.findIndex((e) => e.user_id === profile?.id) + 1;
 
-            {myScore && (
-              <div className="grid grid-cols-3 gap-4 mb-8">
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <p className="text-2xl font-bold text-yellow-600">
-                    {myScore.total_score}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Final Score</p>
-                </div>
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <p className="text-2xl font-bold text-green-600">
-                    {myScore.correct_answers}/{myScore.questions_answered}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Correct</p>
-                </div>
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <p className="text-2xl font-bold text-purple-600">
-                    {myScore.current_streak}🔥
-                  </p>
-                  <p className="text-xs text-muted-foreground">Streak</p>
+  // MAIN RENDER - Always show everything, no conditional returns
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950">
+      {/* Top Bar */}
+      <div className="sticky top-0 z-20 border-b border-purple-500/20 bg-purple-950/80 backdrop-blur-sm">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Brain className="h-6 w-6 text-yellow-500" />
+              <div>
+                <h1 className="text-lg font-bold text-white">
+                  Trivia Challenge
+                </h1>
+                <div className="flex items-center gap-2">
+                  <div
+                    className={cn(
+                      "w-2 h-2 rounded-full",
+                      isMyTurn ? "bg-green-500 animate-pulse" : "bg-blue-500",
+                    )}
+                  />
+                  <span className="text-xs text-gray-400">
+                    {isMyTurn
+                      ? "YOUR TURN - Answer now!"
+                      : hasAnswered
+                        ? "Answer submitted"
+                        : "Waiting for turn"}
+                  </span>
                 </div>
               </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {myScore && (
+                <Badge className="bg-yellow-500/20 text-yellow-400">
+                  <Trophy className="h-3 w-3 mr-1" /> {myScore.total_score} pts
+                </Badge>
+              )}
+              {userRank > 0 && (
+                <Badge className="bg-purple-500/20 text-purple-400">
+                  <Crown className="h-3 w-3 mr-1" /> #{userRank}
+                </Badge>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left - Queue */}
+          <div className="lg:col-span-1 space-y-4">
+            {myScore && (
+              <Card className="bg-white/5 border-purple-500/20">
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-3 rounded-lg bg-yellow-500/10">
+                      <p className="text-xl font-bold text-yellow-400">
+                        {myScore.total_score}
+                      </p>
+                      <p className="text-xs text-gray-400">Score</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-green-500/10">
+                      <p className="text-xl font-bold text-green-400">
+                        {myScore.correct_answers}/{myScore.questions_answered}
+                      </p>
+                      <p className="text-xs text-gray-400">Correct</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-blue-500/10">
+                      <p className="text-xl font-bold text-blue-400">
+                        {myScore.accuracy}%
+                      </p>
+                      <p className="text-xs text-gray-400">Accuracy</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-purple-500/10">
+                      <p className="text-xl font-bold text-purple-400">
+                        {myScore.current_streak}🔥
+                      </p>
+                      <p className="text-xs text-gray-400">Streak</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
-            <Button onClick={() => router.push(`/challenges/${challengeId}`)}>
-              View Challenge Details
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+            <Card className="bg-white/5 border-purple-500/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-white text-sm flex items-center gap-2">
+                  <Users className="h-4 w-4 text-blue-400" />
+                  Queue ({queueParticipants.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <ScrollArea className="h-[400px] px-4 pb-4">
+                  {queueParticipants.map((p, idx) => {
+                    const isMe =
+                      p.user_name === (profile?.full_name || profile?.email);
+                    const isAnswering = p.current_status === "answering";
 
-  // Waiting state
-  if (gamePhase === "waiting") {
-    return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="grid gap-6 max-w-4xl mx-auto">
-          {/* Waiting Card */}
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Brain className="h-16 w-16 text-yellow-500 mx-auto mb-4 animate-pulse" />
-              <h2 className="text-2xl font-bold mb-2">Waiting for Your Turn</h2>
-              <p className="text-muted-foreground mb-2">
-                The host will call participants one at a time to answer
-                questions
-              </p>
-
-              {queueStatus && (
-                <div className="flex items-center justify-center gap-2 mt-4">
-                  <Ticket className="h-5 w-5 text-blue-500" />
-                  <span className="font-bold">
-                    Your Ticket: #{queueStatus.ticket_number}
-                  </span>
-                  <Badge variant="outline">
-                    Position #{queueStatus.queue_position}
-                  </Badge>
-                </div>
-              )}
-
-              <div className="mt-6 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                <Clock className="h-4 w-4" />
-                <span>
-                  Stay ready! When selected, you'll have limited time to answer
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* My Stats */}
-          {myScore && (
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="font-semibold mb-4">My Performance</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-3 rounded-lg bg-yellow-500/10">
-                    <p className="text-2xl font-bold text-yellow-600">
-                      {myScore.total_score}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Total Score</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-green-500/10">
-                    <p className="text-2xl font-bold text-green-600">
-                      {myScore.correct_answers}/{myScore.questions_answered}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Correct</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-blue-500/10">
-                    <p className="text-2xl font-bold text-blue-600">
-                      {myScore.accuracy}%
-                    </p>
-                    <p className="text-xs text-muted-foreground">Accuracy</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-purple-500/10">
-                    <p className="text-2xl font-bold text-purple-600">
-                      {myScore.current_streak}🔥
-                    </p>
-                    <p className="text-xs text-muted-foreground">Streak</p>
-                  </div>
-                </div>
+                    return (
+                      <div
+                        key={p.ticket_number}
+                        className={cn(
+                          "flex items-center gap-3 p-2 rounded-lg mb-1",
+                          isAnswering &&
+                            "bg-yellow-500/10 border border-yellow-500/30",
+                          isMe && "bg-blue-500/10 border border-blue-500/30",
+                          p.current_status === "eliminated" && "opacity-40",
+                        )}
+                      >
+                        <span className="text-sm font-mono text-gray-400 w-8">
+                          #{p.ticket_number}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className={cn(
+                              "text-sm font-medium truncate",
+                              isMe ? "text-blue-400" : "text-white",
+                            )}
+                          >
+                            {p.user_name} {isMe && "(You)"}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {p.total_score} pts • {p.correct_answers}/
+                            {p.questions_answered}
+                          </p>
+                        </div>
+                        {isAnswering && (
+                          <Badge className="bg-yellow-500/20 text-yellow-400 text-xs animate-pulse">
+                            Answering
+                          </Badge>
+                        )}
+                        {isMe && !isAnswering && (
+                          <Badge className="bg-blue-500/20 text-blue-400 text-xs">
+                            Waiting
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </ScrollArea>
               </CardContent>
             </Card>
-          )}
+          </div>
 
-          {/* Queue Participants */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">Participant Queue</h3>
-                <Badge variant="outline">
-                  <Users className="h-3 w-3 mr-1" />
-                  {queueParticipants.length} participants
-                </Badge>
-              </div>
-
-              <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                {queueParticipants.map((participant) => (
-                  <div
-                    key={participant.ticket_number}
-                    className={cn(
-                      "flex items-center justify-between p-3 rounded-lg",
-                      participant.current_status === "answering" &&
-                        "bg-yellow-500/10 border border-yellow-500/30",
-                      participant.current_status === "eliminated" &&
-                        "bg-red-500/10 opacity-50",
-                      participant.user_name ===
-                        (profile?.full_name || profile?.email) &&
-                        "ring-2 ring-blue-500",
-                      participant.current_status === "waiting" && "bg-muted/30",
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Badge className="text-lg font-mono">
-                        #{participant.ticket_number}
-                      </Badge>
-                      <div>
-                        <p className="font-medium">
-                          {participant.user_name}
-                          {participant.user_name ===
-                            (profile?.full_name || profile?.email) && (
-                            <span className="text-blue-500 ml-1">(You)</span>
-                          )}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Score: {participant.total_score} •{" "}
-                          {participant.correct_answers}/
-                          {participant.questions_answered}
-                        </p>
-                      </div>
+          {/* Right - Question Area */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* Show who's answering (when it's not me) */}
+            {currentAnsweringUser && !isMyTurn && (
+              <Card className="bg-yellow-500/5 border-yellow-500/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+                    <div>
+                      <p className="text-sm text-gray-400">
+                        Currently Answering
+                      </p>
+                      <p className="text-lg font-bold text-yellow-400">
+                        {currentAnsweringUser.user_name}
+                        <span className="text-sm font-normal text-gray-400 ml-2">
+                          Ticket #{currentAnsweringUser.ticket_number}
+                        </span>
+                      </p>
                     </div>
-                    <Badge
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* MY QUESTION - Show when it's my turn or I've answered */}
+            {(isMyTurn || hasAnswered) && currentQuestion && (
+              <Card
+                className={cn(
+                  "backdrop-blur border-2",
+                  isMyTurn && "border-yellow-500/50 bg-yellow-500/5",
+                  hasAnswered &&
+                    answerResult?.is_correct &&
+                    "border-green-500/50 bg-green-500/5",
+                  hasAnswered &&
+                    !answerResult?.is_correct &&
+                    "border-red-500/50 bg-red-500/5",
+                )}
+              >
+                <CardContent className="p-6">
+                  {/* Timer */}
+                  {isMyTurn && (
+                    <div className="mb-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <Badge
+                          className={cn(
+                            timeLeft <= 2
+                              ? "bg-red-500 animate-pulse"
+                              : timeLeft <= 3
+                                ? "bg-yellow-500"
+                                : "bg-green-500",
+                          )}
+                        >
+                          <Timer className="h-3 w-3 mr-1" /> {timeLeft}s
+                        </Badge>
+                        <div className="flex gap-2">
+                          <Badge variant="outline">
+                            {currentQuestion.points_value} pts
+                          </Badge>
+                          <Badge variant="outline">
+                            {currentQuestion.difficulty}
+                          </Badge>
+                        </div>
+                      </div>
+                      <Progress
+                        value={
+                          (timeLeft /
+                            (currentQuestion.time_limit_seconds || 5)) *
+                          100
+                        }
+                        className="h-2"
+                      />
+                    </div>
+                  )}
+
+                  {/* Question */}
+                  <h2 className="text-xl font-bold text-white mb-6">
+                    {currentQuestion.question}
+                  </h2>
+
+                  {/* MULTIPLE CHOICE / TRUE-FALSE */}
+                  {(currentQuestion.question_type === "multiple_choice" ||
+                    currentQuestion.question_type === "true_false") &&
+                    currentQuestion.options && (
+                      <div className="space-y-3">
+                        {currentQuestion.options.map(
+                          (option: string, idx: number) => {
+                            const isCorrect =
+                              idx === currentQuestion.correct_answer_index;
+                            const isWrong =
+                              hasAnswered &&
+                              idx === selectedAnswer &&
+                              !answerResult?.is_correct;
+
+                            return (
+                              <Button
+                                key={idx}
+                                variant={
+                                  hasAnswered && isCorrect
+                                    ? "default"
+                                    : isWrong
+                                      ? "destructive"
+                                      : selectedAnswer === idx
+                                        ? "default"
+                                        : "outline"
+                                }
+                                className={cn(
+                                  "w-full justify-start text-left h-auto py-4 px-5",
+                                  hasAnswered &&
+                                    isCorrect &&
+                                    "bg-green-600 border-green-500",
+                                  isWrong && "bg-red-600 border-red-500",
+                                  isMyTurn &&
+                                    !selectedAnswer &&
+                                    "hover:bg-purple-500/20",
+                                )}
+                                onClick={() => handleMultipleChoiceAnswer(idx)}
+                                disabled={
+                                  !isMyTurn ||
+                                  selectedAnswer !== null ||
+                                  isSubmitting
+                                }
+                              >
+                                <span className="font-bold mr-3 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                                  {String.fromCharCode(65 + idx)}
+                                </span>
+                                <span className="flex-1">{option}</span>
+                                {hasAnswered && isCorrect && (
+                                  <CheckCircle className="h-5 w-5 text-white" />
+                                )}
+                                {isWrong && (
+                                  <XCircle className="h-5 w-5 text-white" />
+                                )}
+                              </Button>
+                            );
+                          },
+                        )}
+                      </div>
+                    )}
+
+                  {/* OPEN-ENDED */}
+                  {currentQuestion.question_type === "open_ended" && (
+                    <div className="space-y-4">
+                      <div className="flex gap-2">
+                        <Input
+                          value={textAnswer}
+                          onChange={(e) => setTextAnswer(e.target.value)}
+                          placeholder="Type your answer..."
+                          disabled={!isMyTurn || isSubmitting}
+                          className="bg-white/10 border-gray-600 text-white"
+                          onKeyDown={(e) =>
+                            e.key === "Enter" && handleOpenEndedAnswer()
+                          }
+                        />
+                        <Button
+                          onClick={handleOpenEndedAnswer}
+                          disabled={
+                            !isMyTurn || !textAnswer.trim() || isSubmitting
+                          }
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {hasAnswered && (
+                        <p
+                          className={cn(
+                            "text-sm",
+                            answerResult?.is_correct
+                              ? "text-green-400"
+                              : "text-red-400",
+                          )}
+                        >
+                          {answerResult?.is_correct
+                            ? "✅ Correct!"
+                            : "❌ Wrong! Accepted answers: " +
+                              (currentQuestion.accepted_answers?.join(", ") ||
+                                "N/A")}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Result */}
+                  {hasAnswered && answerResult && (
+                    <div
                       className={cn(
-                        participant.current_status === "answering" &&
-                          "bg-yellow-500 text-white animate-pulse",
-                        participant.current_status === "waiting" &&
-                          "bg-blue-500/20 text-blue-400",
-                        participant.current_status === "eliminated" &&
-                          "bg-red-500/20 text-red-400",
+                        "mt-6 p-4 rounded-xl border",
+                        answerResult.is_correct
+                          ? "bg-green-500/10 border-green-500/30"
+                          : "bg-red-500/10 border-red-500/30",
                       )}
                     >
-                      {participant.current_status}
-                    </Badge>
-                  </div>
-                ))}
+                      <div className="flex items-center gap-2 mb-2">
+                        {answerResult.is_correct ? (
+                          <CheckCircle className="h-5 w-5 text-green-400" />
+                        ) : (
+                          <XCircle className="h-5 w-5 text-red-400" />
+                        )}
+                        <span className="font-bold text-white">
+                          {answerResult.message}
+                        </span>
+                      </div>
+                      <p className="text-sm">
+                        Points:{" "}
+                        <span className="font-bold">
+                          {answerResult.is_correct ? "+" : ""}
+                          {answerResult.points_earned}
+                        </span>
+                        {answerResult.response_time_ms && (
+                          <span className="text-gray-400 ml-4">
+                            ({(answerResult.response_time_ms / 1000).toFixed(1)}
+                            s)
+                          </span>
+                        )}
+                      </p>
+                      {currentQuestion.explanation && (
+                        <div className="mt-3 pt-3 border-t border-white/10 flex gap-2">
+                          <Lightbulb className="h-4 w-4 text-yellow-500 flex-shrink-0" />
+                          <p className="text-sm text-gray-300">
+                            {currentQuestion.explanation}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
-                {queueParticipants.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>No participants in queue yet</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+            {/* Waiting state (no active question for me) */}
+            {!isMyTurn && !hasAnswered && (
+              <Card className="bg-white/5 border-purple-500/20">
+                <CardContent className="p-12 text-center">
+                  <Brain className="h-16 w-16 text-yellow-500 mx-auto mb-4 animate-pulse" />
+                  <h2 className="text-2xl font-bold text-white mb-2">
+                    Get Ready!
+                  </h2>
+                  <p className="text-gray-400">
+                    {currentAnsweringUser
+                      ? `${currentAnsweringUser.user_name} is currently answering`
+                      : "Waiting for the host to select a participant"}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
-          {/* Mini Leaderboard */}
-          {leaderboard.length > 0 && (
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="font-semibold mb-4">Top Players</h3>
-                <div className="space-y-2">
-                  {leaderboard.slice(0, 5).map((entry, idx) => (
-                    <div
-                      key={entry.user_id}
-                      className="flex items-center justify-between p-2 rounded"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>
+            {/* Leaderboard */}
+            {leaderboard.length > 0 && (
+              <Card className="bg-white/5 border-purple-500/20">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-white text-sm flex items-center gap-2">
+                    <Trophy className="h-4 w-4 text-yellow-500" /> Leaderboard
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {leaderboard.slice(0, 10).map((entry, idx) => {
+                    const isMe = entry.user_id === profile?.id;
+                    return (
+                      <div
+                        key={entry.user_id}
+                        className={cn(
+                          "flex items-center gap-3 p-2 rounded-lg",
+                          isMe && "bg-blue-500/10 border border-blue-500/20",
+                        )}
+                      >
+                        <span className="w-8 text-center text-lg">
                           {idx === 0
                             ? "🥇"
                             : idx === 1
@@ -675,215 +826,32 @@ export default function TriviaChallengePage() {
                                 ? "🥉"
                                 : `#${idx + 1}`}
                         </span>
-                        <span
-                          className={cn(
-                            entry.user_id === profile?.id &&
-                              "font-bold text-yellow-600",
-                          )}
-                        >
-                          {entry.full_name}
-                        </span>
+                        <div className="flex-1">
+                          <p
+                            className={cn(
+                              "text-sm font-medium",
+                              isMe ? "text-blue-400" : "text-white",
+                            )}
+                          >
+                            {entry.full_name} {isMe && "(You)"}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {entry.correct_answers}/{entry.questions_answered} •{" "}
+                            {entry.accuracy}%
+                          </p>
+                        </div>
+                        <p className="text-lg font-bold text-white">
+                          {entry.total_score}
+                        </p>
                       </div>
-                      <span className="font-bold">{entry.total_score}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
-    );
-  }
-
-  // Answering state
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <Card className="max-w-2xl mx-auto">
-        <CardContent className="p-8">
-          {currentQuestion && (
-            <>
-              {/* Timer Bar */}
-              <div className="mb-6">
-                <div className="flex justify-between items-center mb-2">
-                  <Badge
-                    className={cn(
-                      timeLeft <= 2
-                        ? "bg-red-500"
-                        : timeLeft <= 3
-                          ? "bg-yellow-500"
-                          : "bg-green-500",
-                      timeLeft <= 2 && "animate-pulse",
-                    )}
-                  >
-                    <Timer className="h-3 w-3 mr-1" />
-                    {timeLeft}s
-                  </Badge>
-                  <div className="flex gap-2">
-                    <Badge variant="outline">
-                      <Zap className="h-3 w-3 mr-1" />
-                      {currentQuestion.points_value} pts
-                    </Badge>
-                    <Badge variant="outline">
-                      {currentQuestion.difficulty}
-                    </Badge>
-                  </div>
-                </div>
-                <Progress
-                  value={
-                    (timeLeft / (currentQuestion.time_limit_seconds || 5)) * 100
-                  }
-                  className={cn(
-                    "h-2",
-                    timeLeft <= 2
-                      ? "bg-red-200"
-                      : timeLeft <= 3
-                        ? "bg-yellow-200"
-                        : "bg-green-200",
-                  )}
-                />
-              </div>
-
-              {/* Question */}
-              <div className="mb-6">
-                <h2 className="text-xl font-bold mb-2">
-                  {currentQuestion.question}
-                </h2>
-                {currentQuestion.category && (
-                  <Badge variant="secondary" className="text-xs">
-                    {currentQuestion.category}
-                  </Badge>
-                )}
-              </div>
-
-              {/* Answer Options */}
-              <div className="space-y-3">
-                {currentQuestion.options?.map((option: string, idx: number) => (
-                  <Button
-                    key={idx}
-                    variant={
-                      gamePhase === "result" &&
-                      idx === currentQuestion.correct_answer_index
-                        ? "default"
-                        : gamePhase === "result" &&
-                            idx === selectedAnswer &&
-                            !answerResult?.is_correct
-                          ? "destructive"
-                          : selectedAnswer === idx
-                            ? "default"
-                            : "outline"
-                    }
-                    className={cn(
-                      "w-full justify-start text-left h-auto py-4 px-6 text-base",
-                      gamePhase === "answering" &&
-                        !isSubmitting &&
-                        "hover:scale-[1.02] transition-transform",
-                      isSubmitting && "opacity-50 cursor-not-allowed",
-                    )}
-                    onClick={() => handleAnswer(idx)}
-                    disabled={
-                      gamePhase !== "answering" ||
-                      selectedAnswer !== null ||
-                      isSubmitting
-                    }
-                  >
-                    <span className="font-bold mr-3 text-lg">
-                      {String.fromCharCode(65 + idx)}.
-                    </span>
-                    <span className="flex-1">{option}</span>
-                    {gamePhase === "result" &&
-                      idx === currentQuestion.correct_answer_index && (
-                        <CheckCircle className="h-5 w-5 ml-2 text-green-500 flex-shrink-0" />
-                      )}
-                    {gamePhase === "result" &&
-                      idx === selectedAnswer &&
-                      !answerResult?.is_correct && (
-                        <XCircle className="h-5 w-5 ml-2 text-red-500 flex-shrink-0" />
-                      )}
-                  </Button>
-                ))}
-              </div>
-
-              {/* Submitting indicator */}
-              {isSubmitting && (
-                <div className="mt-4 text-center">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-yellow-500" />
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Submitting answer...
-                  </p>
-                </div>
-              )}
-
-              {/* Result Display */}
-              {gamePhase === "result" && answerResult && (
-                <div
-                  className={cn(
-                    "mt-6 p-6 rounded-lg border",
-                    answerResult.is_correct
-                      ? "bg-green-500/10 border-green-500/30"
-                      : "bg-red-500/10 border-red-500/30",
-                  )}
-                >
-                  <div className="flex items-center gap-3 mb-3">
-                    {answerResult.is_correct ? (
-                      <CheckCircle className="h-6 w-6 text-green-500" />
-                    ) : (
-                      <XCircle className="h-6 w-6 text-red-500" />
-                    )}
-                    <span className="text-lg font-bold">
-                      {answerResult.message}
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Points earned:</span>
-                      <span className="font-bold text-lg">
-                        {answerResult.is_correct ? "+" : ""}
-                        {answerResult.points_earned}
-                      </span>
-                    </div>
-
-                    {answerResult.speed_bonus > 0 && (
-                      <div className="flex justify-between text-green-600">
-                        <span>⚡ Speed bonus:</span>
-                        <span className="font-bold">
-                          +{answerResult.speed_bonus}
-                        </span>
-                      </div>
-                    )}
-
-                    {answerResult.streak_bonus > 0 && (
-                      <div className="flex justify-between text-purple-600">
-                        <span>🔥 Streak bonus:</span>
-                        <span className="font-bold">
-                          +{answerResult.streak_bonus}
-                        </span>
-                      </div>
-                    )}
-
-                    {answerResult.response_time_ms && (
-                      <div className="flex justify-between text-muted-foreground">
-                        <span>Response time:</span>
-                        <span>
-                          {(answerResult.response_time_ms / 1000).toFixed(1)}s
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {currentQuestion.explanation && (
-                    <div className="mt-4 pt-4 border-t flex items-start gap-2">
-                      <Lightbulb className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm">{currentQuestion.explanation}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

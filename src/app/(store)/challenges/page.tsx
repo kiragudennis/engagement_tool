@@ -618,7 +618,7 @@ function MyChallengeCard({
             <Link href={`/challenges/${challenge.id}`}>View</Link>
           </Button>
           <Button asChild variant="outline" className="flex-1 gap-1">
-            <Link href={`/challenges/${challenge.id}/leaderboard`}>
+            <Link href={`/challenges/${challenge.id}`}>
               <TrendingUp className="h-4 w-4" />
               Leaderboard
             </Link>

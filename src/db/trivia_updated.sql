@@ -181,7 +181,88 @@ BEGIN
 END;
 $$;
 
--- Function to get next participant in queue
+-- 1. Add a function to clean up stale selections and handle timeouts
+CREATE OR REPLACE FUNCTION cleanup_stale_trivia_selections(
+    p_challenge_id UUID DEFAULT NULL
+)
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_cleaned_count INTEGER := 0;
+    v_timeout_seconds INTEGER;
+    v_selection RECORD;
+BEGIN
+    -- Get the default time limit from challenge config or use 5 seconds
+    SELECT COALESCE(
+        (scoring_config->>'default_time_limit')::INTEGER,
+        5
+    ) INTO v_timeout_seconds
+    FROM challenges
+    WHERE id = COALESCE(p_challenge_id, '00000000-0000-0000-0000-000000000000');
+    
+    -- Find stale 'current' selections that have exceeded time limit
+    FOR v_selection IN
+        SELECT 
+            cts.id,
+            cts.challenge_id,
+            cts.question_id,
+            cts.user_id,
+            cts.participant_id,
+            cts.ticket_number,
+            cts.question_shown_at,
+            COALESCE(ctq.time_limit_seconds, v_timeout_seconds) as time_limit
+        FROM challenge_trivia_selections cts
+        LEFT JOIN challenge_trivia_questions ctq ON ctq.id = cts.question_id
+        WHERE cts.status = 'current'
+        AND cts.question_shown_at < (NOW() - INTERVAL '1 second' * COALESCE(ctq.time_limit_seconds, v_timeout_seconds))
+        AND (p_challenge_id IS NULL OR cts.challenge_id = p_challenge_id)
+    LOOP
+        -- Mark as timeout
+        UPDATE challenge_trivia_selections
+        SET 
+            status = 'timeout',
+            answer_submitted_at = NOW(),
+            is_correct = FALSE,
+            points_earned = 0
+        WHERE id = v_selection.id;
+        
+        -- Add to live ticker
+        INSERT INTO challenge_live_ticker (
+            challenge_id,
+            user_name,
+            action_text,
+            points_awarded
+        )
+        SELECT
+            v_selection.challenge_id,
+            COALESCE(u.full_name, 'Anonymous'),
+            '⏰ Ticket #' || v_selection.ticket_number || ' ran out of time!',
+            0
+        FROM users u
+        WHERE u.id = v_selection.user_id;
+        
+        v_cleaned_count := v_cleaned_count + 1;
+    END LOOP;
+    
+    -- Also clean up any 'current' selections that are orphaned (no question exists)
+    WITH orphaned AS (
+        UPDATE challenge_trivia_selections
+        SET status = 'timeout',
+            answer_submitted_at = NOW()
+        WHERE status = 'current'
+        AND question_shown_at < (NOW() - INTERVAL '10 minutes')
+        AND (p_challenge_id IS NULL OR challenge_id = p_challenge_id)
+        RETURNING id
+    )
+    SELECT COUNT(*) INTO v_cleaned_count FROM orphaned;
+    
+    RETURN v_cleaned_count;
+END;
+$$;
+
+-- 2. Update get_next_queued_participant to clean up before selecting
 CREATE OR REPLACE FUNCTION get_next_queued_participant(
     p_challenge_id UUID,
     p_current_question_id UUID
@@ -196,6 +277,17 @@ DECLARE
     v_selection_id UUID;
     v_question challenge_trivia_questions%ROWTYPE;
 BEGIN
+    -- Clean up any stale selections first
+    PERFORM cleanup_stale_trivia_selections(p_challenge_id);
+    
+    -- Also mark any existing 'current' for other users as 'passed' since we're selecting someone new
+    UPDATE challenge_trivia_selections
+    SET status = 'passed',
+        answer_submitted_at = NOW()
+    WHERE challenge_id = p_challenge_id
+    AND status = 'current'
+    AND question_id != p_current_question_id;
+    
     -- Get current question
     SELECT * INTO v_question
     FROM challenge_trivia_questions
@@ -208,8 +300,7 @@ BEGIN
     AND question_id = p_current_question_id
     AND status IN ('answered', 'timeout', 'passed');
     
-    -- Get next participant from queue
-    -- Prioritize those who haven't attempted this question yet
+    -- Get next participant from queue who hasn't attempted this question
     SELECT 
         cp.id as participant_id,
         cp.user_id,
@@ -221,8 +312,8 @@ BEGIN
     JOIN users u ON u.id = cp.user_id
     WHERE cp.challenge_id = p_challenge_id
     AND cp.is_active_in_round = TRUE
+    AND cp.joined_via_spin = TRUE
     AND NOT EXISTS (
-        -- Exclude those who already attempted this question
         SELECT 1 FROM challenge_trivia_selections cts
         WHERE cts.challenge_id = p_challenge_id
         AND cts.question_id = p_current_question_id
@@ -230,7 +321,6 @@ BEGIN
         AND cts.status IN ('answered', 'timeout', 'passed')
     )
     AND NOT EXISTS (
-        -- Exclude those who are eliminated
         SELECT 1 FROM challenge_trivia_selections cts
         WHERE cts.challenge_id = p_challenge_id
         AND cts.user_id = cp.user_id
@@ -240,7 +330,7 @@ BEGIN
     LIMIT 1;
     
     IF NOT FOUND THEN
-        -- Everyone has attempted, reset and go back to start
+        -- Everyone has attempted, reset
         SELECT 
             cp.id as participant_id,
             cp.user_id,
@@ -252,6 +342,7 @@ BEGIN
         JOIN users u ON u.id = cp.user_id
         WHERE cp.challenge_id = p_challenge_id
         AND cp.is_active_in_round = TRUE
+        AND cp.joined_via_spin = TRUE
         ORDER BY cp.queue_position ASC
         LIMIT 1;
     END IF;
@@ -293,7 +384,7 @@ BEGIN
     ) VALUES (
         p_challenge_id,
         v_next_participant.user_name,
-        'Ticket #' || v_next_participant.ticket_number || ' is up! Attempt #' || (v_attempt_count + 1)::TEXT,
+        '🎯 Ticket #' || v_next_participant.ticket_number || ' is up! Question attempt #' || (v_attempt_count + 1)::TEXT,
         0
     );
     
@@ -308,7 +399,7 @@ BEGIN
 END;
 $$;
 
--- Function to pass question to next participant
+-- 3. Update pass_to_next_participant to clean up first
 CREATE OR REPLACE FUNCTION pass_to_next_participant(
     p_selection_id UUID,
     p_reason TEXT DEFAULT 'wrong_answer'
@@ -332,11 +423,16 @@ BEGIN
         RETURN json_build_object('success', false, 'error', 'Selection not found');
     END IF;
     
-    -- Mark current as passed
-    UPDATE challenge_trivia_selections
-    SET status = 'passed',
-        answer_submitted_at = NOW()
-    WHERE id = p_selection_id;
+    -- Clean up stale selections
+    PERFORM cleanup_stale_trivia_selections(v_selection.challenge_id);
+    
+    -- Mark current as passed (only if still 'current')
+    IF v_selection.status = 'current' THEN
+        UPDATE challenge_trivia_selections
+        SET status = 'passed',
+            answer_submitted_at = NOW()
+        WHERE id = p_selection_id;
+    END IF;
     
     -- Add to ticker
     INSERT INTO challenge_live_ticker (
@@ -349,9 +445,9 @@ BEGIN
         v_selection.challenge_id,
         u.full_name,
         CASE 
-            WHEN p_reason = 'wrong_answer' THEN 'Wrong answer! Passing to next player ❌'
-            WHEN p_reason = 'timeout' THEN 'Time is up! Passing to next player ⏰'
-            ELSE 'Passed to next player ➡️'
+            WHEN p_reason = 'wrong_answer' THEN '❌ Wrong answer! Passing to next player'
+            WHEN p_reason = 'timeout' THEN '⏰ Time is up! Passing to next player'
+            ELSE '➡️ Passed to next player'
         END,
         0
     FROM users u
@@ -369,6 +465,7 @@ BEGIN
     JOIN users u ON u.id = cp.user_id
     WHERE cp.challenge_id = v_selection.challenge_id
     AND cp.is_active_in_round = TRUE
+    AND cp.joined_via_spin = TRUE
     AND cp.user_id != v_selection.user_id
     AND NOT EXISTS (
         SELECT 1 FROM challenge_trivia_selections cts
@@ -381,7 +478,6 @@ BEGIN
     LIMIT 1;
     
     IF NOT FOUND THEN
-        -- Everyone has tried, no one gets points
         RETURN json_build_object(
             'success', true,
             'message', 'All participants attempted. Question closed.',
@@ -428,7 +524,7 @@ BEGIN
     ) VALUES (
         v_selection.challenge_id,
         v_next_participant.user_name,
-        'Ticket #' || v_next_participant.ticket_number || ' now answering! (Attempt #' || v_attempt_count::TEXT || ')',
+        '🎯 Ticket #' || v_next_participant.ticket_number || ' now answering! (Attempt #' || v_attempt_count::TEXT || ')',
         0
     );
     
@@ -443,7 +539,7 @@ BEGIN
 END;
 $$;
 
--- Function to get participant queue status
+-- 4. Update get_trivia_queue_status to properly identify answering status
 CREATE OR REPLACE FUNCTION get_trivia_queue_status(
     p_challenge_id UUID
 )
@@ -460,6 +556,9 @@ RETURNS TABLE (
 LANGUAGE plpgsql
 AS $$
 BEGIN
+    -- Clean up stale selections before returning queue status
+    PERFORM cleanup_stale_trivia_selections(p_challenge_id);
+    
     RETURN QUERY
     SELECT 
         cp.ticket_number,
@@ -475,6 +574,7 @@ BEGIN
                 WHERE cts.challenge_id = p_challenge_id
                 AND cts.user_id = cp.user_id
                 AND cts.status = 'current'
+                AND cts.question_shown_at > (NOW() - INTERVAL '5 minutes') -- Only recent
             ) THEN 'answering'
             WHEN EXISTS (
                 SELECT 1 FROM challenge_trivia_selections cts
@@ -493,6 +593,29 @@ BEGIN
 END;
 $$;
 
+-- 5. Create a cron job to periodically clean up stale selections
+-- This can be done via pg_cron if available, or you can call this from your app
+CREATE OR REPLACE FUNCTION auto_cleanup_trivia_selections()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_cleaned INTEGER;
+BEGIN
+    v_cleaned := cleanup_stale_trivia_selections();
+    
+    -- Log cleanup
+    IF v_cleaned > 0 THEN
+        RAISE NOTICE 'Cleaned up % stale trivia selections', v_cleaned;
+    END IF;
+END;
+$$;
+
+-- Optional: Enable pg_cron extension and schedule cleanup
+-- CREATE EXTENSION IF NOT EXISTS pg_cron;
+-- SELECT cron.schedule('cleanup-trivia-selections', '*/30 * * * *', 'SELECT auto_cleanup_trivia_selections();');
+
 -- Add support for open-ended questions
 ALTER TABLE challenge_trivia_questions
 ADD COLUMN IF NOT EXISTS question_type TEXT DEFAULT 'multiple_choice' 
@@ -507,7 +630,8 @@ ADD COLUMN IF NOT EXISTS case_sensitive BOOLEAN DEFAULT FALSE;
 CREATE OR REPLACE FUNCTION submit_trivia_answer(
     p_selection_id UUID,
     p_answer_index INTEGER DEFAULT NULL,
-    p_text_answer TEXT DEFAULT NULL
+    p_text_answer TEXT DEFAULT NULL,
+    p_response_time_ms INTEGER DEFAULT NULL
 )
 RETURNS JSON
 LANGUAGE plpgsql
@@ -532,9 +656,13 @@ BEGIN
     IF NOT FOUND THEN
         RETURN json_build_object('success', false, 'error', 'Invalid selection or already answered');
     END IF;
-    
-    -- Calculate response time
-    v_response_time := EXTRACT(MILLISECONDS FROM (NOW() - v_selection.question_shown_at))::INTEGER;
+
+    -- Use provided response time or calculate it
+    IF p_response_time_ms IS NOT NULL THEN
+        v_response_time := p_response_time_ms;
+    ELSE
+        v_response_time := EXTRACT(MILLISECONDS FROM (NOW() - v_selection.question_shown_at))::INTEGER;
+    END IF;
     
     -- Get question
     SELECT * INTO v_question

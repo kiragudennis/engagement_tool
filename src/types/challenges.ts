@@ -199,3 +199,64 @@ export interface RecruitProfile {
   bio: string;
   current_team: string | null;
 }
+
+export interface TriviaQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correct_answer_index: number;
+  difficulty: string;
+  points_value: number;
+  time_limit_seconds: number;
+  category: string;
+  explanation: string;
+  display_order: number;
+  question_type: "multiple_choice" | "true_false" | "open_ended";
+  accepted_answers: string[];
+  case_sensitive: boolean;
+}
+
+export interface TriviaSelection {
+  id: string;
+  challenge_id: string;
+  question_id: string;
+  user_id: string;
+  participant_id: string;
+  ticket_number: number;
+  queue_position: number;
+  attempt_number: number;
+  selected_answer: number | null;
+  is_correct: boolean | null;
+  points_earned: number;
+  question_shown_at: string;
+  answer_submitted_at: string | null;
+  response_time_ms: number | null;
+  status:
+    | "queued"
+    | "current"
+    | "answered"
+    | "timeout"
+    | "passed"
+    | "skipped"
+    | "eliminated";
+}
+
+export interface TriviaScore {
+  total_score: number;
+  correct_answers: number;
+  questions_answered: number;
+  current_streak: number;
+  best_streak: number;
+  accuracy: number;
+}
+
+export interface QueueStatus {
+  ticket_number: number;
+  user_name: string;
+  queue_position: number;
+  is_active: boolean;
+  total_score: number;
+  questions_answered: number;
+  correct_answers: number;
+  current_status: "answering" | "eliminated" | "waiting";
+}

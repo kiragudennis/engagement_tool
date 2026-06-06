@@ -108,12 +108,60 @@ CREATE POLICY "Anyone can view questions" ON challenge_trivia_questions
 
 CREATE POLICY "Anyone can view trivia scores" ON challenge_trivia_scores
     FOR SELECT USING (true);
+-- First, DROP ALL existing policies on this table
+DROP POLICY IF EXISTS "Users can insert their answers" ON challenge_trivia_selections;
+DROP POLICY IF EXISTS "Users can view their own selections" ON challenge_trivia_selections;
+DROP POLICY IF EXISTS "Users can update their own selections" ON challenge_trivia_selections;
+DROP POLICY IF EXISTS "Admins can view all selections" ON challenge_trivia_selections;
 
-CREATE POLICY "Users can insert their answers" ON challenge_trivia_selections
-    FOR UPDATE USING (auth.uid() = user_id);
+-- 1. SELECT - Users can see their own selections (CRITICAL for real-time)
+CREATE POLICY "select_own_selections"
+ON challenge_trivia_selections
+FOR SELECT
+TO authenticated
+USING (auth.uid() = user_id);
+
+-- 2. INSERT - Users can insert their own selections (needed for real-time to work properly)
+CREATE POLICY "insert_own_selections"
+ON challenge_trivia_selections
+FOR INSERT
+TO authenticated
+WITH CHECK (auth.uid() = user_id);
+
+-- 3. UPDATE - Users can update their own selections (for answering)
+CREATE POLICY "update_own_selections"
+ON challenge_trivia_selections
+FOR UPDATE
+TO authenticated
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- 4. DELETE - Optional, but good to have
+CREATE POLICY "delete_own_selections"
+ON challenge_trivia_selections
+FOR DELETE
+TO authenticated
+USING (auth.uid() = user_id);
+
+-- 5. Admin access (if you have is_admin function)
+CREATE POLICY "admin_all_access"
+ON challenge_trivia_selections
+FOR ALL
+TO authenticated
+USING (public.is_admin())
+WITH CHECK (public.is_admin());
 
 -- Admin policies
 CREATE POLICY "Admins can manage trivia" ON challenge_trivia_questions
+    FOR ALL USING (public.is_admin());
+
+CREATE POLICY "Admins can manage trivia scores" ON challenge_trivia_scores
+    FOR ALL USING (public.is_admin());
+
+CREATE POLICY "Admins can manage trivia round questions" ON challenge_trivia_round_questions
+    FOR ALL USING (public.is_admin());
+
+CREATE POLICY "Admins can manage trivia rounds" ON challenge_trivia_rounds
     FOR ALL USING (public.is_admin());
 
 CREATE POLICY "Admins can manage rounds" ON challenge_trivia_rounds

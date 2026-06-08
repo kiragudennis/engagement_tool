@@ -75,9 +75,15 @@ export default function SpinLivePage() {
   const [loading, setLoading] = useState(true);
   const [countdown, setCountdown] = useState("0h 0m 0s");
 
-  // Create service instance
-  const wheelService = new SpinningWheelClientService(supabase);
+  // Create service instance with useRef to avoid recreation
+  const wheelServiceRef = useRef<SpinningWheelClientService | null>(null);
   const winnerAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Initialize service once
+  if (!wheelServiceRef.current && supabase) {
+    wheelServiceRef.current = new SpinningWheelClientService(supabase);
+  }
+  const wheelService = wheelServiceRef.current;
 
   // Funnel States
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -145,9 +151,9 @@ export default function SpinLivePage() {
     return () => clearInterval(interval);
   }, [game?.ends_at]);
 
-  // Fetch game data
+  // Fetch game data - stable with useCallback
   const fetchGameData = useCallback(async () => {
-    if (!gameId) return;
+    if (!gameId || !wheelService) return;
     try {
       const gameData = await wheelService.getGame(gameId);
       if (gameData) {
@@ -163,9 +169,9 @@ export default function SpinLivePage() {
     }
   }, [gameId, wheelService]);
 
-  // Fetch participants and stats
+  // Fetch participants and stats - stable with useCallback
   const fetchParticipants = useCallback(async () => {
-    if (!gameId) return;
+    if (!gameId || !wheelService) return;
     try {
       const participantsList = await wheelService.getAllParticipants(
         gameId,
@@ -182,9 +188,9 @@ export default function SpinLivePage() {
     }
   }, [gameId, wheelService]);
 
-  // Fetch recent winners
+  // Fetch recent winners - stable with useCallback
   const fetchRecentWinners = useCallback(async () => {
-    if (!gameId) return;
+    if (!gameId || !wheelService) return;
     try {
       const winnersData = await wheelService.getRecentWinners(gameId, 20);
       setRecentWins(
@@ -202,7 +208,6 @@ export default function SpinLivePage() {
   }, [gameId, wheelService]);
 
   // Main real-time subscription with simplified queue
-  // Simplified with ONE channel
   useEffect(() => {
     if (!supabase || !gameId) return;
 
@@ -223,7 +228,6 @@ export default function SpinLivePage() {
           console.log("Spin event:", event.action_type, event.user_name);
 
           if (event.action_type === "spin_start") {
-            // Someone started spinning - show animation
             setCurrentSpinner({
               user_name: event.user_name,
               is_spinning: true,
@@ -231,7 +235,6 @@ export default function SpinLivePage() {
             setWheelSpinning(true);
             setMustSpin(true);
 
-            // Auto-stop after 3 seconds
             if (spinningTimeoutRef.current) {
               clearTimeout(spinningTimeoutRef.current);
             }
@@ -241,7 +244,6 @@ export default function SpinLivePage() {
               setCurrentSpinner(null);
             }, 3000);
           } else if (event.action_type === "win") {
-            // Someone won
             setRecentWins((prev) => [
               {
                 name: event.user_name,
@@ -255,7 +257,6 @@ export default function SpinLivePage() {
               winnerAudioRef.current.play().catch(() => {});
             }
 
-            // Stop current animation
             setMustSpin(false);
             setWheelSpinning(false);
             setCurrentSpinner(null);
@@ -275,7 +276,6 @@ export default function SpinLivePage() {
           filter: `game_id=eq.${gameId}`,
         },
         async (payload) => {
-          // Fetch user details for the new participant
           const { data: userData } = await supabase
             .from("users")
             .select("id, full_name")
@@ -344,7 +344,6 @@ export default function SpinLivePage() {
       .subscribe(async (status) => {
         console.log("Main channel status:", status);
         if (status === "SUBSCRIBED") {
-          // Track this viewer
           await mainChannel.track({
             user_id: "viewer",
             online_at: new Date().toISOString(),
@@ -358,24 +357,46 @@ export default function SpinLivePage() {
         clearTimeout(spinningTimeoutRef.current);
       }
     };
-  }, [supabase, gameId]);
+  }, [supabase, gameId]); // Only depends on supabase and gameId
 
-  // Initial data fetch
+  // Initial data fetch - runs once when component mounts
   useEffect(() => {
     fetchGameData();
     fetchParticipants();
     fetchRecentWinners();
-  }, [fetchGameData, fetchParticipants, fetchRecentWinners]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId]); // Only depends on gameId
 
-  // Refresh stats periodically
+  // Refresh stats periodically - uses refs to avoid recreating interval
   useEffect(() => {
     if (!gameId) return;
     const interval = setInterval(() => {
-      fetchParticipants();
-      fetchRecentWinners();
+      if (wheelService) {
+        wheelService
+          .getAllParticipants(gameId, 50)
+          .then(setParticipants)
+          .catch(console.error);
+        wheelService
+          .getParticipantStats(gameId)
+          .then(setParticipantStats)
+          .catch(console.error);
+        wheelService
+          .getRecentWinners(gameId, 20)
+          .then((winnersData) => {
+            setRecentWins(
+              (winnersData || []).map((winner: any) => ({
+                name: winner.name,
+                prize: winner.prize,
+                timestamp:
+                  winner.timestamp ?? winner.time ?? new Date().toISOString(),
+              })),
+            );
+          })
+          .catch(console.error);
+      }
     }, 60000);
     return () => clearInterval(interval);
-  }, [gameId, fetchParticipants, fetchRecentWinners]);
+  }, [gameId, wheelService]);
 
   const wheelData = game
     ? game.prize_config.map((prize) => ({

@@ -1856,7 +1856,7 @@ export default function SuccessPage({
                     variant="ghost"
                     className="w-full justify-start"
                   >
-                    <Link href="/products">
+                    <Link href="/">
                       <ShoppingBag className="h-4 w-4 mr-2" />
                       Continue Shopping
                     </Link>
@@ -1876,9 +1876,9 @@ export default function SuccessPage({
                     variant="ghost"
                     className="w-full justify-start"
                   >
-                    <Link href="/contact">
+                    <Link href="/about">
                       <Phone className="h-4 w-4 mr-2" />
-                      Contact Support
+                      About Us
                     </Link>
                   </Button>
                 </div>

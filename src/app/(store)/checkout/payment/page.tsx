@@ -797,7 +797,8 @@ export default function PaymentPage() {
                     <div>
                       <h3 className="font-bold">Need Help?</h3>
                       <p className="text-sm text-gray-600 dark:text-gray-300">
-                        Our lighting experts are here to help
+                        Our customer support team is here to assist you with any
+                        payment issues or questions you may have.
                       </p>
                     </div>
                   </div>
@@ -805,10 +806,10 @@ export default function PaymentPage() {
                     <div className="flex items-center gap-2">
                       <Phone className="h-4 w-4 text-blue-500" />
                       <a
-                        href="tel:+254727833691"
+                        href="tel:+254113062599"
                         className="font-bold text-blue-600 hover:text-blue-700"
                       >
-                        0727 833 691
+                        0113 062 599
                       </a>
                     </div>
                     <div className="flex items-center gap-2">

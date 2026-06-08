@@ -118,7 +118,17 @@ export default function SpinGamePage() {
   } | null>(null);
 
   // User State
-  const [userState, setUserState] = useState<UserSpinState | null>(null);
+  const [userState, setUserState] = useState<UserSpinState>({
+    spins_used_today: 0,
+    spins_used_week: 0,
+    spins_used_total: 0,
+    free_remaining_today: 0,
+    free_remaining_week: 0,
+    free_remaining_total: 0,
+    points_balance: 0,
+    can_spin_free: true,
+    can_spin_paid: false,
+  });
   const [recentWinners, setRecentWinners] = useState<
     Array<{ name: string; prize: string; time: string }>
   >([]);
@@ -130,10 +140,12 @@ export default function SpinGamePage() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const wheelService = useMemo(
-    () => new SpinningWheelClientService(supabase),
-    [supabase],
-  );
+  // Use ref for wheelService to avoid recreation
+  const wheelServiceRef = useRef<SpinningWheelClientService | null>(null);
+  if (!wheelServiceRef.current && supabase) {
+    wheelServiceRef.current = new SpinningWheelClientService(supabase);
+  }
+  const wheelService = wheelServiceRef.current;
 
   // Set up a countdown timer for time-limited games
   useEffect(() => {
@@ -174,14 +186,14 @@ export default function SpinGamePage() {
   });
 
   const fetchGameData = useCallback(async () => {
-    if (!gameId) return;
+    if (!gameId || !supabase) return;
 
     // Fetch game details - handle case when game doesn't exist
     const { data: gameData, error: gameError } = await supabase
       .from("spin_games")
       .select("*")
       .eq("id", gameId)
-      .maybeSingle(); // Use maybeSingle() instead of single() - returns null if no rows
+      .maybeSingle();
 
     if (gameError || !gameData) {
       setError("Game not found");
@@ -192,7 +204,7 @@ export default function SpinGamePage() {
     setGame(gameData as SpinGame);
 
     // If user is logged in, fetch their state
-    if (profile?.id) {
+    if (profile?.id && wheelService) {
       try {
         const allocation = await wheelService.getUserAllocation(
           profile.id,
@@ -213,7 +225,6 @@ export default function SpinGamePage() {
         });
       } catch (err) {
         console.error("Error fetching user state:", err);
-        // Set default user state
         setUserState({
           spins_used_today: 0,
           spins_used_week: 0,
@@ -232,6 +243,8 @@ export default function SpinGamePage() {
   }, [gameId, profile?.id, supabase, wheelService]);
 
   const fetchRecentWinners = useCallback(async () => {
+    if (!gameId || !supabase) return;
+
     // Handle case when there are no spin attempts yet
     const { data, error } = await supabase
       .from("spin_attempts")
@@ -315,17 +328,23 @@ export default function SpinGamePage() {
     enabled: Boolean(gameId),
   });
 
+  // Initial data fetch - runs once
   useEffect(() => {
     fetchGameData();
     fetchRecentWinners();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId]); // Only depends on gameId, not on fetch functions
 
-    // Refresh every 10 seconds
+  // Refresh every 10 seconds - separate from the initial fetch
+  useEffect(() => {
+    if (!gameId) return;
+
     const interval = setInterval(() => {
       fetchRecentWinners();
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [fetchGameData, fetchRecentWinners]);
+  }, [gameId, fetchRecentWinners]); // fetchRecentWinners is stable now
 
   const handleSpin = async (usePoints: boolean) => {
     if (!profile) {
@@ -336,6 +355,11 @@ export default function SpinGamePage() {
 
     if (!game) return;
     if (spinning) return;
+    if (!wheelService) {
+      toast.error("Wheel service is not available.");
+      return;
+    }
+
     if (game.is_single_prize && game.single_prize_claimed) {
       toast.error("Grand prize has already been claimed!");
       return;
@@ -965,7 +989,7 @@ export default function SpinGamePage() {
               </div>
             )}
             {/* User Stats Card */}
-            {profile && userState ? (
+            {profile ? (
               <Card>
                 <CardContent className="pt-6">
                   <h3 className="font-semibold mb-3 flex items-center gap-2">

@@ -555,7 +555,6 @@ export default function DrawLivePage() {
           </Card>
         </motion.div>
       )}
-      // Add a badge in the stats bar to show live entry status
       <div className="flex items-center gap-2 text-white/80 text-sm">
         {liveEntryAwarded ? (
           <Badge className="bg-green-500/20 text-green-400 border-0 gap-1">

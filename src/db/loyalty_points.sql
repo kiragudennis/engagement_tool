@@ -929,39 +929,172 @@ BEGIN
         RAISE NOTICE 'User % account activated for 30 days (was: %)', NEW.user_id, v_current_status;
         
         -- ============================================
-        -- PART 2: PROCESS SIGNUP REFERRALS
-        -- ============================================
-        -- If user was referred and status just changed to active,
-        -- this will trigger the referral completion
+-- PART 2: PROCESS SIGNUP REFERRALS (on first purchase)
+-- ============================================
+-- Complete pending signup referrals and award referrer
+IF EXISTS (
+    SELECT 1 FROM referrals
+    WHERE referred_user_id = NEW.user_id
+    AND status = 'joined'
+    AND conversion_type = 'signup'
+) THEN
+    -- Update pending signup referrals to completed
+    UPDATE referrals
+    SET 
+        status = 'completed',
+        completed_at = NOW(),
+        updated_at = NOW(),
+        reward_points = COALESCE(reward_points, 100)
+    WHERE referred_user_id = NEW.user_id
+    AND status = 'joined'
+    AND conversion_type = 'signup';
+    
+    -- ✅ Award loyalty points to the referrer (always, regardless of challenges)
+    INSERT INTO loyalty_transactions (
+        user_id,
+        points_change,
+        current_points,
+        transaction_type,
+        description,
+        metadata
+    )
+    SELECT
+        r.referrer_id,
+        r.reward_points,
+        COALESCE((SELECT points FROM loyalty_points WHERE user_id = r.referrer_id), 0) + r.reward_points,
+        'referral_bonus',
+        'Referral bonus: ' || COALESCE(
+            (SELECT full_name FROM users WHERE id = NEW.user_id), 
+            NEW.user_id::TEXT
+        ) || ' completed their first purchase',
+        jsonb_build_object(
+            'referral_id', r.id,
+            'referred_user_id', NEW.user_id,
+            'referred_email', r.referred_email,
+            'order_id', NEW.id,
+            'order_number', NEW.order_number,
+            'conversion_type', 'signup'
+        )
+    FROM referrals r
+    WHERE r.referred_user_id = NEW.user_id
+    AND r.status = 'completed'
+    AND r.conversion_type = 'signup'
+    AND r.completed_at >= NOW() - INTERVAL '1 minute';
+    
+    -- ✅ Update referrer's loyalty points balance
+    INSERT INTO loyalty_points (user_id, points, points_earned, last_updated)
+    SELECT
+        r.referrer_id,
+        r.reward_points,
+        r.reward_points,
+        NOW()
+    FROM referrals r
+    WHERE r.referred_user_id = NEW.user_id
+    AND r.status = 'completed'
+    ON CONFLICT (user_id) DO UPDATE
+    SET 
+        points = loyalty_points.points + EXCLUDED.points,
+        points_earned = loyalty_points.points_earned + EXCLUDED.points_earned,
+        last_updated = EXCLUDED.last_updated;
+    
+    -- ✅ Process referral challenges (if any exist)
+    -- This is separate - challenges are bonus on top of the base referral reward
+    PERFORM process_referral_challenge_completion(r.id)
+    FROM referrals r
+    WHERE r.referred_user_id = NEW.user_id
+    AND r.status = 'completed'
+    AND r.conversion_type = 'signup'
+    AND r.completed_at >= NOW() - INTERVAL '1 minute';
+    
+    RAISE NOTICE 'Signup referral completed: referrer awarded points + challenges processed for user %', NEW.user_id;
+END IF;
+
+-- ============================================
+-- PART 2b: PROCESS FIRST_PURCHASE REFERRALS
+-- ============================================
+IF EXISTS (
+    SELECT 1 FROM referrals
+    WHERE referred_user_id = NEW.user_id
+    AND status = 'joined'
+    AND conversion_type = 'first_purchase'
+) THEN
+    -- Check if this is actually their first purchase
+    IF NOT EXISTS (
+        SELECT 1 FROM orders
+        WHERE user_id = NEW.user_id
+        AND status = 'completed'
+        AND payment_status = 'paid'
+        AND id != NEW.id
+    ) THEN
+        -- Complete the purchase referral
+        UPDATE referrals
+        SET 
+            status = 'completed',
+            completed_at = NOW(),
+            updated_at = NOW(),
+            reward_points = COALESCE(reward_points, 200),
+            conversion_value = NEW.total_amount
+        WHERE referred_user_id = NEW.user_id
+        AND status = 'joined'
+        AND conversion_type = 'first_purchase';
         
-        -- Check if user has pending signup referrals
-        IF EXISTS (
-            SELECT 1 FROM referrals
-            WHERE referred_user_id = NEW.user_id
-            AND status = 'joined'
-            AND conversion_type = 'signup'
-        ) THEN
-            -- Update pending signup referrals to completed
-            UPDATE referrals
-            SET 
-                status = 'completed',
-                completed_at = NOW(),
-                updated_at = NOW(),
-                reward_points = COALESCE(reward_points, 100)
-            WHERE referred_user_id = NEW.user_id
-            AND status = 'joined'
-            AND conversion_type = 'signup';
-            
-            -- Process each completed referral through the challenge system
-            PERFORM process_referral_challenge_completion(r.id)
-            FROM referrals r
-            WHERE r.referred_user_id = NEW.user_id
-            AND r.status = 'completed'
-            AND r.conversion_type = 'signup'
-            AND r.completed_at >= NOW() - INTERVAL '1 minute';
-            
-            RAISE NOTICE 'Signup referrals completed for user %', NEW.user_id;
-        END IF;
+        -- ✅ Award loyalty points to the referrer
+        INSERT INTO loyalty_transactions (
+            user_id,
+            points_change,
+            current_points,
+            transaction_type,
+            description,
+            metadata
+        )
+        SELECT
+            r.referrer_id,
+            r.reward_points,
+            COALESCE((SELECT points FROM loyalty_points WHERE user_id = r.referrer_id), 0) + r.reward_points,
+            'referral_bonus',
+            'Referral bonus: referred user made first purchase of KSH ' || NEW.total_amount::TEXT,
+            jsonb_build_object(
+                'referral_id', r.id,
+                'referred_user_id', NEW.user_id,
+                'referred_email', r.referred_email,
+                'order_id', NEW.id,
+                'order_number', NEW.order_number,
+                'purchase_amount', NEW.total_amount,
+                'conversion_type', 'first_purchase'
+            )
+        FROM referrals r
+        WHERE r.referred_user_id = NEW.user_id
+        AND r.status = 'completed'
+        AND r.conversion_type = 'first_purchase'
+        AND r.completed_at >= NOW() - INTERVAL '1 minute';
+        
+        -- ✅ Update referrer's loyalty points balance
+        INSERT INTO loyalty_points (user_id, points, points_earned, last_updated)
+        SELECT
+            r.referrer_id,
+            r.reward_points,
+            r.reward_points,
+            NOW()
+        FROM referrals r
+        WHERE r.referred_user_id = NEW.user_id
+        AND r.status = 'completed'
+        ON CONFLICT (user_id) DO UPDATE
+        SET 
+            points = loyalty_points.points + EXCLUDED.points,
+            points_earned = loyalty_points.points_earned + EXCLUDED.points_earned,
+            last_updated = EXCLUDED.last_updated;
+        
+        -- ✅ Process referral challenges
+        PERFORM process_referral_challenge_completion(r.id)
+        FROM referrals r
+        WHERE r.referred_user_id = NEW.user_id
+        AND r.status = 'completed'
+        AND r.conversion_type = 'first_purchase'
+        AND r.completed_at >= NOW() - INTERVAL '1 minute';
+        
+        RAISE NOTICE 'Purchase referral completed for user %', NEW.user_id;
+    END IF;
+END IF;
         
         -- ============================================
         -- PART 3: AWARD LOYALTY POINTS

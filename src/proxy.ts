@@ -88,3 +88,76 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|webp|svg|ico|json|txt)).*)",
   ],
 };
+
+// middleware.ts (root of project)
+// import { NextRequest, NextResponse } from "next/server";
+// import { createServerClient } from "@supabase/ssr";
+
+// export async function middleware(req: NextRequest) {
+//   const { pathname } = req.nextUrl;
+
+//   // Only protect admin routes
+//   if (!pathname.startsWith("/admin/")) return NextResponse.next();
+
+//   const supabase = createServerClient(
+//     process.env.NEXT_PUBLIC_SUPABASE_URL!,
+//     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+//     {
+//       cookies: {
+//         get: (name) => req.cookies.get(name)?.value,
+//         set: () => {}, // Read-only in middleware
+//         remove: () => {},
+//       },
+//     }
+//   );
+
+//   const { data: { user } } = await supabase.auth.getUser();
+
+//   if (!user) {
+//     return NextResponse.redirect(new URL("/login?redirect=" + pathname, req.url));
+//   }
+
+//   // Extract business slug from path: /admin/[businessSlug]/...
+//   const slug = pathname.split("/")[2];
+//   if (!slug) return NextResponse.next();
+
+//   // Check if user is admin of this business
+//   const { data: business } = await supabase
+//     .from("businesses")
+//     .select("id, slug, plan, subscription_status, trial_ends_at")
+//     .eq("slug", slug)
+//     .single();
+
+//   if (!business) {
+//     return NextResponse.redirect(new URL("/business/signup", req.url));
+//   }
+
+//   const { data: admin } = await supabase
+//     .from("business_admins")
+//     .select("id")
+//     .eq("business_id", business.id)
+//     .eq("user_id", user.id)
+//     .single();
+
+//   if (!admin) {
+//     return NextResponse.redirect(new URL("/spin", req.url));
+//   }
+
+//   // Check trial/plan status
+//   const isTrialActive = business.subscription_status === "trial" &&
+//     business.trial_ends_at && new Date(business.trial_ends_at) > new Date();
+//   const isPaid = business.subscription_status === "active";
+
+//   if (!isTrialActive && !isPaid) {
+//     // Redirect to billing if accessing protected routes
+//     if (pathname !== `/admin/${slug}` && pathname !== `/admin/${slug}/billing`) {
+//       return NextResponse.redirect(new URL(`/admin/${slug}/billing`, req.url));
+//     }
+//   }
+
+//   return NextResponse.next();
+// }
+
+// export const config = {
+//   matcher: ["/admin/:path*"],
+// };

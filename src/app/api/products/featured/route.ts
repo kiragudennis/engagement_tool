@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       supabaseAdmin
         .from("products")
         .select(
-          "id, title, price, originalPrice, currency, images, category, slug, featured, isDealOfTheDay, rating, reviewsCount, stock, description"
+          "id, title, price, original_price, currency, images, category, slug, featured, deal_of_the_day, rating, reviewscount, stock, description",
         )
         .or("featured.eq.true,isDealOfTheDay.eq.true")
         .order("isDealOfTheDay", { ascending: false })
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
           `
           *,
           coupon_redemptions(count)
-        `
+        `,
         )
         .eq("is_active", true)
         .lte("valid_from", now)
@@ -43,11 +43,11 @@ export async function GET(request: NextRequest) {
     if (productsResponse.error) {
       console.error(
         "Error fetching featured products:",
-        productsResponse.error
+        productsResponse.error,
       );
       return NextResponse.json(
         { error: "Failed to fetch featured products" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
 
     response.headers.set(
       "Cache-Control",
-      "public, s-maxage=1800, stale-while-revalidate=900"
+      "public, s-maxage=1800, stale-while-revalidate=900",
     );
 
     return response;
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
     console.error("Featured products fetch error:", error);
     return NextResponse.json(
       { error: error.message || "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

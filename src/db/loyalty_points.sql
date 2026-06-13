@@ -1171,7 +1171,7 @@ BEGIN
         points_to_award := 0;
     END;
     
-    -- ============================================
+        -- ============================================
     -- PART 4: AWARD DRAW ENTRIES
     -- ============================================
     BEGIN
@@ -1196,12 +1196,22 @@ BEGIN
             IF FOUND THEN
                 RAISE WARNING '[DRAW] Found draw: % (id=%)', v_draw.name, v_draw.id;
                 
-                v_entry_count := FLOOR(NEW.total_amount * (v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric);
-                RAISE WARNING '[DRAW] Raw entry count: % (amount=% * rate=%)', 
-                    v_entry_count, NEW.total_amount, (v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric;
+                -- ✅ Use COALESCE for all JSON extractions (safety net for broken draw configs)
+                v_entry_count := FLOOR(
+                    NEW.total_amount * 
+                    COALESCE((v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric, 0.05)
+                );
                 
-                IF NEW.total_amount >= (v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric THEN
-                    v_entry_count := LEAST(v_entry_count, (v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer);
+                RAISE WARNING '[DRAW] Raw entry count: % (amount=% * rate=%)', 
+                    v_entry_count, NEW.total_amount, 
+                    COALESCE((v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric, 0.05);
+                
+                IF NEW.total_amount >= COALESCE((v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric, 10) THEN
+                    v_entry_count := LEAST(
+                        v_entry_count, 
+                        COALESCE((v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer, 5000)
+                    );
+                    
                     RAISE WARNING '[DRAW] After max cap: % entries', v_entry_count;
                     
                     IF v_entry_count > 0 THEN
@@ -1228,13 +1238,17 @@ BEGIN
                         v_entries_awarded := v_entry_count;
                     ELSE
                         RAISE WARNING '[DRAW] Entry count is 0, skipping';
+                        v_entries_awarded := 0;
                     END IF;
                 ELSE
                     RAISE WARNING '[DRAW] Order amount % below minimum %', 
-                        NEW.total_amount, (v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric;
+                        NEW.total_amount, 
+                        COALESCE((v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric, 10);
+                    v_entries_awarded := 0;
                 END IF;
             ELSE
                 RAISE WARNING '[DRAW] No active draw found';
+                v_entries_awarded := 0;
             END IF;
         END IF;
     EXCEPTION WHEN OTHERS THEN
@@ -1253,8 +1267,8 @@ BEGIN
         SET 
             loyalty_points_earned = points_to_award,
             draw_entries_awarded = CASE WHEN v_entries_awarded > 0 THEN v_entries_awarded ELSE 0 END,
-            draw_id = CASE WHEN v_entries_awarded > 0 THEN v_draw.id ELSE NULL END,
-            draw_entry_details = CASE WHEN v_entries_awarded > 0 THEN 
+            draw_id = CASE WHEN v_entries_awarded > 0 AND v_draw.id IS NOT NULL THEN v_draw.id ELSE NULL END,
+            draw_entry_details = CASE WHEN v_entries_awarded > 0 AND v_draw.id IS NOT NULL THEN 
                 jsonb_build_object(
                     'draw_name', v_draw.name,
                     'draw_id', v_draw.id,
@@ -1262,9 +1276,9 @@ BEGIN
                     'entries_awarded', v_entries_awarded,
                     'calculation', jsonb_build_object(
                         'order_amount', NEW.total_amount,
-                        'entries_per_ksh', (v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric,
-                        'min_purchase', (v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric,
-                        'max_entries', (v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer
+                        'entries_per_ksh', COALESCE((v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric, 0.05),
+                        'min_purchase', COALESCE((v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric, 10),
+                        'max_entries', COALESCE((v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer, 5000)
                     ),
                     'awarded_at', NOW()
                 )
@@ -1282,7 +1296,7 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
         RAISE WARNING '[UPDATE ORDER ERROR] %', SQLERRM;
     END;
-    
+
     -- ============================================
     -- PART 5 & 6: Challenges and Team Spending
     -- ============================================

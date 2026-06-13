@@ -1,329 +1,315 @@
-# E-Commerce
+## What We've Built
 
-A full-featured e-commerce platform built with modern web technologies.
+| System                                      | Status               |
+| ------------------------------------------- | -------------------- |
+| Spin wheel engine                           | ✅ Complete          |
+| Trivia challenge system                     | ✅ Complete          |
+| Live broadcast display                      | ✅ Complete          |
+| Multi-business foundation                   | ✅ Database + tables |
+| Business signup flow                        | ✅                   |
+| Access codes (public, single-use, bulk, QR) | ✅                   |
+| Code-gated customer activation              | ✅                   |
+| Branded business spin page                  | ✅                   |
+| Business admin dashboard                    | ✅                   |
+| Code management page                        | ✅                   |
+| Customer list + export                      | ✅                   |
+| Pricing page                                | ✅                   |
+| PayPal + M-Pesa checkout                    | ✅                   |
+| Payment webhooks                            | ✅                   |
+| Customer loyalty points                     | ✅                   |
+| Customer account dashboard                  | ✅                   |
+| Streak tracking hook                        | ✅                   |
 
-## Features
+## What's Missing
 
-- **Public Store**
+| Gap                                                                     | Priority    |
+| ----------------------------------------------------------------------- | ----------- |
+| **Subscription enforcement** - middleware that checks plan limits       | 🔴 Critical |
+| **Plan limit enforcement** - block spins when monthly limit reached     | 🔴 Critical |
+| **Trial expiry handling** - auto-lock features after trial              | 🔴 Critical |
+| **Business settings page** - branding, activation duration, admin users | 🟡 High     |
+| **Spin game config in admin** - reuse existing admin but scoped         | 🟡 High     |
+| **Trivia host controls in admin** - scoped to business                  | 🟡 High     |
+| **Points redemption API** - actually redeem points                      | 🟡 High     |
+| **Email notifications** - trial ending, payment receipt, etc            | 🟡 High     |
+| **README / Documentation**                                              | 🔴 Critical |
+| **Landing page** - marketing site                                       | 🟡 High     |
+| **SEO metadata** - for business pages                                   | 🟢 Medium   |
+| **Error boundaries** - graceful failures                                | 🟢 Medium   |
+| **Rate limiting** - prevent abuse                                       | 🟢 Medium   |
+| **Analytics page** - charts for businesses                              | 🟢 Medium   |
 
-  - Homepage with featured products
-  - Product listings with filters (categories, belt levels, tags)
-  - Product detail pages
-  - Shopping cart
-  - Checkout process
-  - PayPal and M-Pesa payment integration
+````
 
-- **Admin Dashboard**
+---
 
-  - Product management (CRUD operations)
-  - Order management
-  - Analytics dashboard
-  - Customer management
+## 4. README.md
 
-- **Technical Features**
-  - Server-side rendering with Next.js 15
-  - TypeScript for type safety
-  - Responsive design with TailwindCSS
-  - UI components from ShadCN UI
-  - Dark mode support
-  - Supabase for database, authentication, and storage
-  - Payment processing with PayPal and M-Pesa
+```markdown
+# 🎡 Engage — Turn Your Business Into a Live Game Show
 
-## Tech Stack
+**Engage** is a multi-tenant engagement platform that lets businesses create gamified experiences (spin wheels, trivia nights) and invite their audience to participate. Businesses broadcast live events via OBS while customers play from their phones.
 
-- **Frontend**: Next.js 15, React, TypeScript, TailwindCSS, ShadCN UI
-- **Backend**: Next.js API routes, Server Actions
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Supabase Auth
-- **Storage**: Supabase Storage
-- **Payments**: PayPal Checkout, M-Pesa Daraja API
-- **Deployment**: Vercel
+---
 
-## Getting Started
+## ✨ Features
+
+### For Businesses
+- **🎰 Spin-to-Win Wheel** — Configurable prize wheel with probabilities, custom branding
+- **🧠 Live Trivia** — Host trivia nights with ticket queues, timed answers, live leaderboards
+- **🎬 OBS Broadcast** — Professional live display for projecting behind the host
+- **🎟️ Access Codes** — Public, single-use, bulk, and QR codes to gate participation
+- **📊 Customer Data** — Every spin captures emails; export to CSV
+- **💰 Monetization** — Free 14-day trial, then Starter/Pro/Enterprise plans
+- **💳 Payments** — M-Pesa and PayPal integration
+
+### For Customers
+- **One Account** — Single login across all businesses
+- **⭐ Loyalty Points** — Earn points for every spin and trivia answer
+- **🎁 Rewards** — Redeem points for extra spins, VIP badges, golden tickets
+- **📱 Mobile-First** — No app download; works in any browser
+
+---
+
+## 🏗️ Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 14 (App Router) |
+| Database | Supabase (PostgreSQL) |
+| Auth | Supabase Auth |
+| Real-time | Supabase Realtime (WebSockets) |
+| Styling | Tailwind CSS + shadcn/ui |
+| Animations | Framer Motion |
+| Payments | PayPal API + M-Pesa Daraja API |
+| Email | Resend |
+| Deployment | Vercel |
+
+---
+
+# Changelog
+
+## [1.0.0] - 2026-06-13
+
+### Added
+- Multi-tenant business foundation with Supabase RLS
+- Spin wheel engine with configurable prizes and probabilities
+- Live trivia challenge system with ticket queue
+- OBS-compatible live broadcast display
+- Access code system (public, single-use, bulk, QR, time-limited)
+- Code-gated customer activation (30-day window per business)
+- Branded business pages with custom colors and logos
+- Business admin dashboard with stats and quick actions
+- Code management page with bulk generation
+- Customer list with CSV export and detail view
+- PayPal and M-Pesa payment integration
+- Customer loyalty points system per business
+- Customer account dashboard with active businesses and history
+- Points redemption options (extra spins, VIP badges, golden tickets)
+- Subscription plans (Starter, Pro, Enterprise) with 14-day free trial
+- Plan limits enforcement and usage tracking
+- Public pages: Landing, Pricing, About, How It Works, Terms, Privacy
+- Real-time Supabase subscriptions for live features
+- canvas-confetti for win celebrations
+- Framer Motion animations throughout
+- Responsive mobile-first design
+
+### Technical
+- Next.js 14 App Router
+- Supabase with PostgreSQL and Row Level Security
+- TypeScript throughout
+- Tailwind CSS with shadcn/ui components
+- Server-side middleware for plan enforcement
+- Webhook handlers for PayPal and M-Pesa
+- Database functions for points, activations, and code redemption
+
+## 📦 Project Structure
+
+````
+
+├── app/
+│ ├── (public)/ # Public-facing pages
+│ │ ├── spin/ # Code entry + signup
+│ │ ├── [businessSlug]/ # Branded business pages
+│ │ │ └── spin/ # Business spin wheel
+│ │ ├── pricing/ # Pricing page
+│ │ └── business/
+│ │ └── signup/ # Business onboarding
+│ │
+│ ├── (admin)/ # Business admin
+│ │ └── admin/
+│ │ └── [businessSlug]/
+│ │ ├── page.tsx # Dashboard
+│ │ ├── codes/ # Code management
+│ │ ├── customers/ # Customer list
+│ │ ├── spin/ # Spin game config
+│ │ ├── trivia/ # Trivia config
+│ │ └── billing/ # Subscription
+│ │
+│ ├── (store)/ # Customer account
+│ │ ├── account/ # Dashboard + points
+│ │ └── challenges/ # Challenge system (legacy e-commerce)
+│ │
+│ └── api/
+│ ├── checkout/ # Payment initiation
+│ └── webhooks/
+│ ├── paypal/ # PayPal webhook
+│ └── mpesa/ # M-Pesa callback
+│
+├── components/
+│ ├── ui/ # shadcn/ui components
+│ ├── notifications/ # Notification bell + service
+│ └── providers/ # Auth, theme providers
+│
+├── lib/
+│ ├── context/ # AuthContext
+│ ├── services/ # Challenges, notifications, plan limits
+│ └── hooks/ # useStreakTracker
+│
+└── types/ # TypeScript types
+
+````
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
-
-- Node.js 18.17 or later
-- npm or yarn
+- Node.js 18+
 - Supabase account
-- PayPal Developer account
-- M-Pesa Daraja API account (optional)
+- PayPal Business account (for payments)
+- M-Pesa Daraja API credentials (for M-Pesa)
+
+### Environment Variables
+
+```bash
+# .env.local
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# PayPal
+PAYPAL_CLIENT_ID=your-paypal-client-id
+PAYPAL_SECRET=your-paypal-secret
+
+# M-Pesa
+MPESA_CONSUMER_KEY=your-mpesa-consumer-key
+MPESA_CONSUMER_SECRET=your-mpesa-consumer-secret
+MPESA_PASSKEY=your-mpesa-passkey
+MPESA_SHORTCODE=174379
+
+# App
+NEXT_PUBLIC_URL=https://engagespin.com
+````
 
 ### Installation
 
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/yourusername/worldsamma-shop.git
-   cd worldsamma-shop
-   ```
-
-2. Install dependencies:
-
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
-
-3. Create a `.env.local` file in the root directory with the following variables:
-
-   ```
-   # Supabase
-   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-
-   # Database (if using external DB)
-   DATABASE_URL=your_database_url
-
-   # PayPal
-   PAYPAL_CLIENT_ID=your_paypal_client_id
-   PAYPAL_SECRET=your_paypal_secret
-   PAYPAL_WEBHOOK_ID=your_paypal_webhook_id
-
-   # M-Pesa (Optional)
-   MPESA_CONSUMER_KEY=your_mpesa_consumer_key
-   MPESA_CONSUMER_SECRET=your_mpesa_consumer_secret
-   MPESA_SHORTCODE=your_mpesa_shortcode
-   MPESA_PASSKEY=your_mpesa_passkey
-   MPESA_CALLBACK_SECRET=your_mpesa_callback_secret
-
-   # Email (for notifications)
-   RESEND_API_KEY=your_resend_api_key
-
-   # Vercel
-   VERCEL_ENV=development
-   ```
-
-4. Set up the database by running the SQL migration in Supabase:
-
-   - Go to your Supabase project
-   - Navigate to the SQL Editor
-   - Copy the contents of `src/db/schema.sql`
-   - Run the SQL to create the tables and set up the schema
-
-5. Run the development server:
-
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   ```
-
-6. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
-
-## Database Setup
-
-The application uses Supabase as the database provider. The schema includes the following tables:
-
-- `users`: Store user information
-- `products`: Store product details
-- `orders`: Store order information
-- `order_items`: Store items within orders
-- `transactions`: Store payment transaction details
-- `page_views`: Store page view statistics for analytics
-
-The complete schema is available in `src/db/schema.sql`.
-
-## Payment Integration
-
-### PayPal Checkout
-
-1. Create a PayPal Developer account at [developer.paypal.com](https://developer.paypal.com)
-2. Create a new app in the PayPal Developer Dashboard
-3. Get your Client ID and Secret
-4. Set up a webhook with the following events:
-   - PAYMENT.CAPTURE.COMPLETED
-   - PAYMENT.CAPTURE.DENIED
-   - PAYMENT.CAPTURE.PENDING
-5. Add the webhook URL: `https://your-domain.com/api/webhooks/paypal`
-6. Add the Client ID, Secret, and Webhook ID to your environment variables
-
-### M-Pesa Integration (Optional)
-
-1. Create a Safaricom Developer account at [developer.safaricom.co.ke](https://developer.safaricom.co.ke)
-2. Create a new app in the Daraja API portal
-3. Get your Consumer Key, Consumer Secret, and Shortcode
-4. Set up a callback URL: `https://your-domain.com/api/webhooks/mpesa`
-5. Add the credentials to your environment variables
-
-## Testing Webhooks Locally
-
-You can test the payment webhooks locally using tools like Postman or curl.
-
-### PayPal Webhook Test
-
 ```bash
-curl -X POST http://localhost:3000/api/webhooks/paypal \
-  -H "Content-Type: application/json" \
-  -H "Paypal-Transmission-Id: test-transmission-id" \
-  -H "Paypal-Transmission-Time: 2023-01-01T12:00:00Z" \
-  -H "Paypal-Transmission-Sig: test-signature" \
-  -H "Paypal-Auth-Algo: SHA256withRSA" \
-  -H "Paypal-Cert-Url: https://api.sandbox.paypal.com/v1/notifications/certs/cert_key_id" \
-  -d '{
-    "event_type": "PAYMENT.CAPTURE.COMPLETED",
-    "resource": {
-      "id": "test-payment-id",
-      "status": "COMPLETED",
-      "amount": {
-        "total": "100.00",
-        "currency": "USD"
-      },
-      "custom_id": "ORD-12345"
-    }
-  }'
+# Clone the repository
+git clone https://github.com/your-org/engage.git
+cd engage
+
+# Install dependencies
+npm install
+
+# Run database migrations
+# Execute all SQL files in /supabase/migrations/ in order
+
+# Start development server
+npm run dev
 ```
 
-### M-Pesa Webhook Test
+### Database Setup
 
-```bash
-curl -X POST http://localhost:3000/api/webhooks/mpesa \
-  -H "Content-Type: application/json" \
-  -d '{
-    "Body": {
-      "stkCallback": {
-        "MerchantRequestID": "test-request-id",
-        "CheckoutRequestID": "test-checkout-id",
-        "ResultCode": 0,
-        "ResultDesc": "The service request is processed successfully.",
-        "CallbackMetadata": {
-          "Item": [
-            {
-              "Name": "Amount",
-              "Value": 100.00
-            },
-            {
-              "Name": "MpesaReceiptNumber",
-              "Value": "TEST12345"
-            },
-            {
-              "Name": "TransactionDate",
-              "Value": 20230101120000
-            },
-            {
-              "Name": "PhoneNumber",
-              "Value": 254712345678
-            }
-          ]
-        }
-      }
-    }
-  }'
-```
+Execute these SQL files in order:
 
-## Deployment
+1. `00-users.sql` — Base users table
+2. `01-businesses.sql` — Multi-tenant foundation
+3. `02-spin-games.sql` — Spin wheel engine
+4. `03-challenges.sql` — Challenge/trivia system
+5. `04-access-codes.sql` — Code management
+6. `05-customer-points.sql` — Loyalty points
+7. `06-payments.sql` — Payment tracking
+8. `07-notifications.sql` — Notification system
 
-The application is designed to be deployed on Vercel.
+---
 
-1. Create a Vercel account at [vercel.com](https://vercel.com)
-2. Install the Vercel CLI:
-   ```bash
-   npm install -g vercel
-   ```
-3. Deploy the application:
-   ```bash
-   vercel
-   ```
-4. Add the environment variables in the Vercel dashboard
+## 🔄 How It Works
 
-## Project Structure
+### Customer Flow
 
 ```
-worldsamma-shop/
-├── public/             # Static assets
-├── src/
-│   ├── app/            # Next.js App Router
-│   │   ├── (admin)/    # Admin routes
-│   │   ├── (store)/    # Store routes
-│   │   ├── api/        # API routes
-│   │   ├── globals.css # Global styles
-│   │   └── layout.tsx  # Root layout
-│   ├── components/     # React components
-│   │   ├── admin/      # Admin components
-│   │   ├── layout/     # Layout components
-│   │   ├── ui/         # UI components
-│   │   └── ...
-│   ├── db/             # Database schema and migrations
-│   ├── hooks/          # Custom React hooks
-│   ├── lib/            # Utility libraries
-│   │   ├── supabase/   # Supabase client
-│   │   └── ...
-│   └── utils/          # Utility functions
-├── .env.example        # Example environment variables
-├── .gitignore          # Git ignore file
-├── components.json     # ShadCN UI components config
-├── next.config.js      # Next.js configuration
-├── package.json        # Project dependencies
-├── postcss.config.js   # PostCSS configuration
-├── tailwind.config.js  # Tailwind CSS configuration
-└── tsconfig.json       # TypeScript configuration
+1. Customer receives a code from a business (receipt, social media, in-store)
+2. Visits engagespin.com/spin
+3. Enters code → creates account (or logs in)
+4. Account activated for that business for 30 days
+5. Spins the wheel → wins prizes
+6. Earns loyalty points for every engagement
+7. Can be active with multiple businesses simultaneously
 ```
 
-## Contributing
+### Business Flow
 
-1. Fork the repository
-2. Create a new branch: `git checkout -b feature/your-feature-name`
-3. Make your changes
-4. Commit your changes: `git commit -m 'Add some feature'`
-5. Push to the branch: `git push origin feature/your-feature-name`
-6. Submit a pull request
+```
+1. Business signs up at engagespin.com/business/signup
+2. Gets 14-day free trial
+3. Configures spin wheel (prizes, probabilities, branding)
+4. Generates access codes (QR for in-store, bulk for receipts)
+5. Shares codes with customers
+6. Customers spin → business captures emails
+7. Broadcasts live trivia via OBS
+8. Exports customer data for marketing
+```
 
-## License
+### Live Broadcast Flow
 
-This project is licensed under the MIT License.
+```
+1. Admin opens host controls at /admin/[slug]/trivia/host
+2. Opens /[slug]/live in OBS as browser source
+3. Host calls participants by ticket number
+4. Customers answer from their phones at /[slug]/trivia
+5. Live display shows question, timer, leaderboard
+6. All real-time via Supabase WebSockets
+```
 
-## Acknowledgements
+---
 
-- [Next.js](https://nextjs.org/)
-- [React](https://reactjs.org/)
-- [TypeScript](https://www.typescriptlang.org/)
-- [TailwindCSS](https://tailwindcss.com/)
-- [ShadCN UI](https://ui.shadcn.com/)
-- [Supabase](https://supabase.io/)
-- [PayPal](https://developer.paypal.com/)
-- [M-Pesa](https://developer.safaricom.co.ke/)
-- [Vercel](https://vercel.com/)
+## 💰 Subscription Plans
 
-## Phase 8: Production Deployment Checklist
+| Feature          | Starter ($29/mo) | Pro ($79/mo) | Enterprise ($199/mo) |
+| ---------------- | ---------------- | ------------ | -------------------- |
+| Spin games       | 1                | 3            | Unlimited            |
+| Spins/month      | 500              | 5,000        | 25,000               |
+| Prize slots      | 6                | 12           | 24                   |
+| Trivia questions | 20               | 100          | Unlimited            |
+| Admin users      | 1                | 3            | 10                   |
+| Custom domain    | ❌               | ✅           | ✅                   |
+| Remove branding  | ❌               | ✅           | ✅                   |
+| API access       | ❌               | ❌           | ✅                   |
 
-### Pre-deployment
-- [ ] All database migrations applied (bundle_live.sql, spinning_wheel_advanced.sql, etc.)
-- [ ] Redis instance provisioned (Upstash or self-hosted)
-- [ ] WebSocket server configured for production (wss://)
-- [ ] Environment variables set on hosting platform
-- [ ] CORS configured for WebSocket connections
+---
 
-### Module Verification
-- [ ] Phase 1: Points Service - Admin can set conversion rate, points flow works across all modules
-- [ ] Phase 2: Bundles - Live stream exclusives, mystery reveal, broadcast screen
-- [ ] Phase 3: Spinning Wheel - Multi-game, real-time leaderboard, live ticker
-- [ ] Phase 4: Challenges - All 7 types, team challenges, "Catch Them" feature
-- [ ] Phase 5: Draws - Multi-phase draw show, winner management, auto-redraw
-- [ ] Phase 6: Deals - BOGO, free gifts, mystery deals, urgency states
-- [ ] Phase 7: Live Display - WebSocket connections, OBS URLs, admin controls
+## 🔐 Security
 
-### Performance Testing
-- [ ] WebSocket handles 500+ concurrent connections
-- [ ] Redis pub/sub works across multiple server instances
-- [ ] Supabase Realtime limits not exceeded
-- [ ] Broadcast pages load in < 2 seconds
+- **Row Level Security (RLS)** — All tables have RLS policies
+- **Code-gated access** — No browsing without verified codes
+- **Rate limiting** — Spins per user per day enforced
+- **Data isolation** — Businesses only see their own customers
+- **Secure webhooks** — PayPal and M-Pesa webhooks verified
 
-### OBS Compatibility
-- [ ] All `/live/*` URLs work as OBS Browser Sources
-- [ ] Transparent backgrounds option available
-- [ ] Auto-refresh on scene activation works
-- [ ] Custom CSS hiding options functional
+---
 
-### Monitoring Setup
-- [ ] WebSocket connection logs
-- [ ] Redis pub/sub monitoring
-- [ ] Supabase realtime usage tracking
-- [ ] Error tracking (Sentry integration)
+## 📝 License
 
-### Go-Live
-- [ ] Full backup of database before deployment
-- [ ] Feature flags ready for rollback
-- [ ] Documentation updated for streamers/hosts
-- [ ] 24-hour monitoring window scheduled
+Proprietary. All rights reserved.
+
+---
+
+## 🙋 Support
+
+- Email: support@engagespin.com
+- Documentation: docs.engagespin.com
+
+```
+
+```

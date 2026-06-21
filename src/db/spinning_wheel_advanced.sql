@@ -269,6 +269,14 @@ BEGIN
     IF NOT v_is_active THEN
         RAISE EXCEPTION 'You need an active code from this business to spin. Ask them for a code!';
     END IF;
+
+    -- Plan engagement limit
+    IF NOT check_business_engagement_allowed(v_business_id) THEN
+        RAISE EXCEPTION 'This business has reached its monthly engagement limit. Try again next month or ask them to upgrade.';
+    END IF;
+
+    -- Live broadcast: spin animation start
+    PERFORM record_spin_start(p_game_id, v_user_id);
     
     -- Check single prize
     IF v_game.is_single_prize AND v_game.single_prize_claimed THEN
@@ -403,6 +411,9 @@ BEGIN
     
     -- Live ticker
     PERFORM record_spin_win(v_attempt_id, v_prize_display);
+
+    -- Increment business engagement meter
+    PERFORM increment_business_engagement(v_business_id, 'spin');
     
     -- Return result
     SELECT json_build_object(

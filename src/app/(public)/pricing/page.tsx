@@ -9,155 +9,26 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Check,
-  Sparkles,
-  Crown,
-  Zap,
   RotateCcw,
   Brain,
   Gift,
   ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-// KES to USD approximate conversion rate (for display purposes only)
-// Actual rate used by banks may differ slightly
-const KES_TO_USD_RATE = 129;
-
-const PLANS = [
-  {
-    name: "Starter",
-    price: 3999, // KES
-    usdPrice: Math.round(3999 / KES_TO_USD_RATE),
-    icon: Sparkles,
-    color: "from-blue-500 to-cyan-500",
-    borderColor: "border-blue-500/30",
-    bgGlow: "bg-blue-500/10",
-    popular: false,
-    desc: "For small businesses getting started",
-    features: [
-      { text: "1 spin game", included: true },
-      { text: "1 trivia challenge", included: true },
-      { text: "1 active draw", included: true },
-      { text: "500 engagements/month", included: true },
-      { text: "6 prize slots on wheel", included: true },
-      { text: "20 trivia questions", included: true },
-      { text: "Basic branding (logo + 1 color)", included: true },
-      { text: "Customer CSV export", included: true },
-      { text: "Live broadcast (OBS)", included: true },
-      { text: "QR code generation", included: true },
-      { text: "Email support", included: true },
-      { text: "Multiple admin users", included: false },
-      { text: "Priority support", included: false },
-      { text: "API access", included: false },
-    ],
-  },
-  {
-    name: "Pro",
-    price: 9999, // KES
-    usdPrice: Math.round(9999 / KES_TO_USD_RATE),
-    icon: Crown,
-    color: "from-purple-500 to-pink-500",
-    borderColor: "border-purple-500/30",
-    bgGlow: "bg-purple-500/10",
-    popular: true,
-    desc: "For growing businesses running regular campaigns",
-    features: [
-      { text: "3 spin games", included: true },
-      { text: "3 trivia challenges", included: true },
-      { text: "3 active draws", included: true },
-      { text: "5,000 engagements/month", included: true },
-      { text: "12 prize slots on wheel", included: true },
-      { text: "100 trivia questions", included: true },
-      { text: "Full branding customization", included: true },
-      { text: "Customer CSV + webhook export", included: true },
-      { text: "Live broadcast (OBS)", included: true },
-      { text: "Bulk code generation", included: true },
-      { text: "Analytics dashboard", included: true },
-      { text: "3 admin users", included: true },
-      { text: "Priority support", included: true },
-      { text: "API access", included: false },
-    ],
-  },
-  {
-    name: "Enterprise",
-    price: 24999, // KES
-    usdPrice: Math.round(24999 / KES_TO_USD_RATE),
-    icon: Zap,
-    color: "from-amber-500 to-orange-500",
-    borderColor: "border-amber-500/30",
-    bgGlow: "bg-amber-500/10",
-    popular: false,
-    desc: "For chains and high-volume venues",
-    features: [
-      { text: "Unlimited spin games", included: true },
-      { text: "Unlimited trivia challenges", included: true },
-      { text: "Unlimited active draws", included: true },
-      { text: "25,000 engagements/month", included: true },
-      { text: "24 prize slots on wheel", included: true },
-      { text: "Unlimited trivia questions", included: true },
-      { text: "Full white-label branding", included: true },
-      { text: "Customer CSV + API + Webhooks", included: true },
-      { text: "Live broadcast (OBS)", included: true },
-      { text: "Multiple locations support", included: true },
-      { text: "Advanced analytics", included: true },
-      { text: "10 admin users", included: true },
-      { text: "Dedicated support", included: true },
-      { text: "API access", included: true },
-    ],
-  },
-];
-
-const FAQS = [
-  {
-    q: "What counts as an 'engagement'?",
-    a: "An engagement is any customer interaction: a spin on your wheel, a trivia answer, or an entry into a draw. The counter resets monthly. Most small businesses stay well within the Starter plan.",
-  },
-  {
-    q: "Can I switch plans later?",
-    a: "Yes! Upgrade or downgrade anytime. If you upgrade, you get the new limits immediately. If you downgrade, the new limits apply at the start of your next billing cycle.",
-  },
-  {
-    q: "Is there a free trial?",
-    a: "Yes, 14-day free trial on any plan. You get 100 engagements during the trial to test everything out. No credit card required.",
-  },
-  {
-    q: "What happens when I hit my engagement limit?",
-    a: "We'll notify you before you hit the limit. Your games stay active but customers won't be able to spin or enter draws until the next month or until you upgrade. Your data and setup are never lost.",
-  },
-  {
-    q: "Can I run draws based on spending amounts?",
-    a: "Yes! With draws, you can set entry rules based on purchase amounts. For example, 'Every KSH 100 spent = 1 entry' or 'Top 3 spenders this month win.' This works with your existing receipt codes.",
-  },
-  {
-    q: "How do customers access my games?",
-    a: "You generate access codes or QR codes from your dashboard. Print them on receipts, post them on social media, or display them in your store. Customers enter the code on our site—no app download needed.",
-  },
-  {
-    q: "Do you support M-Pesa?",
-    a: "Yes! We accept M-Pesa and international cards for subscriptions.",
-  },
-];
+import {
+  PLANS,
+  PRICING_FAQS,
+  KES_TO_USD_RATE,
+  getPriceKes,
+  formatKES,
+  kesToUsd,
+} from "@/lib/config/plans";
 
 export default function PricingPage() {
   const router = useRouter();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">(
     "monthly",
   );
-
-  const getPrice = (basePrice: number) => {
-    return billingCycle === "annual"
-      ? Math.round((basePrice * 10) / 12)
-      : basePrice;
-  };
-
-  const formatKES = (amount: number) => {
-    return new Intl.NumberFormat("en-KE", {
-      style: "currency",
-      currency: "KES",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-950 to-slate-950">
@@ -234,10 +105,9 @@ export default function PricingPage() {
       <div className="container mx-auto px-4 pb-20">
         <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {PLANS.map((plan, i) => {
-            const Icon = plan.icon;
-            const price = getPrice(plan.price);
-            const usdPrice = Math.round(price / KES_TO_USD_RATE);
-            const annualSavings = plan.price * 12 - plan.price * 10;
+            const price = getPriceKes(plan, billingCycle);
+            const usdPrice = kesToUsd(price);
+            const annualSavings = plan.priceKes * 12 - plan.priceKes * 10;
 
             return (
               <motion.div
@@ -337,7 +207,9 @@ export default function PricingPage() {
                           ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
                           : "bg-white/10 hover:bg-white/20 text-white",
                       )}
-                      onClick={() => router.push("/business/signup")}
+                      onClick={() =>
+                        router.push(`/business/signup?plan=${plan.id}`)
+                      }
                     >
                       {plan.popular ? (
                         <>
@@ -475,7 +347,7 @@ export default function PricingPage() {
             Frequently Asked Questions
           </h2>
           <div className="space-y-4">
-            {FAQS.map((faq, i) => (
+            {PRICING_FAQS.map((faq, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0 }}

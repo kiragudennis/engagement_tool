@@ -601,6 +601,10 @@ BEGIN
     WHERE id = v_selection.challenge_id;
     
     v_business_id := v_challenge.business_id;
+
+    IF v_business_id IS NOT NULL AND NOT check_business_engagement_allowed(v_business_id) THEN
+        RETURN json_build_object('success', false, 'error', 'Business engagement limit reached');
+    END IF;
     
     -- Check answer
     IF v_question.question_type = 'multiple_choice' OR v_question.question_type = 'true_false' THEN
@@ -745,6 +749,10 @@ BEGIN
     
     -- Recalculate ranks
     PERFORM recalculate_challenge_ranks(v_selection.challenge_id);
+
+    IF v_business_id IS NOT NULL THEN
+        PERFORM increment_business_engagement(v_business_id, 'trivia');
+    END IF;
     
     RETURN json_build_object(
         'success', true,

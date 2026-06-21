@@ -4,7 +4,6 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import Footer from "@/components/layout/Footer";
 import { AuthProvider } from "@/lib/context/AuthContext";
-import { StoreProvider } from "@/lib/context/StoreContext";
 import { Toaster } from "sonner";
 import { GlobalLoader } from "@/components/GlobalLoader";
 import { StreakTrackerProvider } from "@/components/challenges/providers/StreakTrackProvider";
@@ -151,13 +150,12 @@ export default function RootLayout({
       >
         <ThemeProvider
           attribute="class"
-          defaultTheme="dark"
+          defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
           <AuthProvider>
             <StreakTrackerProvider>
-              <StoreProvider>
                 <div className="flex flex-col min-h-screen w-full">
                   <main className="flex-grow">
                     {children}
@@ -166,7 +164,6 @@ export default function RootLayout({
                   </main>
                   <Footer />
                 </div>
-              </StoreProvider>
             </StreakTrackerProvider>
           </AuthProvider>
         </ThemeProvider>

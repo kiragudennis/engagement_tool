@@ -348,6 +348,8 @@ BEGIN
                 SELECT v_draw.id, COALESCE(u.full_name, 'Customer'), 
                        COALESCE(v_code.max_uses_per_user, 1), 'code'
                 FROM users u WHERE u.id = p_user_id;
+
+                PERFORM increment_business_engagement(v_business.id, 'draw');
                 
                 v_draw_entered := TRUE;
             END IF;

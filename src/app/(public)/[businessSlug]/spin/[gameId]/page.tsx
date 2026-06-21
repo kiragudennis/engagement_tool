@@ -821,7 +821,7 @@ export default function BusinessSpinPage() {
                   className="border-purple-300 dark:border-purple-500/30"
                 >
                   <Link
-                    href={`/${businessSlug}/live/${game?.id}`}
+                    href={`/${businessSlug}/spin/live/${game?.id}`}
                     target="_blank"
                   >
                     <Eye className="h-4 w-4 mr-1" /> Open Live View

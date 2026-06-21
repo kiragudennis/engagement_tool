@@ -296,7 +296,7 @@ function GameSelector({
             {games.map((g) => (
               <Link
                 key={g.id}
-                href={`/${businessSlug}/live/${g.id}`}
+                href={`/${businessSlug}/spin/live/${g.id}`}
                 className={cn(
                   "flex items-center gap-2 px-4 py-2.5 text-sm transition-colors hover:bg-white/10",
                   g.id === activeGameId

@@ -63,6 +63,8 @@ import {
   Brain,
 } from "lucide-react";
 import { toast } from "sonner";
+import { canCreateSpinGame } from "@/lib/services/plan-limits";
+import { openSpinLive } from "@/lib/utils/live-urls";
 import { SpinGame, PrizeSegment } from "@/types/spinning-wheel";
 
 const PRIZE_COLORS = [
@@ -187,6 +189,18 @@ export default function SpinningWheelAdmin() {
         if (error) throw error;
         toast.success("Game updated successfully");
       } else {
+        if (game.business_id) {
+          const allowed = await canCreateSpinGame(supabase, game.business_id);
+          if (!allowed) {
+            toast.error("Spin game limit reached. Upgrade your plan to create more games.", {
+              action: {
+                label: "Upgrade",
+                onClick: () => window.location.href = "/pricing",
+              },
+            });
+            return;
+          }
+        }
         const { error } = await supabase.from("spin_games").insert(game);
         if (error) throw error;
         toast.success("Game created successfully");
@@ -306,9 +320,7 @@ export default function SpinningWheelAdmin() {
                   onToggleStatus={() =>
                     toggleGameStatus(game.id, game.is_active)
                   }
-                  onLiveView={() =>
-                    window.open(`/spin/live/${game.id}`, "_blank")
-                  }
+                  onLiveView={() => openSpinLive(supabase, game)}
                   getGameTypeIcon={getGameTypeIcon}
                 />
               ))}
@@ -341,9 +353,7 @@ export default function SpinningWheelAdmin() {
                   onToggleStatus={() =>
                     toggleGameStatus(game.id, game.is_active)
                   }
-                  onLiveView={() =>
-                    window.open(`/spin/live/${game.id}`, "_blank")
-                  }
+                  onLiveView={() => openSpinLive(supabase, game)}
                   getGameTypeIcon={getGameTypeIcon}
                 />
               ))}

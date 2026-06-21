@@ -60,6 +60,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
+import { canCreateCode } from "@/lib/services/plan-limits";
 
 // ─── Types ──────────────────────────────────────────────
 interface AccessCode {
@@ -211,6 +212,18 @@ export default function CodeManagementPage() {
   // ─── Create Code ──────────────────────────────────────
   const handleCreateCode = async () => {
     if (!business) return;
+
+    const allowed = await canCreateCode(supabase, business.id);
+    if (!allowed) {
+      toast.error("Code limit reached for your plan. Upgrade to add more codes.", {
+        action: {
+          label: "Upgrade",
+          onClick: () => router.push(`/admin/${businessSlug}/billing?upgrade=pro`),
+        },
+      });
+      return;
+    }
+
     setCreating(true);
     try {
       const code =
@@ -249,6 +262,13 @@ export default function CodeManagementPage() {
   // ─── Create Bulk Codes ────────────────────────────────
   const handleCreateBulkCodes = async () => {
     if (!business) return;
+
+    const allowed = await canCreateCode(supabase, business.id);
+    if (!allowed) {
+      toast.error("Code limit reached for your plan.");
+      return;
+    }
+
     setCreating(true);
     try {
       const codes = generateBulkCodes(businessSlug, bulkCount);

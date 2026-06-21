@@ -73,7 +73,9 @@ interface SuspiciousActivity {
 export default function ChallengeLiveControls() {
   const { challengeId } = useParams<{ challengeId: string }>();
   const { supabase } = useAuth();
-  const [challenge, setChallenge] = useState<Challenge | null>(null);
+  const [challenge, setChallenge] = useState<
+    (Challenge & { business_slug?: string }) | null
+  >(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [leaderboard, setLeaderboard] = useState<Participant[]>([]);
   const [suspiciousActivities, setSuspiciousActivities] = useState<
@@ -105,10 +107,16 @@ export default function ChallengeLiveControls() {
     // Load challenge details
     const { data: challengeData } = await supabase
       .from("challenges")
-      .select("*")
+      .select("*, businesses(slug)")
       .eq("id", challengeId)
       .single();
-    setChallenge(challengeData);
+    if (challengeData) {
+      setChallenge({
+        ...challengeData,
+        business_slug: (challengeData as { businesses?: { slug: string } })
+          .businesses?.slug,
+      } as Challenge & { business_slug?: string });
+    }
 
     // Load leaderboard
     const board = await challengesService.getLeaderboard(challengeId, 50);
@@ -352,7 +360,14 @@ export default function ChallengeLiveControls() {
                 )}
               </button>
               <Button asChild variant="outline" size="sm">
-                <Link href={`/challenges/live/${challenge.id}`} target="_blank">
+                <Link
+                  href={
+                    challenge.business_slug
+                      ? `/${challenge.business_slug}/trivia/${challenge.id}/live`
+                      : "#"
+                  }
+                  target="_blank"
+                >
                   <Eye className="h-4 w-4 mr-2" />
                   Open Live Display
                 </Link>

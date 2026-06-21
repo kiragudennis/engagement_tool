@@ -7,6 +7,7 @@ import {
   generateSlug,
 } from "@/lib/schemas/business-schema";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { createSessionForUser, findUserIdByEmail } from "@/lib/auth/server";
 
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
@@ -59,22 +60,14 @@ export async function POST(req: NextRequest) {
         authError.message?.includes("already been registered") ||
         authError.message?.includes("already exists")
       ) {
-        // Look up existing user by email
-        const {
-          data: { users },
-          error: lookupError,
-        } = await supabaseAdmin.auth.admin.listUsers();
-
-        const existingUser = users?.find((u) => u.email === email);
-        if (lookupError || !existingUser) {
-          console.error("User lookup error:", lookupError);
+        const existingId = await findUserIdByEmail(email);
+        if (!existingId) {
           return NextResponse.json(
             { error: "Failed to find existing account. Try logging in first." },
             { status: 500 },
           );
         }
-
-        userId = existingUser.id;
+        userId = existingId;
       } else {
         console.error("Auth error:", authError);
         return NextResponse.json({ error: authError.message }, { status: 400 });
@@ -192,6 +185,11 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         console.error("Welcome email failed:", e);
       }
+    }
+
+    const { error: sessionError } = await createSessionForUser(email, password);
+    if (sessionError) {
+      console.error("Session creation after signup failed:", sessionError);
     }
 
     return NextResponse.json({

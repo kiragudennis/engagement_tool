@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
 import Link from "next/link";
+import { PlanLimitBanner } from "@/components/billing/PlanLimitBanner";
 
 export default function BusinessAdminDashboard() {
   const { businessSlug } = useParams<{ businessSlug: string }>();
@@ -233,6 +234,7 @@ export default function BusinessAdminDashboard() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
+        <PlanLimitBanner business={business} />
         {/* Quick Stats */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
           {[

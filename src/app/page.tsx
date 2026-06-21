@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import {
-  Sparkles,
   RotateCcw,
   Gift,
   Users,
@@ -28,10 +27,16 @@ import {
   Music,
   Timer,
 } from "lucide-react";
-import { cn, formatKES } from "@/lib/utils";
-import Footer from "@/components/layout/Footer";
+import { cn } from "@/lib/utils";
+import { PLANS, formatKES, kesToUsd } from "@/lib/config/plans";
 import { DemoWheel } from "@/components/landing/demo-wheel";
 import Header from "@/components/layout/Header";
+// import spinAnimation from "@/assets/lottie/spin-1.json";
+// import challengesAnimation from "@/assets/lottie/challenges.json";
+// import drawsAnimation from "@/assets/lottie/draws.json";
+// import bundlesAnimation from "@/assets/lottie/bundles.json";
+// import dealsAnimation from "@/assets/lottie/deals.json";
+// import { LottieIcon } from "@/components/ui/lottie-icon";
 
 // ─── Product Suite ─────────────────────────────────────
 const PRODUCT_SUITE = [
@@ -157,58 +162,6 @@ const FAQ = [
   },
 ];
 
-const KES_TO_USD_RATE = 130;
-
-// Update your PLANS array
-const PLANS = [
-  {
-    name: "Starter",
-    price: 3999, // KES
-    usdPrice: Math.round(3999 / KES_TO_USD_RATE),
-    desc: "For small businesses getting started",
-    features: [
-      "1 spin game",
-      "1 trivia challenge",
-      "1 active draw",
-      "500 engagements/mo",
-      "Basic branding",
-      "CSV export",
-    ],
-    highlight: false,
-  },
-  {
-    name: "Pro",
-    price: 9999, // KES
-    usdPrice: Math.round(9999 / KES_TO_USD_RATE),
-    desc: "For growing businesses running regular campaigns",
-    features: [
-      "3 spin games",
-      "3 trivia challenges",
-      "3 active draws",
-      "5,000 engagements/mo",
-      "Full branding",
-      "Analytics dashboard",
-      "Bulk code generation",
-    ],
-    highlight: true,
-  },
-  {
-    name: "Enterprise",
-    price: 24999, // KES
-    usdPrice: Math.round(24999 / KES_TO_USD_RATE),
-    desc: "For chains and high-volume venues",
-    features: [
-      "Unlimited everything",
-      "25,000 engagements/mo",
-      "Multiple locations",
-      "API access",
-      "Dedicated support",
-      "Advanced analytics",
-    ],
-    highlight: false,
-  },
-];
-
 // ─── Main Component ─────────────────────────────────────
 export default function LandingPage() {
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
@@ -225,17 +178,25 @@ export default function LandingPage() {
       <Header />
       {/* ─── HERO ────────────────────────────────────── */}
       <section
-        ref={heroRef}
-        className="relative pt-32 pb-24 overflow-hidden bg-gray-50 dark:bg-transparent"
-      >
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-purple-100 dark:bg-purple-500/10 rounded-full blur-3xl" />
-        <div className="absolute top-1/4 right-0 w-[400px] h-[400px] bg-pink-100 dark:bg-pink-500/10 rounded-full blur-3xl" />
-        {/* Background image that covers the whole section with overflow */}
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-110 opacity-10"
-          style={{ backgroundImage: "url('/images/you-win-banner.jpg')" }}
-        />
-
+  ref={heroRef}
+  className="relative pt-32 pb-24 overflow-hidden"
+>
+  {/* Background image with theme-aware overlay */}
+  <div
+    className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-110"
+    style={{ backgroundImage: "url('/images/happy-people-banner.jpg')" }}
+  />
+  
+  {/* Theme-aware overlay - light mode */}
+  <div className="absolute inset-0 bg-white/50 dark:hidden" />
+  
+  {/* Theme-aware overlay - dark mode */}
+  <div className="absolute inset-0 hidden dark:block bg-black/60" />
+  
+  {/* Decorative blur effects */}
+  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-purple-400/20 rounded-full blur-3xl" />
+  <div className="absolute top-1/4 right-0 w-[400px] h-[400px] bg-pink-100 dark:bg-pink-400/20 rounded-full blur-3xl" />
+  
         <motion.div
           style={{ opacity: heroOpacity }}
           className="container mx-auto px-4 relative z-10"
@@ -263,15 +224,48 @@ export default function LandingPage() {
                 </span>
               </motion.h1>
               <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="text-lg text-gray-500 dark:text-white/50 mt-6 leading-relaxed max-w-lg"
-              >
-                Give your customers a reason to return. Spin wheels, trivia
-                nights, and prize draws. You capture their phone and emails.
-                They come back to claim prizes. Everyone wins.
-              </motion.p>
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ delay: 0.3 }}
+  className="text-lg mt-6 leading-relaxed max-w-lg
+    text-gray-600 dark:text-gray-300"
+>
+  Give your customers a reason to return.{' '}
+  <span className="relative inline-block">
+    Spin wheels
+    <motion.span
+      className="absolute bottom-0 left-0 w-full h-[3px] bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
+      initial={{ width: 0 }}
+      animate={{ width: '100%' }}
+      transition={{ delay: 0.8, duration: 0.8 }}
+    />
+  </span>
+  ,{' '}
+  <span className="relative inline-block">
+    trivia nights
+    <motion.span
+      className="absolute bottom-0 left-0 w-full h-[3px] bg-gradient-to-r from-pink-500 to-amber-500 rounded-full"
+      initial={{ width: 0 }}
+      animate={{ width: '100%' }}
+      transition={{ delay: 1.0, duration: 0.8 }}
+    />
+  </span>
+  , and{' '}
+  <span className="relative inline-block">
+    prize draws
+    <motion.span
+      className="absolute bottom-0 left-0 w-full h-[3px] bg-gradient-to-r from-amber-500 to-purple-500 rounded-full"
+      initial={{ width: 0 }}
+      animate={{ width: '100%' }}
+      transition={{ delay: 1.2, duration: 0.8 }}
+    />
+  </span>
+  . You capture their phone and emails.
+  They come back to claim prizes.{' '}
+  <span className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-400 dark:to-pink-400">
+    Everyone wins.
+  </span>
+</motion.p>
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -300,7 +294,7 @@ export default function LandingPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.6 }}
-                className="flex items-center gap-6 mt-8 text-xs sm:text-sm text-gray-400 dark:text-white/40"
+                className="flex items-center gap-6 mt-8 text-xs sm:text-sm"
               >
                 <span className="flex items-center gap-1">
                   <Check className="h-4 w-4 text-green-500" /> 14-day free trial
@@ -540,13 +534,13 @@ export default function LandingPage() {
                 <Card
                   className={cn(
                     "h-full border transition-all shadow-sm dark:shadow-none",
-                    plan.highlight
+                    plan.popular
                       ? "border-purple-300 dark:border-purple-500/50 bg-purple-50/50 dark:bg-purple-500/5 scale-105"
                       : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/5",
                   )}
                 >
                   <CardContent className="flex flex-col h-full relative pt-8">
-                    {plan.highlight && (
+                    {plan.popular && (
                       <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 border-0">
                         Most Popular
                       </Badge>
@@ -556,26 +550,29 @@ export default function LandingPage() {
                     </h3>
                     <div className="mt-4">
                       <span className="text-4xl font-bold text-gray-900 dark:text-white">
-                        {formatKES(plan.price)}
+                        {formatKES(plan.priceKes)}
                       </span>
                       <span className="text-gray-400 dark:text-white/40 text-lg">
                         /mo
                       </span>
                       <p className="text-sm text-gray-400 dark:text-white/30 mt-1">
-                        ≈ ${plan.usdPrice} USD
+                        ≈ ${kesToUsd(plan.priceKes)} USD
                       </p>
                     </div>
                     <p className="text-gray-500 dark:text-white/40 text-sm mt-1">
                       {plan.desc}
                     </p>
                     <ul className="mt-6 space-y-3 flex-1">
-                      {plan.features.map((f, j) => (
+                      {plan.features
+                        .filter((f) => f.included)
+                        .slice(0, 6)
+                        .map((f, j) => (
                         <li
                           key={j}
                           className="flex items-center gap-2 text-sm text-gray-600 dark:text-white/60"
                         >
                           <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                          {f}
+                          {f.text}
                         </li>
                       ))}
                     </ul>
@@ -583,12 +580,12 @@ export default function LandingPage() {
                       asChild
                       className={cn(
                         "mt-6 w-full",
-                        plan.highlight
+                        plan.popular
                           ? "bg-gradient-to-r from-purple-600 to-pink-600"
                           : "bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 text-gray-900 dark:text-white",
                       )}
                     >
-                      <Link href="/business/signup">Start Free Trial</Link>
+                      <Link href={`/business/signup?plan=${plan.id}`}>Start Free Trial</Link>
                     </Button>
                   </CardContent>
                 </Card>

@@ -50,15 +50,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
 
       try {
-        // We need to fetch users loyalty tier and points
         const { data, error } = await supabase
-          .from("user_loyalty_profile")
+          .from("users")
           .select("*")
           .eq("id", supabaseUser.id)
           .maybeSingle();
 
         if (error) {
-          console.error("Error fetching user role:", error.message);
+          console.error("Error fetching user profile:", error.message);
 
           if (
             error.code?.includes("AUTH") ||
@@ -79,7 +78,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: data.id,
           email: data.email,
           role: data.role,
-
           full_name: data.full_name,
           phone: data.phone,
           address: data.address,
@@ -87,32 +85,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           postal_code: data.postal_code,
           country: data.country,
           referral_code: data.referral_code,
-
           business_name: data.business_name,
           business_type: data.business_type,
-
           receive_offers: data.receive_offers,
           receive_newsletter: data.receive_newsletter,
-
           email_verified: data.email_verified,
           last_login: data.last_login,
-
           metadata: data.metadata,
-
           created_at: data.created_at,
           updated_at: data.updated_at,
-
-          // loyalty data
-          loyalty: data.loyalty_points
-            ? {
-                points: data.loyalty_points.points,
-                points_earned: data.loyalty_points.points_earned,
-                points_redeemed: data.loyalty_points.points_redeemed,
-                tier: data.loyalty_points.tier,
-                tier_details: data.loyalty_points.loyalty_tiers,
-                last_updated: data.loyalty_points.last_updated,
-              }
-            : null,
+          loyalty: null,
         };
 
         setProfile(profileData);
@@ -178,21 +160,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     password: string,
   ): Promise<{ error: AuthError | null }> => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
     });
 
-    if (error) throw error;
+    const data = await res.json();
+    if (!res.ok) {
+      return { error: { message: data.error || "Login failed" } as AuthError };
+    }
 
-    await supabase
-      .from("users")
-      .update({
-        last_login: new Date().toISOString(),
-      })
-      .eq("id", data.user.id);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    return { error };
+    if (session?.user) {
+      await fetchUser(session.user);
+    }
+
+    return { error: null };
   };
   // Login with magic link
   const signInWithMagicLink = async (email: string) => {
@@ -227,8 +214,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async (): Promise<void> => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    await fetch("/api/auth/logout", { method: "POST" });
+    await supabase.auth.signOut();
     setProfile(null);
   };
 

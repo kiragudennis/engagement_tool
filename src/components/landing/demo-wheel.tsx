@@ -5,6 +5,8 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Volume2, VolumeX } from "lucide-react";
 import confetti from "canvas-confetti";
+import spinAnimation from "@/assets/lottie/spin-1.json";
+import { LottieIcon } from "../ui/lottie-icon";
 
 const SEGMENTS = [
   { label: "Free Coffee", color: "#8B5CF6", icon: "☕", value: "coffee" },
@@ -450,40 +452,46 @@ export function DemoWheel() {
         </motion.div>
       </div>
 
-      {/* Spin Button */}
-      <motion.button
-        onClick={handleSpin}
-        disabled={spinning}
-        className="relative mt-8 px-10 py-4 rounded-full font-bold text-lg text-white shadow-2xl transition-all disabled:opacity-60 disabled:cursor-not-allowed overflow-hidden group"
-        style={{ background: "linear-gradient(135deg, #8B5CF6, #EC4899)" }}
-        whileHover={!spinning ? { scale: 1.05 } : {}}
-        whileTap={!spinning ? { scale: 0.95 } : {}}
-      >
-        <motion.div
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-          animate={{ x: ["-100%", "200%"] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-        />
-        <span className="relative z-10 flex items-center gap-2">
-          {spinning ? (
-            <>
-              <motion.span
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-              >
-                ⚡
-              </motion.span>
-              Spinning...
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-5 w-5" />
-              Spin to Win!
-              <Sparkles className="h-5 w-5" />
-            </>
-          )}
-        </span>
-      </motion.button>
+     {/* Spin Button */}
+<motion.button
+  onClick={handleSpin}
+  disabled={spinning}
+  className="relative mt-6 px-4 py-4 rounded-lg font-bold text-lg text-white shadow-2xl transition-all disabled:opacity-60 disabled:cursor-not-allowed overflow-hidden group"
+  style={{ background: "linear-gradient(135deg, #F59E0B, #D97706)" }}
+  whileHover={!spinning ? { scale: 1.05 } : {}}
+  whileTap={!spinning ? { scale: 0.95 } : {}}
+>
+  <motion.div
+    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+    animate={{ x: ["-100%", "200%"] }}
+    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+  />
+  <span className="relative z-10 flex items-center gap-2">
+    {spinning ? (
+      <>
+        <motion.span
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        >
+          ⚡
+        </motion.span>
+        Spinning...
+      </>
+    ) : (
+      <div className="flex items-center gap-2">
+        <LottieIcon
+                  animation={spinAnimation}
+                  isCategory={false}
+                />
+        Spin to Win!
+        <LottieIcon
+                  animation={spinAnimation}
+                  isCategory={false}
+                />
+      </div>
+    )}
+  </span>
+</motion.button>
 
       {/* Result Popup */}
       <AnimatePresence>
@@ -551,7 +559,7 @@ export function DemoWheel() {
       </AnimatePresence>
 
       {/* Instruction text */}
-      <p className="text-xs mt-3 text-gray-500 dark:text-gray-400">
+      <p className="text-xs mt-3">
         👆 Try spinning the demo wheel!
       </p>
     </div>

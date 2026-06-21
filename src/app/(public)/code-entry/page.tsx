@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import Link from "next/link";
 import GamingBackground from "@/components/GamingBackground";
-import { businessSignupSchema } from "@/lib/schemas/business-schema";
+import { customerSignupSchema } from "@/lib/schemas/auth-schema";
 
 // ─── Types ──────────────────────────────────────────────
 interface CodeResult {
@@ -130,68 +130,31 @@ export default function CodeEntryPage() {
     setCodeResult(null);
 
     try {
-      // Look up the code to see what it unlocks
-      const { data: codeData } = await supabase
-        .from("access_codes")
-        .select(
-          `
-          id, business_id, code, unlocks, type,
-          businesses!inner(id, name, slug, logo_url, brand_color)
-        `,
-        )
-        .eq("code", code.toUpperCase().trim())
-        .eq("is_active", true)
-        .single();
+      const res = await fetch(
+        `/api/customer/validate-code?code=${encodeURIComponent(code.toUpperCase().trim())}`,
+      );
+      const data = await res.json();
 
-      if (!codeData) {
-        setError("Invalid or expired code. Ask the business for a valid code.");
+      if (!res.ok) {
+        setError(data.error || "Invalid or expired code. Ask the business for a valid code.");
         setLoading(false);
         return;
       }
 
-      const business = codeData.businesses;
       const baseResult: CodeResult = {
-        business_name: business.name,
-        business_slug: business.slug,
-        business_logo: business.logo_url,
-        business_color: business.brand_color,
-        unlocks: codeData.unlocks,
-        code: codeData.code,
-        redirect_url: `/${business.slug}/${codeData.unlocks === "trivia" ? "trivia" : "spin"}`,
+        business_name: data.business_name,
+        business_slug: data.business_slug,
+        business_logo: data.business_logo,
+        business_color: data.business_color,
+        unlocks: data.unlocks,
+        code: data.code,
+        redirect_url: data.redirect_url,
+        draw_name: data.draw_name,
+        draw_prize: data.draw_prize,
+        draw_ends_at: data.draw_ends_at,
+        trivia_name: data.trivia_name,
+        trivia_time: data.trivia_time,
       };
-
-      // If code unlocks a draw, get draw details
-      if (codeData.unlocks === "draw" || codeData.unlocks === "both") {
-        const { data: draw } = await supabase
-          .from("draws")
-          .select("name, prize_name, entry_ends_at")
-          .eq("access_code_id", codeData.id)
-          .eq("status", "open")
-          .single();
-
-        if (draw) {
-          baseResult.draw_name = draw.name;
-          baseResult.draw_prize = draw.prize_name;
-          baseResult.draw_ends_at = draw.entry_ends_at;
-          baseResult.redirect_url = `/${business.slug}/draw`;
-        }
-      }
-
-      // If code unlocks trivia, get trivia details
-      if (codeData.unlocks === "trivia" || codeData.unlocks === "both") {
-        const { data: challenge } = await supabase
-          .from("challenges")
-          .select("name, starts_at")
-          .eq("business_id", business.id)
-          .eq("challenge_type", "trivia")
-          .eq("status", "active")
-          .single();
-
-        if (challenge) {
-          baseResult.trivia_name = challenge.name;
-          baseResult.trivia_time = challenge.starts_at;
-        }
-      }
 
       setCodeResult(baseResult);
 
@@ -203,7 +166,7 @@ export default function CodeEntryPage() {
       }
 
       // User IS logged in — redeem immediately
-      await redeemAndRedirect(codeData.code);
+      await redeemAndRedirect(data.code);
     } catch (err: any) {
       setError(err.message || "Something went wrong");
     } finally {
@@ -235,7 +198,7 @@ export default function CodeEntryPage() {
 
   // app/(public)/spin/page.tsx - Updated handleSignup
 const handleSignup = async () => {
-  const parsed = businessSignupSchema.safeParse(signupData);
+  const parsed = customerSignupSchema.safeParse(signupData);
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
     const flat = parsed.error.flatten().fieldErrors;
@@ -261,7 +224,7 @@ const handleSignup = async () => {
     if (!res.ok) throw new Error(data.error || "Failed to redeem code");
 
     toast.success(`Welcome to ${data.business_name}!`);
-    setTimeout(() => router.push(data.redirect_url), 1000);
+    window.location.href = data.redirect_url;
   } catch (err: any) {
     toast.error(err.message);
   } finally {

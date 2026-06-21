@@ -49,7 +49,14 @@ export function DrawListItem({
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/draws/live/${draw.id}`} target="_blank">
+              <Link
+                href={
+                  draw.business_slug
+                    ? `/${draw.business_slug}/draw/${draw.id}/live`
+                    : `#`
+                }
+                target="_blank"
+              >
                 <Eye className="h-4 w-4" />
               </Link>
             </Button>

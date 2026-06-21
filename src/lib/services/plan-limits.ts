@@ -1,108 +1,101 @@
-// lib/services/plan-limits.ts
 import { SupabaseClient } from "@supabase/supabase-js";
+import {
+  getPlanLimits,
+  type PlanLimits,
+  isUnlimited,
+} from "@/lib/config/plans";
 
-export interface PlanLimits {
-  maxSpinsPerMonth: number;
-  maxSpinGames: number;
-  maxTriviaChallenges: number;
-  maxPrizeSlots: number;
-  maxTriviaQuestions: number;
-  maxCodes: number;
-  maxAdminUsers: number;
-  canRemoveBranding: boolean;
-  canUseCustomDomain: boolean;
-  hasApiAccess: boolean;
-  hasAnalytics: boolean;
-}
+export type { PlanLimits };
 
-const PLAN_LIMITS: Record<string, PlanLimits> = {
-  trial: {
-    maxSpinsPerMonth: 100,
-    maxSpinGames: 1,
-    maxTriviaChallenges: 1,
-    maxPrizeSlots: 6,
-    maxTriviaQuestions: 10,
-    maxCodes: 3,
-    maxAdminUsers: 1,
-    canRemoveBranding: false,
-    canUseCustomDomain: false,
-    hasApiAccess: false,
-    hasAnalytics: false,
-  },
-  starter: {
-    maxSpinsPerMonth: 500,
-    maxSpinGames: 1,
-    maxTriviaChallenges: 1,
-    maxPrizeSlots: 6,
-    maxTriviaQuestions: 20,
-    maxCodes: 10,
-    maxAdminUsers: 1,
-    canRemoveBranding: false,
-    canUseCustomDomain: false,
-    hasApiAccess: false,
-    hasAnalytics: false,
-  },
-  pro: {
-    maxSpinsPerMonth: 5000,
-    maxSpinGames: 3,
-    maxTriviaChallenges: 3,
-    maxPrizeSlots: 12,
-    maxTriviaQuestions: 100,
-    maxCodes: 50,
-    maxAdminUsers: 3,
-    canRemoveBranding: true,
-    canUseCustomDomain: true,
-    hasApiAccess: false,
-    hasAnalytics: true,
-  },
-  enterprise: {
-    maxSpinsPerMonth: 25000,
-    maxSpinGames: 999,
-    maxTriviaChallenges: 999,
-    maxPrizeSlots: 24,
-    maxTriviaQuestions: 999,
-    maxCodes: 999,
-    maxAdminUsers: 10,
-    canRemoveBranding: true,
-    canUseCustomDomain: true,
-    hasApiAccess: true,
-    hasAnalytics: true,
-  },
-};
+export { getPlanLimits };
 
-export function getPlanLimits(plan: string): PlanLimits {
-  return PLAN_LIMITS[plan] || PLAN_LIMITS.trial;
-}
-
-export async function checkSpinLimit(
+export async function checkEngagementLimit(
   supabase: SupabaseClient,
   businessId: string,
 ): Promise<{ allowed: boolean; used: number; max: number }> {
   const { data: business } = await supabase
     .from("businesses")
-    .select("plan, subscription_status, spins_this_month")
+    .select(
+      "plan, subscription_status, engagements_this_month, spins_this_month, trial_ends_at",
+    )
     .eq("id", businessId)
     .single();
 
   if (!business) return { allowed: false, used: 0, max: 0 };
 
   const limits = getPlanLimits(business.plan);
-  const used = business.spins_this_month || 0;
+  const used =
+    business.engagements_this_month ?? business.spins_this_month ?? 0;
+
+  const trialExpired =
+    business.subscription_status === "trial" &&
+    business.trial_ends_at &&
+    new Date(business.trial_ends_at) <= new Date();
+
+  const subscriptionBlocked = ["expired", "past_due", "cancelled"].includes(
+    business.subscription_status,
+  );
+
+  if (trialExpired || subscriptionBlocked) {
+    return { allowed: false, used, max: limits.maxEngagementsPerMonth };
+  }
 
   return {
-    allowed: used < limits.maxSpinsPerMonth,
+    allowed: used < limits.maxEngagementsPerMonth,
     used,
-    max: limits.maxSpinsPerMonth,
+    max: limits.maxEngagementsPerMonth,
   };
 }
 
+export async function incrementEngagementCount(
+  supabase: SupabaseClient,
+  businessId: string,
+  type: "spin" | "trivia" | "draw" = "spin",
+): Promise<void> {
+  await supabase.rpc("increment_business_engagement", {
+    p_business_id: businessId,
+    p_type: type,
+  });
+}
+
+/** @deprecated use incrementEngagementCount */
 export async function incrementSpinCount(
   supabase: SupabaseClient,
   businessId: string,
 ): Promise<void> {
-  await supabase.rpc("increment_business_spin_count", {
-    p_business_id: businessId,
-  });
+  return incrementEngagementCount(supabase, businessId, "spin");
+}
+
+/** @deprecated use checkEngagementLimit */
+export async function checkSpinLimit(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<{ allowed: boolean; used: number; max: number }> {
+  return checkEngagementLimit(supabase, businessId);
+}
+
+async function countUnderLimit(
+  supabase: SupabaseClient,
+  businessId: string,
+  table: string,
+  max: number,
+  extraFilter?: Record<string, string>,
+): Promise<boolean> {
+  if (isUnlimited(max)) return true;
+
+  let query = supabase
+    .from(table)
+    .select("*", { count: "exact", head: true })
+    .eq("business_id", businessId);
+
+  if (extraFilter) {
+    for (const [key, value] of Object.entries(extraFilter)) {
+      query = query.eq(key, value);
+    }
+  }
+
+  const { count } = await query;
+  return (count || 0) < max;
 }
 
 export async function canCreateSpinGame(
@@ -114,16 +107,51 @@ export async function canCreateSpinGame(
     .select("plan")
     .eq("id", businessId)
     .single();
-
   if (!business) return false;
+  return countUnderLimit(
+    supabase,
+    businessId,
+    "spin_games",
+    getPlanLimits(business.plan).maxSpinGames,
+  );
+}
 
-  const limits = getPlanLimits(business.plan);
-  const { count } = await supabase
-    .from("spin_games")
-    .select("*", { count: "exact", head: true })
-    .eq("business_id", businessId);
+export async function canCreateTriviaChallenge(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<boolean> {
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("plan")
+    .eq("id", businessId)
+    .single();
+  if (!business) return false;
+  return countUnderLimit(
+    supabase,
+    businessId,
+    "challenges",
+    getPlanLimits(business.plan).maxTriviaChallenges,
+    { challenge_type: "trivia" },
+  );
+}
 
-  return (count || 0) < limits.maxSpinGames;
+export async function canCreateDraw(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<boolean> {
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("plan")
+    .eq("id", businessId)
+    .single();
+  if (!business) return false;
+  return countUnderLimit(
+    supabase,
+    businessId,
+    "draws",
+    getPlanLimits(business.plan).maxActiveDraws,
+    { status: "open" },
+  );
 }
 
 export async function canCreateCode(
@@ -135,14 +163,29 @@ export async function canCreateCode(
     .select("plan")
     .eq("id", businessId)
     .single();
-
   if (!business) return false;
+  return countUnderLimit(
+    supabase,
+    businessId,
+    "access_codes",
+    getPlanLimits(business.plan).maxCodes,
+  );
+}
 
+export async function canAddAdminUser(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<boolean> {
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("plan")
+    .eq("id", businessId)
+    .single();
+  if (!business) return false;
   const limits = getPlanLimits(business.plan);
   const { count } = await supabase
-    .from("access_codes")
+    .from("business_admins")
     .select("*", { count: "exact", head: true })
     .eq("business_id", businessId);
-
-  return (count || 0) < limits.maxCodes;
+  return (count || 0) < limits.maxAdminUsers;
 }

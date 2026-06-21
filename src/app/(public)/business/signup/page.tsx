@@ -129,7 +129,9 @@ export default function BusinessSignupPage() {
             </CardContent>
           </Card>
           <Button
-            onClick={() => router.push(`/admin/${businessSlug}`)}
+            onClick={() => {
+              window.location.href = `/admin/${businessSlug}`;
+            }}
             className="mt-6 gap-2"
             size="lg"
           >

@@ -6,10 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
-    "ws:dev": "tsx server/websocket-server.ts",
-    "ws:start": "node dist/server/websocket-server.js",
-    "dev:all": "concurrently \"next dev\" \"npm run ws:dev\""
+    "lint": "eslint ."
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",

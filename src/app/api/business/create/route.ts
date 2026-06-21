@@ -1,0 +1,208 @@
+// app/api/business/create/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { Resend } from "resend";
+import {
+  businessSignupSchema,
+  generateSlug,
+} from "@/lib/schemas/business-schema";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+
+    // Validate with Zod
+    const parsed = businessSignupSchema.safeParse(body);
+    if (!parsed.success) {
+      const errors = parsed.error.flatten().fieldErrors;
+      return NextResponse.json(
+        { error: "Validation failed", errors },
+        { status: 400 },
+      );
+    }
+
+    const { businessName, fullName, email, password } = parsed.data;
+    const slug = generateSlug(businessName);
+
+    // Check if business slug is taken
+    const { data: existingBusiness } = await supabaseAdmin
+      .from("businesses")
+      .select("id")
+      .eq("slug", slug)
+      .single();
+
+    if (existingBusiness) {
+      return NextResponse.json(
+        { error: "This business name is already taken" },
+        { status: 409 },
+      );
+    }
+
+    let userId: string;
+
+    // Try to create the user account
+    const { data: authData, error: authError } =
+      await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { full_name: fullName },
+      });
+
+    if (authError) {
+      if (
+        authError.message?.includes("already been registered") ||
+        authError.message?.includes("already exists")
+      ) {
+        // Look up existing user by email
+        const {
+          data: { users },
+          error: lookupError,
+        } = await supabaseAdmin.auth.admin.listUsers();
+
+        const existingUser = users?.find((u) => u.email === email);
+        if (lookupError || !existingUser) {
+          console.error("User lookup error:", lookupError);
+          return NextResponse.json(
+            { error: "Failed to find existing account. Try logging in first." },
+            { status: 500 },
+          );
+        }
+
+        userId = existingUser.id;
+      } else {
+        console.error("Auth error:", authError);
+        return NextResponse.json({ error: authError.message }, { status: 400 });
+      }
+    } else {
+      userId = authData.user!.id;
+    }
+
+    // Ensure user exists in public.users
+    await supabaseAdmin.from("users").upsert(
+      {
+        id: userId,
+        email,
+        full_name: fullName,
+        role: "customer",
+        status: "active",
+        onboarding_completed: true,
+      },
+      { onConflict: "id" },
+    );
+
+    // Create business
+    const { data: business, error: businessError } = await supabaseAdmin
+      .from("businesses")
+      .insert({
+        name: businessName,
+        slug,
+        admin_email: email,
+        admin_name: fullName,
+        brand_color: "#8B5CF6",
+        brand_secondary_color: "#EC4899",
+        subscription_status: "trial",
+        trial_ends_at: new Date(
+          Date.now() + 14 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
+        activation_duration_days: 30,
+      })
+      .select()
+      .single();
+
+    if (businessError) {
+      console.error("Business creation error:", businessError);
+      return NextResponse.json(
+        { error: "Failed to create business" },
+        { status: 500 },
+      );
+    }
+
+    // Add user as owner
+    await supabaseAdmin.from("business_admins").insert({
+      business_id: business.id,
+      user_id: userId,
+      role: "owner",
+      accepted_at: new Date().toISOString(),
+    });
+
+    // Generate default QR code
+    await supabaseAdmin.from("access_codes").insert({
+      business_id: business.id,
+      code: `${slug.toUpperCase().replace(/-/g, "")}-QR`,
+      type: "qr",
+      label: "In-Store QR Code",
+      unlocks: "spin",
+      max_uses: null,
+      max_uses_per_user: 1,
+      description: "Default QR code for in-store customers",
+    });
+
+    // Send welcome email
+    if (resend) {
+      try {
+        await resend.emails.send({
+          from: "Engage <welcome@engagespin.com>",
+          to: email,
+          subject: `🎉 Welcome to Engage, ${fullName}!`,
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"></head>
+            <body style="font-family: Arial, sans-serif; margin: 0; padding: 0;">
+              <div style="max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #8B5CF6, #EC4899); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+                  <h1 style="color: white; margin: 0; font-size: 24px;">🎉 Welcome to Engage!</h1>
+                </div>
+                <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px;">
+                  <p style="font-size: 16px;">Hi ${fullName},</p>
+                  <p style="font-size: 16px;">Your business <strong>${businessName}</strong> is ready to engage customers!</p>
+                  
+                  <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                    <p style="margin: 0 0 8px; font-size: 14px; color: #6b7280;">Your public page:</p>
+                    <p style="margin: 0; font-family: monospace; font-size: 16px; color: #f59e0b;">
+                      engagespin.com/${slug}/spin
+                    </p>
+                  </div>
+                  
+                  <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                    <p style="margin: 0 0 8px; font-size: 14px; color: #6b7280;">Your dashboard:</p>
+                    <p style="margin: 0; font-family: monospace; font-size: 14px; color: #8b5cf6;">
+                      engagespin.com/admin/${slug}
+                    </p>
+                  </div>
+                  
+                  <p style="font-size: 14px; color: #374151;">You're on a <strong>14-day free trial</strong>. No credit card needed.</p>
+                  
+                  <a href="${process.env.NEXT_PUBLIC_URL}/admin/${slug}" 
+                     style="display: inline-block; background: #8B5CF6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin-top: 15px; font-size: 16px;">
+                    Go to Dashboard →
+                  </a>
+                </div>
+              </div>
+            </body>
+            </html>
+          `,
+        });
+      } catch (e) {
+        console.error("Welcome email failed:", e);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      business: { id: business.id, name: business.name, slug: business.slug },
+    });
+  } catch (error: any) {
+    console.error("Business creation error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}

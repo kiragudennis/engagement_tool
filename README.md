@@ -39,8 +39,6 @@
 | **Rate limiting** - prevent abuse                                       | 🟢 Medium   |
 | **Analytics page** - charts for businesses                              | 🟢 Medium   |
 
-````
-
 ---
 
 ## 4. README.md
@@ -55,6 +53,7 @@
 ## ✨ Features
 
 ### For Businesses
+
 - **🎰 Spin-to-Win Wheel** — Configurable prize wheel with probabilities, custom branding
 - **🧠 Live Trivia** — Host trivia nights with ticket queues, timed answers, live leaderboards
 - **🎬 OBS Broadcast** — Professional live display for projecting behind the host
@@ -64,6 +63,7 @@
 - **💳 Payments** — M-Pesa and PayPal integration
 
 ### For Customers
+
 - **One Account** — Single login across all businesses
 - **⭐ Loyalty Points** — Earn points for every spin and trivia answer
 - **🎁 Rewards** — Redeem points for extra spins, VIP badges, golden tickets
@@ -73,17 +73,17 @@
 
 ## 🏗️ Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | Next.js 14 (App Router) |
-| Database | Supabase (PostgreSQL) |
-| Auth | Supabase Auth |
-| Real-time | Supabase Realtime (WebSockets) |
-| Styling | Tailwind CSS + shadcn/ui |
-| Animations | Framer Motion |
-| Payments | PayPal API + M-Pesa Daraja API |
-| Email | Resend |
-| Deployment | Vercel |
+| Layer      | Technology                     |
+| ---------- | ------------------------------ |
+| Framework  | Next.js 14 (App Router)        |
+| Database   | Supabase (PostgreSQL)          |
+| Auth       | Supabase Auth                  |
+| Real-time  | Supabase Realtime (WebSockets) |
+| Styling    | Tailwind CSS + shadcn/ui       |
+| Animations | Framer Motion                  |
+| Payments   | PayPal API + M-Pesa Daraja API |
+| Email      | Resend                         |
+| Deployment | Vercel                         |
 
 ---
 
@@ -92,6 +92,7 @@
 ## [1.0.0] - 2026-06-13
 
 ### Added
+
 - Multi-tenant business foundation with Supabase RLS
 - Spin wheel engine with configurable prizes and probabilities
 - Live trivia challenge system with ticket queue
@@ -115,6 +116,7 @@
 - Responsive mobile-first design
 
 ### Technical
+
 - Next.js 14 App Router
 - Supabase with PostgreSQL and Row Level Security
 - TypeScript throughout
@@ -124,8 +126,7 @@
 - Database functions for points, activations, and code redemption
 
 ## 📦 Project Structure
-
-````
+```
 
 ├── app/
 │ ├── (public)/ # Public-facing pages
@@ -238,7 +239,6 @@ Execute these SQL files in order:
 
 ### Customer Flow
 
-```
 1. Customer receives a code from a business (receipt, social media, in-store)
 2. Visits engagespin.com/spin
 3. Enters code → creates account (or logs in)
@@ -246,11 +246,9 @@ Execute these SQL files in order:
 5. Spins the wheel → wins prizes
 6. Earns loyalty points for every engagement
 7. Can be active with multiple businesses simultaneously
-```
 
 ### Business Flow
 
-```
 1. Business signs up at engagespin.com/business/signup
 2. Gets 14-day free trial
 3. Configures spin wheel (prizes, probabilities, branding)
@@ -259,18 +257,29 @@ Execute these SQL files in order:
 6. Customers spin → business captures emails
 7. Broadcasts live trivia via OBS
 8. Exports customer data for marketing
-```
 
 ### Live Broadcast Flow
 
-```
 1. Admin opens host controls at /admin/[slug]/trivia/host
 2. Opens /[slug]/live in OBS as browser source
 3. Host calls participants by ticket number
 4. Customers answer from their phones at /[slug]/trivia
 5. Live display shows question, timer, leaderboard
 6. All real-time via Supabase WebSockets
-```
+
+### Loyalty Tiers (Repurposed)
+
+-- Existing tiers repurposed for engagement
+-- Bronze: 0-500 lifetime points (default, everyone starts here)
+-- Silver: 500-2,000 points (regular spinner)
+-- Gold: 2,000-10,000 points (super fan)
+-- Platinum: 10,000+ points (legendary)
+
+-- Points earned:
+-- Spin the wheel: 10 points per spin
+-- Trivia answer: 5 points per answer
+-- Trivia correct: 25 bonus points
+-- Refer a business: 100 points (when they sign up)
 
 ---
 
@@ -309,7 +318,3 @@ Proprietary. All rights reserved.
 
 - Email: support@engagespin.com
 - Documentation: docs.engagespin.com
-
-```
-
-```

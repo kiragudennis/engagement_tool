@@ -3,7 +3,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/context/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,8 +14,14 @@ import {
   Loader2,
   ArrowRight,
   CheckCircle,
+  User,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
 
 function generateSlug(name: string): string {
   return name
@@ -26,13 +31,14 @@ function generateSlug(name: string): string {
 }
 
 export default function BusinessSignupPage() {
-  const { supabase, profile } = useAuth();
   const router = useRouter();
   const [step, setStep] = useState<"form" | "creating" | "done">("form");
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     businessName: "",
-    adminName: "",
+    fullName: "",
     email: "",
+    password: "",
   });
   const [businessSlug, setBusinessSlug] = useState("");
 
@@ -41,69 +47,56 @@ export default function BusinessSignupPage() {
       toast.error("Business name is required");
       return;
     }
+    if (!formData.fullName.trim()) {
+      toast.error("Your name is required");
+      return;
+    }
+    if (!formData.email.trim()) {
+      toast.error("Email is required");
+      return;
+    }
+    if (!formData.password || formData.password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
 
     setStep("creating");
 
     try {
-      const slug = generateSlug(formData.businessName);
-      setBusinessSlug(slug);
+      const res = await fetch("/api/business/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessName: formData.businessName,
+          fullName: formData.fullName,
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
 
-      // Create business record
-      const { data: business, error } = await supabase
-        .from("businesses")
-        .insert({
-          name: formData.businessName,
-          slug,
-          admin_email: formData.email || profile?.email || "",
-          admin_name: formData.adminName || profile?.full_name || "",
-          brand_color: "#8B5CF6",
-          brand_secondary_color: "#EC4899",
-        })
-        .select()
-        .single();
+      const data = await res.json();
 
-      if (error) {
-        if (error.code === "23505") {
+      if (!res.ok) {
+        if (res.status === 409) {
           toast.error(
             "This business name is already taken. Try a different one.",
           );
           setStep("form");
           return;
         }
-        throw error;
+        throw new Error(data.error || "Failed to create business");
       }
 
-      // Add current user as owner
-      if (profile?.id) {
-        await supabase.from("business_admins").insert({
-          business_id: business.id,
-          user_id: profile.id,
-          role: "owner",
-          accepted_at: new Date().toISOString(),
-        });
-      }
-
-      // Generate default QR code for the business
-      await supabase.from("access_codes").insert({
-        business_id: business.id,
-        code: `${slug.toUpperCase().replace(/-/g, "")}-QR`,
-        type: "qr",
-        label: "In-Store QR Code",
-        unlocks: "spin",
-        max_uses: null,
-        max_uses_per_user: 1,
-        description: "Default QR code for in-store customers",
-      });
-
+      setBusinessSlug(data.business.slug);
       setStep("done");
-
-      toast.success("Business created! Welcome to Engage!");
+      toast.success("Business created! Check your email for details.");
     } catch (err: any) {
       toast.error(err.message || "Failed to create business");
       setStep("form");
     }
   };
 
+  // ─── Done State ───────────────────────────────────────
   if (step === "done") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 flex items-center justify-center p-4">
@@ -120,11 +113,19 @@ export default function BusinessSignupPage() {
             Your business is ready to engage customers.
           </p>
           <Card className="bg-black/50 border-white/10 mt-6">
-            <CardContent className="p-4 text-center">
-              <p className="text-white/60 text-sm mb-1">Your public page:</p>
-              <p className="text-yellow-400 font-mono text-lg">
-                engagespin.com/{businessSlug}/spin
-              </p>
+            <CardContent className="p-4 text-center space-y-3">
+              <div>
+                <p className="text-white/60 text-sm mb-1">Your public page:</p>
+                <p className="text-yellow-400 font-mono text-lg">
+                  engagespin.com/{businessSlug}/spin
+                </p>
+              </div>
+              <div>
+                <p className="text-white/60 text-sm mb-1">Your dashboard:</p>
+                <p className="text-purple-400 font-mono text-sm">
+                  engagespin.com/admin/{businessSlug}
+                </p>
+              </div>
             </CardContent>
           </Card>
           <Button
@@ -139,6 +140,7 @@ export default function BusinessSignupPage() {
     );
   }
 
+  // ─── Signup Form ──────────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 flex items-center justify-center p-4">
       <motion.div
@@ -176,42 +178,78 @@ export default function BusinessSignupPage() {
                 </p>
               )}
             </div>
+
             <div>
-              <Label className="text-white">Your Name</Label>
-              <Input
-                value={formData.adminName}
-                onChange={(e) =>
-                  setFormData((p) => ({ ...p, adminName: e.target.value }))
-                }
-                placeholder={profile?.full_name || "John Doe"}
-                className="mt-1 bg-white/5 border-white/10 text-white"
-                disabled={step === "creating"}
-              />
+              <Label className="text-white">Your Name *</Label>
+              <div className="relative mt-1">
+                <User className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                <Input
+                  value={formData.fullName}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, fullName: e.target.value }))
+                  }
+                  placeholder="Jane Doe"
+                  className="pl-9 bg-white/5 border-white/10 text-white"
+                  disabled={step === "creating"}
+                />
+              </div>
             </div>
+
             <div>
-              <Label className="text-white">Email</Label>
-              <Input
-                type="email"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData((p) => ({ ...p, email: e.target.value }))
-                }
-                placeholder={profile?.email || "you@email.com"}
-                className="mt-1 bg-white/5 border-white/10 text-white"
-                disabled={step === "creating"}
-              />
+              <Label className="text-white">Email *</Label>
+              <div className="relative mt-1">
+                <Mail className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                <Input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, email: e.target.value }))
+                  }
+                  placeholder="you@email.com"
+                  className="pl-9 bg-white/5 border-white/10 text-white"
+                  disabled={step === "creating"}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-white">Password *</Label>
+              <div className="relative mt-1">
+                <Lock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  value={formData.password}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, password: e.target.value }))
+                  }
+                  placeholder="Min. 6 characters"
+                  className="pl-9 pr-10 bg-white/5 border-white/10 text-white"
+                  disabled={step === "creating"}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
               <p className="text-sm text-purple-300 flex items-center gap-2">
-                <Sparkles className="h-4 w-4" />
-                14-day free trial · No credit card required
+                <Sparkles className="h-4 w-4" /> 14-day free trial · No credit
+                card required
               </p>
             </div>
 
             <Button
               onClick={handleSubmit}
-              disabled={step === "creating" || !formData.businessName.trim()}
+              disabled={step === "creating"}
               className="w-full h-12 gap-2 bg-gradient-to-r from-purple-600 to-pink-600"
             >
               {step === "creating" ? (
@@ -222,6 +260,16 @@ export default function BusinessSignupPage() {
                 </>
               )}
             </Button>
+
+            <p className="text-center text-white/30 text-sm">
+              Already have an account?{" "}
+              <Link
+                href="/login"
+                className="text-purple-400 hover:text-purple-300"
+              >
+                Sign in
+              </Link>
+            </p>
           </CardContent>
         </Card>
       </motion.div>

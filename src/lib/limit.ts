@@ -269,3 +269,22 @@ export async function processEmailQueue(): Promise<{
 
   return { sent, failed };
 }
+
+export const getPlanCode = (plan: string, cycle: "monthly" | "annual") => {
+  const plans = {
+    starter: {
+      monthly: "PLN_ydgtlvrtrjpbtz8",
+      annual: "PLN_l2nu74bpwgmfckg",
+    },
+    pro: {
+      monthly: "PLN_1y7cuxm6auf2cxq",
+      annual: "PLN_f8njityjpmp6eal",
+    },
+    enterprise: {
+      monthly: "PLN_99uja3f924723eg",
+      annual: "PLN_dquz9sky664pvk5",
+    },
+  };
+
+  return plans[plan as keyof typeof plans]?.[cycle];
+};

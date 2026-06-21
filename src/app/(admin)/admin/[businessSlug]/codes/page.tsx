@@ -53,6 +53,9 @@ import {
   Gift,
   Eye,
   EyeOff,
+  RotateCcw,
+  Brain,
+  Trophy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -813,6 +816,7 @@ export default function CodeManagementPage() {
             </div>
             <div>
               <Label className="text-white">Unlocks</Label>
+
               <Select
                 value={formData.unlocks}
                 onValueChange={(v) =>
@@ -823,9 +827,42 @@ export default function CodeManagementPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="spin">Spin Only</SelectItem>
-                  <SelectItem value="trivia">Trivia Only</SelectItem>
-                  <SelectItem value="both">Both</SelectItem>
+                  <SelectItem value="spin">
+                    <div className="flex items-center gap-2">
+                      <RotateCcw className="h-4 w-4" />
+                      Spin Only
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="trivia">
+                    <div className="flex items-center gap-2">
+                      <Brain className="h-4 w-4" />
+                      Trivia Only
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="draw">
+                    <div className="flex items-center gap-2">
+                      <Trophy className="h-4 w-4" />
+                      Draw Only
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="spin_draw">
+                    <div className="flex items-center gap-2">
+                      <Gift className="h-4 w-4" />
+                      Spin + Draw
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="trivia_draw">
+                    <div className="flex items-center gap-2">
+                      <Brain className="h-4 w-4" />
+                      Trivia + Draw
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="all">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4" />
+                      All (Spin + Trivia + Draw)
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

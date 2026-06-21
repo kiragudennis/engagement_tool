@@ -63,7 +63,7 @@ import {
   Brain,
 } from "lucide-react";
 import { toast } from "sonner";
-import { SpinGame, PrizeSegment } from "@/types/spinning_wheel";
+import { SpinGame, PrizeSegment } from "@/types/spinning-wheel";
 
 const PRIZE_COLORS = [
   "#FF6B6B",

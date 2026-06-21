@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { AuthProvider } from "@/lib/context/AuthContext";
 import { StoreProvider } from "@/lib/context/StoreContext";
@@ -152,7 +151,7 @@ export default function RootLayout({
       >
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme="dark"
           enableSystem
           disableTransitionOnChange
         >
@@ -160,7 +159,6 @@ export default function RootLayout({
             <StreakTrackerProvider>
               <StoreProvider>
                 <div className="flex flex-col min-h-screen w-full">
-                  <Header />
                   <main className="flex-grow">
                     {children}
                     <GlobalLoader /> {/* shows on every route transition */}

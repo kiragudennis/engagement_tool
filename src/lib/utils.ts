@@ -25,6 +25,15 @@ export function formatCurrency(
   }).format(amount);
 }
 
+export const formatKES = (amount: number) => {
+  return new Intl.NumberFormat("en-KE", {
+    style: "currency",
+    currency: "KES",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+};
+
 export function calculateShipping({
   zone,
   weightKg = 0.5,

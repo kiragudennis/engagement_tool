@@ -1,1336 +1,284 @@
--- 1. First, create loyalty_tiers table (if not exists)
+-- ============================================
+-- ENGAGE PLATFORM: Loyalty System - Cleaned
+-- ============================================
+
+-- 1. Loyalty tiers (simplified for engagement)
 CREATE TABLE IF NOT EXISTS loyalty_tiers (
-    tier text PRIMARY KEY CHECK (tier IN ('bronze', 'silver', 'gold', 'platinum')),
-    min_points integer NOT NULL,
-    points_per_shilling numeric(5,2) NOT NULL DEFAULT 1.0,
-    discount_percentage integer NOT NULL DEFAULT 0,
-    free_shipping_threshold numeric(10,2),
-    priority_support boolean DEFAULT false,
-    birthday_bonus_points integer DEFAULT 0,
-    created_at timestamptz DEFAULT now()
+    tier TEXT PRIMARY KEY CHECK (tier IN ('bronze', 'silver', 'gold', 'platinum')),
+    min_points INTEGER NOT NULL,
+    points_multiplier NUMERIC(3,1) NOT NULL DEFAULT 1.0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. Create loyalty_points table (if not exists)
-CREATE TABLE IF NOT EXISTS loyalty_points (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id uuid REFERENCES users(id) ON DELETE CASCADE UNIQUE,
-    points integer DEFAULT 0 CHECK (points >= 0),
-    points_earned integer DEFAULT 0,
-    points_redeemed integer DEFAULT 0,
-    tier text DEFAULT 'bronze' REFERENCES loyalty_tiers(tier),
-    last_updated timestamptz DEFAULT now(),
-    created_at timestamptz DEFAULT now(),
-    updated_at timestamptz DEFAULT now()
-);
-
--- Get current loyalty profile for all users (for AuthContext)
--- Create a view that joins everything
-CREATE OR REPLACE VIEW user_loyalty_profile AS
-SELECT 
-  u.*,
-  lp.points,
-  lp.points_earned,
-  lp.points_redeemed,
-  lp.tier as current_tier,
-  lt.min_points,
-  lt.points_per_shilling,
-  lt.discount_percentage,
-  lt.free_shipping_threshold,
-  lt.priority_support,
-  lt.birthday_bonus_points,
-  lp.last_updated as loyalty_last_updated
-FROM users u
-LEFT JOIN loyalty_points lp ON u.id = lp.user_id
-LEFT JOIN loyalty_tiers lt ON lp.tier = lt.tier;
-
--- 3. Create loyalty_transactions table (if not exists) - THIS IS THE MISSING TABLE
-CREATE TABLE IF NOT EXISTS loyalty_transactions (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id uuid REFERENCES users(id) ON DELETE CASCADE,
-    order_id uuid REFERENCES orders(id) ON DELETE SET NULL,
-    points_change integer NOT NULL,
-    current_points integer NOT NULL,
-    transaction_type text NOT NULL CHECK (transaction_type IN ('earned', 'redeemed', 'expired', 'adjusted', 'signup_bonus', 'refunded', 'account_activation')),
-    description text NOT NULL,
-    expires_at timestamptz,
-    metadata jsonb DEFAULT '{}'::jsonb,
-    created_at timestamptz DEFAULT now()
-);
-
--- 4. Insert default loyalty tiers (if not already inserted)
-INSERT INTO loyalty_tiers (tier, min_points, points_per_shilling, discount_percentage, free_shipping_threshold, priority_support, birthday_bonus_points) 
-VALUES
-('bronze', 0, 1.0, 0, 5000.00, false, 100),
-('silver', 1000, 1.5, 5, 3000.00, false, 200),
-('gold', 5000, 2.0, 10, 2000.00, true, 500),
-('platinum', 15000, 3.0, 15, 1000.00, true, 1000)
+-- Insert default tiers
+INSERT INTO loyalty_tiers (tier, min_points, points_multiplier) VALUES
+    ('bronze', 0, 1.0),
+    ('silver', 500, 1.2),
+    ('gold', 2000, 1.5),
+    ('platinum', 10000, 2.0)
 ON CONFLICT (tier) DO NOTHING;
 
--- 5. Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_loyalty_points_user_id ON loyalty_points(user_id);
-CREATE INDEX IF NOT EXISTS idx_loyalty_points_tier ON loyalty_points(tier);
-CREATE INDEX IF NOT EXISTS idx_loyalty_transactions_user_id ON loyalty_transactions(user_id);
-CREATE INDEX IF NOT EXISTS idx_loyalty_transactions_order_id ON loyalty_transactions(order_id);
-CREATE INDEX IF NOT EXISTS idx_loyalty_transactions_created_at ON loyalty_transactions(created_at DESC);
-
--- Drop all existing versions of the function
-DROP FUNCTION IF EXISTS get_user_loyalty_summary(uuid) CASCADE;
-
--- Create a single, clean version
-CREATE OR REPLACE FUNCTION get_user_loyalty_summary(p_user_id uuid)
-RETURNS json
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    loyalty_record RECORD;
-    user_tier RECORD;
-    next_tier RECORD;
-    points_to_next_tier integer;
-    recent_transactions json;
-    available_points integer;
-    total_earned integer;
-    total_redeemed integer;
-    result json;
-BEGIN
-    -- Check if user exists
-    IF NOT EXISTS (SELECT 1 FROM users WHERE id = p_user_id) THEN
-        RETURN json_build_object(
-            'success', false,
-            'message', 'User not found'
-        );
-    END IF;
+-- 2. Loyalty points (per business)
+CREATE TABLE IF NOT EXISTS loyalty_points (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+    points INTEGER DEFAULT 0 CHECK (points >= 0),
+    points_earned INTEGER DEFAULT 0,
+    points_redeemed INTEGER DEFAULT 0,
+    tier TEXT DEFAULT 'bronze' REFERENCES loyalty_tiers(tier),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
     
-    -- Get loyalty points
-    SELECT * INTO loyalty_record
-    FROM loyalty_points
-    WHERE user_id = p_user_id;
-    
-    IF NOT FOUND THEN
-        -- Create default record
-        INSERT INTO loyalty_points (user_id, tier, points, points_earned, points_redeemed)
-        VALUES (p_user_id, 'bronze', 0, 0, 0)
-        ON CONFLICT (user_id) DO UPDATE SET updated_at = now()
-        RETURNING * INTO loyalty_record;
-    END IF;
-    
-    -- Get current tier details
-    SELECT * INTO user_tier
-    FROM loyalty_tiers
-    WHERE tier = loyalty_record.tier;
-    
-    IF NOT FOUND THEN
-        -- Default to bronze tier if not found
-        SELECT * INTO user_tier
-        FROM loyalty_tiers
-        WHERE tier = 'bronze';
-    END IF;
-    
-    -- Get next tier
-    SELECT * INTO next_tier
-    FROM loyalty_tiers
-    WHERE min_points > COALESCE(user_tier.min_points, 0)
-    ORDER BY min_points
-    LIMIT 1;
-    
-    -- Calculate points to next tier
-    IF next_tier.tier IS NOT NULL THEN
-        points_to_next_tier := GREATEST(next_tier.min_points - COALESCE(loyalty_record.points, 0), 0);
-    ELSE
-        points_to_next_tier := 0;
-    END IF;
-    
-    -- Calculate available points for redemption (only multiples of 100)
-    available_points := FLOOR(COALESCE(loyalty_record.points, 0) / 100) * 100;
-    
-    -- Get recent transactions - FIXED VERSION
-    SELECT COALESCE(
-        json_agg(
-            json_build_object(
-                'date', t.created_at,
-                'type', t.transaction_type,
-                'points', ABS(t.points_change),
-                'description', t.description,
-                'order_number', o.order_number
-            )
-        ),
-        '[]'::json
-    ) INTO recent_transactions
-    FROM (
-        SELECT *
-        FROM loyalty_transactions
-        WHERE user_id = p_user_id
-        ORDER BY created_at DESC
-        LIMIT 10
-    ) t
-    LEFT JOIN orders o ON t.order_id = o.id;
-    
-    -- Use points_earned and points_redeemed from loyalty_points table
-    total_earned := COALESCE(loyalty_record.points_earned, 0);
-    total_redeemed := COALESCE(loyalty_record.points_redeemed, 0);
-    
-    -- Build result
-    result := json_build_object(
-        'points', COALESCE(loyalty_record.points, 0),
-        'availableForRedemption', available_points,
-        'redemptionRate', 0.1,
-        'maxDiscount', (available_points / 10.0),
-        'tier', COALESCE(loyalty_record.tier, 'bronze'),
-        'tierDetails', json_build_object(
-            'name', COALESCE(user_tier.tier, 'bronze'),
-            'pointsPerShilling', COALESCE(user_tier.points_per_shilling, 1.0),
-            'discountPercentage', COALESCE(user_tier.discount_percentage, 0),
-            'freeShippingThreshold', user_tier.free_shipping_threshold,
-            'prioritySupport', COALESCE(user_tier.priority_support, false),
-            'birthdayBonusPoints', COALESCE(user_tier.birthday_bonus_points, 0)
-        ),
-        'nextTier', CASE WHEN next_tier.tier IS NOT NULL THEN
-            json_build_object(
-                'name', next_tier.tier,
-                'minPoints', next_tier.min_points,
-                'pointsNeeded', points_to_next_tier,
-                'discountPercentage', next_tier.discount_percentage
-            )
-        ELSE NULL END,
-        'recentTransactions', recent_transactions,
-        'pointsValue', (COALESCE(loyalty_record.points, 0) / 10.0),
-        'totalEarned', total_earned,
-        'totalRedeemed', total_redeemed,
-        'success', true
-    );
-    
-    RETURN result;
-EXCEPTION
-    WHEN OTHERS THEN
-        -- Return error information
-        RETURN json_build_object(
-            'success', false,
-            'message', SQLERRM,
-            'error_code', SQLSTATE
-        );
-END;
-$$;
-
--- Grant execute permission to authenticated users
-GRANT EXECUTE ON FUNCTION get_user_loyalty_summary(uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION get_user_loyalty_summary(uuid) TO anon;
-
--- 7. Create a simple test function to verify tables exist
-CREATE OR REPLACE FUNCTION check_loyalty_tables_exist()
-RETURNS json
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    tables_exist boolean;
-    result json;
-BEGIN
-    -- Check if all required tables exist
-    SELECT 
-        EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'loyalty_tiers') AND
-        EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'loyalty_points') AND
-        EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'loyalty_transactions')
-    INTO tables_exist;
-    
-    result := json_build_object(
-        'tables_exist', tables_exist,
-        'loyalty_tiers', EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'loyalty_tiers'),
-        'loyalty_points', EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'loyalty_points'),
-        'loyalty_transactions', EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'loyalty_transactions')
-    );
-    
-    RETURN result;
-END;
-$$;
-
--- Add order_number and tracking_url to orders table for customer tracking
-ALTER TABLE orders 
-ADD COLUMN IF NOT EXISTS estimated_delivery timestamptz,
-ADD COLUMN IF NOT EXISTS loyalty_points_earned integer DEFAULT 0,
-ADD COLUMN IF NOT EXISTS loyalty_points_redeemed integer DEFAULT 0;
-
--- Create index for performance
-CREATE INDEX IF NOT EXISTS idx_loyalty_points_user_id ON loyalty_points(user_id);
-CREATE INDEX IF NOT EXISTS idx_loyalty_transactions_user_id ON loyalty_transactions(user_id);
-CREATE INDEX IF NOT EXISTS idx_loyalty_transactions_order_id ON loyalty_transactions(order_id);
-CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number);
-CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
-
--- Create a table to store redeemed loyalty discounts
-CREATE TABLE IF NOT EXISTS loyalty_redemptions (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id uuid REFERENCES users(id) ON DELETE CASCADE,
-    order_id uuid REFERENCES orders(id) ON DELETE CASCADE,
-    points_used integer NOT NULL CHECK (points_used > 0),
-    discount_amount numeric(10,2) NOT NULL CHECK (discount_amount > 0),
-    status text DEFAULT 'pending' CHECK (status IN ('pending', 'applied', 'refunded', 'expired')),
-    metadata jsonb DEFAULT '{}'::jsonb,
-    created_at timestamptz DEFAULT now(),
-    updated_at timestamptz DEFAULT now(),
-    
-    CONSTRAINT unique_order_redemption UNIQUE(order_id)
+    UNIQUE(user_id, business_id)
 );
 
--- Index for better performance
-CREATE INDEX idx_loyalty_redemptions_user_id ON loyalty_redemptions(user_id);
-CREATE INDEX idx_loyalty_redemptions_order_id ON loyalty_redemptions(order_id);
-CREATE INDEX idx_loyalty_redemptions_status ON loyalty_redemptions(status);
+-- 3. Loyalty transactions
+CREATE TABLE IF NOT EXISTS loyalty_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+    points_change INTEGER NOT NULL,
+    current_points INTEGER NOT NULL,
+    transaction_type TEXT NOT NULL CHECK (transaction_type IN (
+        'earned', 'redeemed', 'expired', 'adjusted',
+        'spin_win', 'trivia_correct', 'trivia_answer', 'daily_visit',
+        'draw_entry', 'draw_consolation', 'referral_bonus'
+    )),
+    description TEXT NOT NULL,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
--- Add valid_until column if it doesn't exist
-ALTER TABLE loyalty_redemptions 
-ADD COLUMN IF NOT EXISTS valid_until timestamptz DEFAULT (now() + interval '24 hours');
+-- ============================================
+-- Indexes
+-- ============================================
+CREATE INDEX IF NOT EXISTS idx_loyalty_points_user ON loyalty_points(user_id);
+CREATE INDEX IF NOT EXISTS idx_loyalty_points_business ON loyalty_points(business_id);
+CREATE INDEX IF NOT EXISTS idx_loyalty_points_tier ON loyalty_points(tier);
+CREATE INDEX IF NOT EXISTS idx_loyalty_transactions_user ON loyalty_transactions(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_loyalty_transactions_business ON loyalty_transactions(business_id, created_at DESC);
 
--- Update existing rows
-UPDATE loyalty_redemptions 
-SET valid_until = created_at + interval '24 hours'
-WHERE valid_until IS NULL;
+-- ============================================
+-- RLS Policies
+-- ============================================
+ALTER TABLE loyalty_tiers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE loyalty_points ENABLE ROW LEVEL SECURITY;
+ALTER TABLE loyalty_transactions ENABLE ROW LEVEL SECURITY;
 
+-- Anyone can view tiers
+CREATE POLICY "Anyone can view tiers" ON loyalty_tiers FOR SELECT USING (true);
 
--- Function to redeem loyalty points for checkout (with order reservation)
-CREATE OR REPLACE FUNCTION redeem_loyalty_points_for_checkout(
-    p_user_id uuid,
-    p_points_to_redeem integer,
-    p_description text DEFAULT 'Points redeemed for discount'
+-- Users can view their own points
+CREATE POLICY "Users can view own points" ON loyalty_points
+    FOR SELECT USING (auth.uid() = user_id);
+
+-- Users can view their own transactions
+CREATE POLICY "Users can view own transactions" ON loyalty_transactions
+    FOR SELECT USING (auth.uid() = user_id);
+
+-- Admin policies
+CREATE POLICY "Admins can manage own business points" ON loyalty_points
+    FOR ALL USING (
+        public.is_admin() AND 
+        business_id IN (SELECT business_id FROM business_admins WHERE user_id = auth.uid())
+    );
+
+CREATE POLICY "Admins can manage own business transactions" ON loyalty_transactions
+    FOR ALL USING (
+        public.is_admin() AND 
+        business_id IN (SELECT business_id FROM business_admins WHERE user_id = auth.uid())
+    );
+
+-- ============================================
+-- Functions
+-- ============================================
+
+-- Create loyalty record for a business
+CREATE OR REPLACE FUNCTION create_business_loyalty_record(
+    p_user_id UUID,
+    p_business_id UUID
 )
-RETURNS json
+RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
-DECLARE
-    loyalty_record RECORD;
-    discount_amount numeric(10,2);
-    redemption_code text;
-    redemption_id uuid; 
-    result json;
 BEGIN
-    -- Validate input
-    IF p_points_to_redeem <= 0 OR p_points_to_redeem % 100 != 0 THEN
-        RETURN json_build_object(
-            'success', false, 
-            'message', 'Points must be redeemed in multiples of 100'
-        );
-    END IF;
-    
-    -- Get loyalty record
-    SELECT * INTO loyalty_record
-    FROM loyalty_points
-    WHERE user_id = p_user_id
-    FOR UPDATE;
-    
-    IF NOT FOUND THEN
-        RETURN json_build_object('success', false, 'message', 'No loyalty account found');
-    END IF;
-    
-    -- Check if user has enough points
-    IF loyalty_record.points < p_points_to_redeem THEN
-        RETURN json_build_object('success', false, 'message', 'Insufficient points');
-    END IF;
-    
-    -- Calculate discount amount (1 point = 0.10 KES)
-    discount_amount := p_points_to_redeem / 10.0;
-    
-    -- Generate unique redemption code
-    redemption_code := 'LOYALTY-' || encode(gen_random_bytes(6), 'hex');
-    
-    -- Create temporary redemption record (will be linked to order later)
-    INSERT INTO loyalty_redemptions (
-        user_id,
-        points_used,
-        discount_amount,
-        status,
-        metadata
-    ) VALUES (
-        p_user_id,
-        p_points_to_redeem,
-        discount_amount,
-        'pending',
-        json_build_object(
-            'redemption_code', redemption_code,
-            'description', p_description,
-            'points_rate', 0.1, -- 1 point = 0.10 KES
-            'created_at', now()
-        )
-    ) RETURNING id INTO redemption_id;
-    
-    -- Return redemption details for checkout
-    result := json_build_object(
-        'success', true,
-        'redemption_id', redemption_id,
-        'redemption_code', redemption_code,
-        'points_redeemed', p_points_to_redeem,
-        'discount_amount', discount_amount,
-        'message', 'Points reserved for checkout. Apply this code during checkout.'
-    );
-    
-    RETURN result;
+    INSERT INTO loyalty_points (user_id, business_id, tier, points, points_earned, points_redeemed)
+    VALUES (p_user_id, p_business_id, 'bronze', 0, 0, 0)
+    ON CONFLICT (user_id, business_id) DO NOTHING;
 END;
 $$;
 
--- Updated apply_loyalty_redemption_to_order function with correct column names
-CREATE OR REPLACE FUNCTION apply_loyalty_redemption_to_order(
-    p_order_id uuid,
-    p_redemption_code text,
-    p_user_id uuid DEFAULT NULL
+-- Award engagement points
+CREATE OR REPLACE FUNCTION award_engagement_points(
+    p_user_id UUID,
+    p_business_id UUID,
+    p_points INTEGER,
+    p_transaction_type TEXT,
+    p_description TEXT DEFAULT NULL,
+    p_metadata JSONB DEFAULT '{}'
 )
-RETURNS json
+RETURNS INTEGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-    redemption_record RECORD;
-    order_record RECORD;
-    loyalty_record RECORD;
-    actual_discount NUMERIC;
-    remaining_total NUMERIC;
-    points_to_deduct integer;
-    points_returned integer;
-    discount_ratio numeric;
-    result json;
+    v_current_points INTEGER;
+    v_new_tier TEXT;
 BEGIN
-    -- Get redemption record
-    SELECT * INTO redemption_record
-    FROM loyalty_redemptions
-    WHERE metadata->>'redemption_code' = p_redemption_code
-      AND status = 'pending'
-      AND valid_until > NOW()
-    FOR UPDATE;
+    -- Ensure loyalty record exists
+    PERFORM create_business_loyalty_record(p_user_id, p_business_id);
     
-    IF NOT FOUND THEN
-        RETURN json_build_object(
-            'success', false, 
-            'message', 'Invalid or expired redemption code'
-        );
-    END IF;
-    
-    -- Get order record
-    SELECT * INTO order_record
-    FROM orders
-    WHERE id = p_order_id
-    FOR UPDATE;
-    
-    IF NOT FOUND THEN
-        RETURN json_build_object(
-            'success', false, 
-            'message', 'Order not found'
-        );
-    END IF;
-    
-    -- Verify user matches
-    IF redemption_record.user_id != order_record.user_id THEN
-        RETURN json_build_object(
-            'success', false, 
-            'message', 'Redemption does not belong to order owner'
-        );
-    END IF;
-    
-    -- Calculate remaining order total BEFORE loyalty discount
-    remaining_total := COALESCE(order_record.subtotal, 0) + 
-                       COALESCE(order_record.shipping_total, 0) + 
-                       COALESCE(order_record.installation_cost, 0) - 
-                       COALESCE(order_record.coupon_discount, 0);
-    
-    -- Cap discount at remaining total (can't discount below zero)
-    actual_discount := LEAST(redemption_record.discount_amount, remaining_total);
-    
-    -- Get loyalty points
-    SELECT * INTO loyalty_record
-    FROM loyalty_points
-    WHERE user_id = redemption_record.user_id
-    FOR UPDATE;
-    
-    -- Check if still has enough points - FIXED: Use points_used
-    IF loyalty_record.points < redemption_record.points_used THEN
-        UPDATE loyalty_redemptions
-        SET status = 'expired',
-            updated_at = now()
-        WHERE id = redemption_record.id;
-        
-        RETURN json_build_object(
-            'success', false, 
-            'message', format('Insufficient points. Have: %s, Need: %s', loyalty_record.points, redemption_record.points_used)
-        );
-    END IF;
-    
-    -- Calculate points to actually deduct (proportional to discount used)
-    IF actual_discount < redemption_record.discount_amount THEN
-        discount_ratio := actual_discount / redemption_record.discount_amount;
-        points_to_deduct := ROUND(redemption_record.points_used * discount_ratio);
-        points_returned := redemption_record.points_used - points_to_deduct;
-    ELSE
-        points_to_deduct := redemption_record.points_used;
-        points_returned := 0;
-    END IF;
-    
-    -- Deduct points from loyalty account
+    -- Update points
     UPDATE loyalty_points
-    SET 
-        points = points - points_to_deduct,
-        points_redeemed = COALESCE(points_redeemed, 0) + points_to_deduct,
-        updated_at = now()
-    WHERE user_id = redemption_record.user_id
-    RETURNING * INTO loyalty_record;
+    SET points = points + p_points,
+        points_earned = points_earned + p_points,
+        updated_at = NOW()
+    WHERE user_id = p_user_id AND business_id = p_business_id
+    RETURNING points INTO v_current_points;
     
-    -- Update order with loyalty discount
-    UPDATE orders
-    SET 
-        loyalty_points_used = points_to_deduct,
-        loyalty_discount = actual_discount,
-        total_amount = GREATEST(0, remaining_total - actual_discount),
-        updated_at = now()
-    WHERE id = p_order_id
-    RETURNING * INTO order_record;
-    
-    -- Update redemption record
-    UPDATE loyalty_redemptions
-    SET 
-        order_id = p_order_id,
-        status = 'applied',
-        used_at = now(),
-        updated_at = now(),
-        metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
-            'applied_at', now(),
-            'order_number', order_record.order_number,
-            'original_discount', redemption_record.discount_amount,
-            'actual_discount_used', actual_discount,
-            'original_points', redemption_record.points_used,
-            'points_used', points_to_deduct,
-            'points_returned', points_returned,
-            'remaining_total', order_record.total_amount
-        )
-    WHERE id = redemption_record.id;
-    
-    -- Create loyalty transaction if table exists
-    BEGIN
-        INSERT INTO loyalty_transactions (
-            user_id,
-            order_id,
-            points_change,
-            current_points,
-            transaction_type,
-            description,
-            metadata
-        ) VALUES (
-            redemption_record.user_id,
-            p_order_id,
-            -points_to_deduct,
-            loyalty_record.points,
-            'redeemed',
-            CASE 
-                WHEN points_returned > 0 
-                THEN format('Redeemed %s points (worth KES %s) for order #%s. %s points returned to balance.', 
-                           points_to_deduct, actual_discount, order_record.order_number, points_returned)
-                ELSE format('Redeemed %s points for KES %s discount on order #%s', 
-                           points_to_deduct, actual_discount, order_record.order_number)
-            END,
-            jsonb_build_object(
-                'redemption_id', redemption_record.id,
-                'original_discount_amount', redemption_record.discount_amount,
-                'actual_discount_used', actual_discount,
-                'original_points', redemption_record.points_used,
-                'points_used', points_to_deduct,
-                'points_returned', points_returned
-            )
-        );
-    EXCEPTION WHEN OTHERS THEN
-        RAISE NOTICE 'Could not create loyalty transaction: %', SQLERRM;
-    END;
-    
-    -- Create notification for partial redemption
-    IF points_returned > 0 THEN
-        BEGIN
-            INSERT INTO notifications (user_id, type, title, message, metadata)
-            VALUES (
-                redemption_record.user_id,
-                'loyalty_partial_redeem',
-                'Partial Points Redemption',
-                format('You redeemed %s points, but only needed %s points (KES %s) for your order. %s points have been returned to your balance.', 
-                       redemption_record.points_used, 
-                       points_to_deduct,
-                       actual_discount,
-                       points_returned),
-                jsonb_build_object(
-                    'redemption_id', redemption_record.id,
-                    'order_id', p_order_id,
-                    'order_number', order_record.order_number,
-                    'points_requested', redemption_record.points_used,
-                    'points_used', points_to_deduct,
-                    'points_returned', points_returned,
-                    'discount_requested', redemption_record.discount_amount,
-                    'discount_used', actual_discount
-                )
-            );
-        EXCEPTION WHEN OTHERS THEN
-            RAISE NOTICE 'Could not create notification: %', SQLERRM;
-        END;
-    END IF;
-    
-    result := json_build_object(
-        'success', true,
-        'discount_amount', actual_discount,
-        'points_used', points_to_deduct,
-        'points_returned', points_returned,
-        'original_discount_requested', redemption_record.discount_amount,
-        'original_points_requested', redemption_record.points_used,
-        'new_total', order_record.total_amount,
-        'was_partial', (points_returned > 0),
-        'message', CASE 
-            WHEN points_returned > 0 
-            THEN format('Used %s points (KES %s) - %s points returned to your balance', 
-                       points_to_deduct, actual_discount, points_returned)
-            ELSE 'Loyalty discount applied successfully'
-        END
-    );
-    
-    RETURN result;
-END;
-$$;
-
--- Update the refund function to work with new constraint
-CREATE OR REPLACE FUNCTION refund_loyalty_points_for_order(p_order_id uuid)
-RETURNS json
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    redemption_record RECORD;
-    loyalty_record RECORD;
-    order_record RECORD;
-    result json;
-BEGIN
-    -- Get redemption record
-    SELECT * INTO redemption_record
-    FROM loyalty_redemptions
-    WHERE order_id = p_order_id
-      AND status = 'applied'
-    FOR UPDATE;
-    
-    IF NOT FOUND THEN
-        RETURN json_build_object(
-            'success', false, 
-            'message', 'No loyalty redemption found for this order'
-        );
-    END IF;
-    
-    -- Get order record
-    SELECT * INTO order_record
-    FROM orders
-    WHERE id = p_order_id
-    FOR UPDATE;
-    
-    -- Get loyalty record
-    SELECT * INTO loyalty_record
-    FROM loyalty_points
-    WHERE user_id = redemption_record.user_id
-    FOR UPDATE;
-    
-    -- Refund points
-    UPDATE loyalty_points
-    SET 
-        points = points + redemption_record.points_used,
-        points_redeemed = points_redeemed - redemption_record.points_used,
-        updated_at = now()
-    WHERE user_id = redemption_record.user_id
-    RETURNING * INTO loyalty_record;
-    
-    -- Update redemption status
-    UPDATE loyalty_redemptions
-    SET 
-        status = 'refunded',
-        updated_at = now(),
-        metadata = metadata || jsonb_build_object(
-            'refunded_at', now(),
-            'refunded_points', redemption_record.points_used,
-            'refund_reason', 'order_cancelled'
-        )
-    WHERE id = redemption_record.id;
-    
-    -- Remove loyalty discount from order
-    UPDATE orders
-    SET 
-        loyalty_points_used = 0,
-        loyalty_discount = 0,
-        total_amount = GREATEST(0, (
-            subtotal - COALESCE(coupon_discount, 0) + 
-            shipping_total + installation_cost
-        )),
-        updated_at = now()
-    WHERE id = p_order_id;
-    
-    -- Create refund transaction
+    -- Record transaction
     INSERT INTO loyalty_transactions (
-        user_id,
-        order_id,
-        points_change,
-        current_points,
-        transaction_type,
-        description,
-        metadata
+        user_id, business_id, points_change, current_points,
+        transaction_type, description, metadata
     ) VALUES (
-        redemption_record.user_id,
-        p_order_id,
-        redemption_record.points_used,
-        loyalty_record.points,
-        'refunded',
-        'Points refunded from cancelled order #' || order_record.order_number,
-        json_build_object(
-            'redemption_id', redemption_record.id,
-            'refund_reason', 'order_cancelled'
-        )
+        p_user_id, p_business_id, p_points, v_current_points,
+        p_transaction_type,
+        COALESCE(p_description, 'Engagement reward'),
+        p_metadata
     );
     
-    result := json_build_object(
-        'success', true,
-        'points_refunded', redemption_record.points_used,
-        'message', 'Loyalty points refunded successfully'
-    );
+    -- Check tier upgrade
+    SELECT tier INTO v_new_tier
+    FROM loyalty_tiers
+    WHERE min_points <= v_current_points
+    ORDER BY min_points DESC LIMIT 1;
     
-    RETURN result;
+    IF v_new_tier IS NOT NULL THEN
+        UPDATE loyalty_points
+        SET tier = v_new_tier, updated_at = NOW()
+        WHERE user_id = p_user_id AND business_id = p_business_id AND tier != v_new_tier;
+    END IF;
+    
+    RETURN v_current_points;
 END;
 $$;
 
--- Function to award referral points with all validations
-CREATE OR REPLACE FUNCTION award_referral_points_on_order_complete(
-  p_order_id uuid
+-- Get business loyalty summary for a user
+CREATE OR REPLACE FUNCTION get_business_loyalty_summary(
+    p_user_id UUID,
+    p_business_id UUID DEFAULT NULL
 )
-RETURNS json
+RETURNS JSON
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-  v_order orders%ROWTYPE;
-  v_referrer_id uuid;
-  v_product_id uuid;
-  v_product_name text;
-  v_points_to_award integer;
-  v_points_per_unit integer;
-  v_product_quantity integer;
-  v_result json;
+    v_result JSON;
 BEGIN
-  -- Get order details
-  SELECT * INTO v_order
-  FROM orders
-  WHERE id = p_order_id;
-  
-  -- Check if order exists and is completed
-  IF NOT FOUND THEN
-    RETURN json_build_object('success', false, 'error', 'Order not found');
-  END IF;
-  
-  IF v_order.payment_status != 'paid' OR v_order.status != 'completed' THEN
-    RETURN json_build_object('success', false, 'error', 'Order not completed');
-  END IF;
-  
-  -- Check if order has referral
-  -- Endpoint already checks but just in case
-  IF v_order.referred_by IS NULL OR v_order.referral_product_id IS NULL THEN
-    RETURN json_build_object('success', false, 'error', 'No referral data');
-  END IF;
-  
-  v_referrer_id := v_order.referred_by;
-  v_product_id := v_order.referral_product_id;
-  
-  -- 1. Prevent self-referral
-  IF v_order.user_id = v_referrer_id THEN
-    RETURN json_build_object('success', false, 'error', 'Self-referral not allowed');
-  END IF;
-  
-  -- 2. Check if points already awarded for this order
-  IF EXISTS (
-    SELECT 1 FROM loyalty_transactions 
-    WHERE order_id = p_order_id 
-    AND user_id = v_referrer_id 
-    AND transaction_type = 'earned'
-    AND description LIKE '%Referral points%'
-  ) THEN
-    RETURN json_build_object('success', false, 'error', 'Points already awarded');
-  END IF;
-  
-  -- 3. Check if referrer and referee already have completed transaction for same product
-  IF EXISTS (
-    SELECT 1 FROM orders o
-    WHERE o.user_id = v_order.user_id
-    AND o.referred_by = v_referrer_id
-    AND o.referral_product_id = v_product_id
-    AND o.payment_status = 'completed'
-    AND o.status = 'completed'
-    AND o.id != p_order_id
-    LIMIT 1
-  ) THEN
-    RETURN json_build_object('success', false, 'error', 'Duplicate referral for same product');
-  END IF;
-  
-  -- 4. Check if referred product is in the order
-  SELECT oi.quantity INTO v_product_quantity
-  FROM order_items oi
-  WHERE oi.order_id = p_order_id
-  AND oi.product_id = v_product_id
-  LIMIT 1;
-  
-  IF NOT FOUND OR v_product_quantity IS NULL THEN
-    RETURN json_build_object('success', false, 'error', 'Referred product not in order');
-  END IF;
-  
-  -- 5. Get product details for points calculation
-  SELECT 
-    p.referral_points,
-    p.name
-  INTO 
-    v_points_per_unit,
-    v_product_name
-  FROM products p
-  WHERE p.id = v_product_id;
-  
-  IF NOT FOUND THEN
-    -- Use default points if product not found or no referral_points set
-    v_points_per_unit := 100;
-    v_product_name := 'Product';
-  END IF;
-  
-  -- Use default if null
-  IF v_points_per_unit IS NULL THEN
-    v_points_per_unit := 100;
-  END IF;
-  
-  -- Calculate total points
-  v_points_to_award := v_points_per_unit * v_product_quantity;
-  
-  -- Minimum 10 points
-  IF v_points_to_award < 10 THEN
-    v_points_to_award := 10;
-  END IF;
-  
-  -- 6. Award points
-  INSERT INTO loyalty_points (user_id, points, points_earned)
-  VALUES (v_referrer_id, v_points_to_award, v_points_to_award)
-  ON CONFLICT (user_id) DO UPDATE
-  SET 
-    points = loyalty_points.points + v_points_to_award,
-    points_earned = loyalty_points.points_earned + v_points_to_award,
-    updated_at = NOW();
-  
-  -- 7. Record transaction
-  INSERT INTO loyalty_transactions (
-    user_id, 
-    order_id, 
-    points_change, 
-    current_points, 
-    transaction_type, 
-    description
-  ) VALUES (
-    v_referrer_id,
-    p_order_id,
-    v_points_to_award,
-    (SELECT points FROM loyalty_points WHERE user_id = v_referrer_id),
-    'earned',
-    'Referral points for ' || v_product_name || ' (Order #' || v_order.order_number || ')'
-  );
-  
-  -- 8. Update tier if needed
-  UPDATE loyalty_points lp
-  SET tier = (
-    SELECT tier 
-    FROM loyalty_tiers 
-    WHERE min_points <= (SELECT points FROM loyalty_points WHERE user_id = v_referrer_id)
-    ORDER BY min_points DESC 
-    LIMIT 1
-  )
-  WHERE user_id = v_referrer_id;
-  
-  RETURN json_build_object(
-    'success', true,
-    'points_awarded', v_points_to_award,
-    'referrer_id', v_referrer_id,
-    'product_id', v_product_id,
-    'product_name', v_product_name,
-    'quantity', v_product_quantity
-  );
-  
-EXCEPTION WHEN OTHERS THEN
-  RETURN json_build_object('success', false, 'error', SQLERRM);
+    IF p_business_id IS NOT NULL THEN
+        SELECT json_build_object(
+            'points', COALESCE(lp.points, 0),
+            'tier', COALESCE(lp.tier, 'bronze'),
+            'points_earned', COALESCE(lp.points_earned, 0),
+            'points_redeemed', COALESCE(lp.points_redeemed, 0),
+            'business_name', b.name,
+            'next_tier', (
+                SELECT json_build_object('name', lt.tier, 'min_points', lt.min_points, 'points_needed', lt.min_points - COALESCE(lp.points, 0))
+                FROM loyalty_tiers lt
+                WHERE lt.min_points > COALESCE(lp.points, 0)
+                ORDER BY lt.min_points LIMIT 1
+            )
+        ) INTO v_result
+        FROM businesses b
+        LEFT JOIN loyalty_points lp ON lp.user_id = p_user_id AND lp.business_id = b.id
+        WHERE b.id = p_business_id;
+    ELSE
+        SELECT COALESCE(json_agg(
+            json_build_object(
+                'business_id', b.id,
+                'business_name', b.name,
+                'business_slug', b.slug,
+                'business_logo', b.logo_url,
+                'business_color', b.brand_color,
+                'points', COALESCE(lp.points, 0),
+                'tier', COALESCE(lp.tier, 'bronze'),
+                'points_earned', COALESCE(lp.points_earned, 0)
+            )
+        ), '[]'::json) INTO v_result
+        FROM businesses b
+        INNER JOIN customer_business_activations cba ON cba.business_id = b.id
+        LEFT JOIN loyalty_points lp ON lp.user_id = p_user_id AND lp.business_id = b.id
+        WHERE cba.user_id = p_user_id AND cba.is_active = TRUE;
+    END IF;
+    
+    RETURN COALESCE(v_result, '{}'::json);
 END;
 $$;
 
--- Drop and recreate with detailed logging + referral processing
-DROP FUNCTION IF EXISTS award_loyalty_points() CASCADE;
+-- Get customer points summary (for account dashboard)
+CREATE OR REPLACE FUNCTION get_customer_points_summary(p_user_id UUID)
+RETURNS TABLE (
+    business_id UUID,
+    business_name TEXT,
+    business_slug TEXT,
+    business_logo TEXT,
+    business_color TEXT,
+    points INTEGER,
+    tier TEXT,
+    lifetime_points INTEGER,
+    last_earned_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+STABLE
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        b.id, b.name, b.slug, b.logo_url, b.brand_color,
+        COALESCE(lp.points, 0),
+        COALESCE(lp.tier, 'bronze'),
+        COALESCE(lp.points_earned, 0),
+        lp.updated_at
+    FROM businesses b
+    INNER JOIN customer_business_activations cba ON cba.business_id = b.id
+    LEFT JOIN loyalty_points lp ON lp.user_id = p_user_id AND lp.business_id = b.id
+    WHERE cba.user_id = p_user_id AND cba.is_active = TRUE
+    ORDER BY COALESCE(lp.points, 0) DESC;
+END;
+$$;
 
-CREATE OR REPLACE FUNCTION award_loyalty_points()
-RETURNS trigger
+-- Auto-create loyalty on activation
+CREATE OR REPLACE FUNCTION create_loyalty_on_activation()
+RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
-DECLARE
-    user_tier loyalty_tiers%ROWTYPE;
-    points_to_award integer;
-    current_points integer;
-    new_tier text;
-    v_draw RECORD;
-    v_entry_count INTEGER := 0;
-    v_entries_awarded INTEGER := 0;
-    v_entry_id UUID;
-    v_current_status TEXT;
 BEGIN
-    -- ============================================
-    -- LOGGING: Always log that trigger fired
-    -- ============================================
-    RAISE WARNING '[TRIGGER FIRED] depth=%, op=%, order_id=%, old_status=%, old_payment=%, new_status=%, new_payment=%',
-        pg_trigger_depth(), TG_OP, NEW.id, OLD.status, OLD.payment_status, NEW.status, NEW.payment_status;
-
-    -- GUARD: Prevent infinite loop
-    IF pg_trigger_depth() > 1 THEN
-        RAISE WARNING '[GUARD] Skipping - depth > 1 (depth=%)', pg_trigger_depth();
-        RETURN NEW;
-    END IF;
-
-    -- ============================================
-    -- CONDITION CHECK
-    -- ============================================
-    RAISE WARNING '[CONDITION CHECK] Checking if should process: status=% → %, payment=% → %',
-        OLD.status, NEW.status, OLD.payment_status, NEW.payment_status;
-    
-    IF NEW.status = 'processing' AND NEW.payment_status = 'completed' 
-       AND (OLD.status != 'processing' OR OLD.payment_status != 'completed') THEN
-        
-        RAISE WARNING '[CONDITION PASSED] Processing rewards for order %', NEW.id;
-        RAISE WARNING '[ORDER DETAILS] user_id=%, amount=%, order_number=%, referred_by=%',
-            NEW.user_id, NEW.total_amount, NEW.order_number, NEW.referred_by;
-    ELSE
-        RAISE WARNING '[CONDITION FAILED] Not processing. Required: status=processing, payment=completed. Got: status=%, payment=%',
-            NEW.status, NEW.payment_status;
-        RETURN NEW;
-    END IF;
-
-    -- ============================================
-    -- PART 1: ACTIVATE USER ACCOUNT (30 days)
-    -- ============================================
-    BEGIN
-        SELECT status INTO v_current_status FROM users WHERE id = NEW.user_id;
-        RAISE WARNING '[ACTIVATION] Current user status: %', v_current_status;
-        
-        UPDATE users
-        SET 
-            status = 'active',
-            metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
-                'last_activation_date', NOW()::TEXT,
-                'activation_expires_at', (NOW() + INTERVAL '30 days')::TEXT,
-                'activation_source', 'order_' || NEW.order_number,
-                'activation_order_id', NEW.id::TEXT
-            ),
-            updated_at = NOW()
-        WHERE id = NEW.user_id;
-        
-        RAISE WARNING '[ACTIVATION] User % updated to active', NEW.user_id;
-        
-        INSERT INTO loyalty_transactions (
-            user_id, order_id, points_change, current_points,
-            transaction_type, description
-        ) VALUES (
-            NEW.user_id, NEW.id, 0,
-            COALESCE((SELECT points FROM loyalty_points WHERE user_id = NEW.user_id), 0),
-            'account_activation',
-            'Account activated for 30 days via order #' || NEW.order_number
-        );
-        
-        RAISE WARNING '[ACTIVATION] Activation transaction recorded';
-    EXCEPTION WHEN OTHERS THEN
-        RAISE WARNING '[ACTIVATION ERROR] %', SQLERRM;
-    END;
-    
-    -- ============================================
-    -- PART 2: PROCESS SIGNUP REFERRALS
-    -- ============================================
-    BEGIN
-        IF EXISTS (
-            SELECT 1 FROM referrals
-            WHERE referred_user_id = NEW.user_id
-            AND status = 'joined'
-            AND conversion_type = 'signup'
-        ) THEN
-            RAISE WARNING '[REFERRALS] Found pending signup referrals';
-            
-            -- Update pending signup referrals to completed
-            UPDATE referrals
-            SET 
-                status = 'completed',
-                completed_at = NOW(),
-                updated_at = NOW(),
-                reward_points = COALESCE(reward_points, 100)
-            WHERE referred_user_id = NEW.user_id
-            AND status = 'joined'
-            AND conversion_type = 'signup';
-            
-            -- Award loyalty points to the referrer (always, regardless of challenges)
-            INSERT INTO loyalty_transactions (
-                user_id, points_change, current_points,
-                transaction_type, description, metadata
-            )
-            SELECT
-                r.referrer_id,
-                r.reward_points,
-                COALESCE((SELECT points FROM loyalty_points WHERE user_id = r.referrer_id), 0) + r.reward_points,
-                'referral_bonus',
-                'Referral bonus: ' || COALESCE(
-                    (SELECT full_name FROM users WHERE id = NEW.user_id), 
-                    NEW.user_id::TEXT
-                ) || ' completed their first purchase',
-                jsonb_build_object(
-                    'referral_id', r.id,
-                    'referred_user_id', NEW.user_id,
-                    'referred_email', r.referred_email,
-                    'order_id', NEW.id,
-                    'order_number', NEW.order_number,
-                    'conversion_type', 'signup'
-                )
-            FROM referrals r
-            WHERE r.referred_user_id = NEW.user_id
-            AND r.status = 'completed'
-            AND r.conversion_type = 'signup'
-            AND r.completed_at >= NOW() - INTERVAL '1 minute';
-            
-            RAISE WARNING '[REFERRALS] Referrer loyalty points awarded';
-            
-            -- Update referrer's loyalty points balance
-            INSERT INTO loyalty_points (user_id, points, points_earned, last_updated)
-            SELECT
-                r.referrer_id,
-                r.reward_points,
-                r.reward_points,
-                NOW()
-            FROM referrals r
-            WHERE r.referred_user_id = NEW.user_id
-            AND r.status = 'completed'
-            ON CONFLICT (user_id) DO UPDATE
-            SET 
-                points = loyalty_points.points + EXCLUDED.points,
-                points_earned = loyalty_points.points_earned + EXCLUDED.points_earned,
-                last_updated = EXCLUDED.last_updated;
-            
-            RAISE WARNING '[REFERRALS] Referrer points balance updated';
-            
-            -- Process referral challenges (bonus on top)
-            PERFORM process_referral_challenge_completion(r.id)
-            FROM referrals r
-            WHERE r.referred_user_id = NEW.user_id
-            AND r.status = 'completed'
-            AND r.conversion_type = 'signup'
-            AND r.completed_at >= NOW() - INTERVAL '1 minute';
-            
-            RAISE WARNING '[REFERRALS] Referral challenges processed';
-        ELSE
-            RAISE WARNING '[REFERRALS] No pending signup referrals';
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        RAISE WARNING '[REFERRALS ERROR] %', SQLERRM;
-    END;
-
-    -- ============================================
-    -- PART 2b: PROCESS FIRST_PURCHASE REFERRALS
-    -- ============================================
-    BEGIN
-        IF EXISTS (
-            SELECT 1 FROM referrals
-            WHERE referred_user_id = NEW.user_id
-            AND status = 'joined'
-            AND conversion_type = 'first_purchase'
-        ) THEN
-            -- Check if this is actually their first purchase
-            IF NOT EXISTS (
-                SELECT 1 FROM orders
-                WHERE user_id = NEW.user_id
-                AND status = 'completed'
-                AND payment_status = 'paid'
-                AND id != NEW.id
-            ) THEN
-                RAISE WARNING '[REFERRALS] Found pending first_purchase referral';
-                
-                UPDATE referrals
-                SET 
-                    status = 'completed',
-                    completed_at = NOW(),
-                    updated_at = NOW(),
-                    reward_points = COALESCE(reward_points, 200),
-                    conversion_value = NEW.total_amount
-                WHERE referred_user_id = NEW.user_id
-                AND status = 'joined'
-                AND conversion_type = 'first_purchase';
-                
-                -- Award loyalty points to referrer
-                INSERT INTO loyalty_transactions (
-                    user_id, points_change, current_points,
-                    transaction_type, description, metadata
-                )
-                SELECT
-                    r.referrer_id,
-                    r.reward_points,
-                    COALESCE((SELECT points FROM loyalty_points WHERE user_id = r.referrer_id), 0) + r.reward_points,
-                    'referral_bonus',
-                    'Referral bonus: referred user made first purchase of KSH ' || NEW.total_amount::TEXT,
-                    jsonb_build_object(
-                        'referral_id', r.id,
-                        'referred_user_id', NEW.user_id,
-                        'referred_email', r.referred_email,
-                        'order_id', NEW.id,
-                        'order_number', NEW.order_number,
-                        'purchase_amount', NEW.total_amount,
-                        'conversion_type', 'first_purchase'
-                    )
-                FROM referrals r
-                WHERE r.referred_user_id = NEW.user_id
-                AND r.status = 'completed'
-                AND r.conversion_type = 'first_purchase'
-                AND r.completed_at >= NOW() - INTERVAL '1 minute';
-                
-                -- Update referrer's loyalty points balance
-                INSERT INTO loyalty_points (user_id, points, points_earned, last_updated)
-                SELECT r.referrer_id, r.reward_points, r.reward_points, NOW()
-                FROM referrals r
-                WHERE r.referred_user_id = NEW.user_id
-                AND r.status = 'completed'
-                ON CONFLICT (user_id) DO UPDATE
-                SET 
-                    points = loyalty_points.points + EXCLUDED.points,
-                    points_earned = loyalty_points.points_earned + EXCLUDED.points_earned,
-                    last_updated = EXCLUDED.last_updated;
-                
-                -- Process referral challenges
-                PERFORM process_referral_challenge_completion(r.id)
-                FROM referrals r
-                WHERE r.referred_user_id = NEW.user_id
-                AND r.status = 'completed'
-                AND r.conversion_type = 'first_purchase'
-                AND r.completed_at >= NOW() - INTERVAL '1 minute';
-                
-                RAISE WARNING '[REFERRALS] Purchase referral completed';
-            ELSE
-                RAISE WARNING '[REFERRALS] Not first purchase, skipping purchase referral';
-            END IF;
-        ELSE
-            RAISE WARNING '[REFERRALS] No pending first_purchase referrals';
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        RAISE WARNING '[REFERRALS ERROR] %', SQLERRM;
-    END;
-    
-    -- ============================================
-    -- PART 3: AWARD LOYALTY POINTS
-    -- ============================================
-    BEGIN
-        IF NEW.referred_by IS NOT NULL THEN
-            RAISE WARNING '[POINTS] Processing referral points for referrer %', NEW.referred_by;
-            PERFORM award_referral_points_on_order_complete(NEW.id);
-        END IF;
-        
-        SELECT lt.* INTO user_tier
-        FROM loyalty_points lp
-        JOIN loyalty_tiers lt ON lp.tier = lt.tier
-        WHERE lp.user_id = NEW.user_id;
-        
-        IF NOT FOUND THEN
-            RAISE WARNING '[POINTS] No loyalty record found, creating bronze tier';
-            INSERT INTO loyalty_points (user_id, tier) VALUES (NEW.user_id, 'bronze')
-            ON CONFLICT (user_id) DO NOTHING;
-            SELECT * INTO user_tier FROM loyalty_tiers WHERE tier = 'bronze';
-        ELSE
-            RAISE WARNING '[POINTS] User tier: %, points_per_shilling: %', user_tier.tier, user_tier.points_per_shilling;
-        END IF;
-        
-        points_to_award := FLOOR(NEW.total_amount * user_tier.points_per_shilling);
-        RAISE WARNING '[POINTS] Calculated points: % (amount=% * rate=%)', points_to_award, NEW.total_amount, user_tier.points_per_shilling;
-        
-        INSERT INTO loyalty_points (user_id, points, points_earned, last_updated)
-        VALUES (NEW.user_id, points_to_award, points_to_award, NOW())
-        ON CONFLICT (user_id) DO UPDATE
-        SET points = loyalty_points.points + EXCLUDED.points,
-            points_earned = loyalty_points.points_earned + EXCLUDED.points_earned,
-            last_updated = EXCLUDED.last_updated,
-            updated_at = NOW()
-        RETURNING points INTO current_points;
-        
-        RAISE WARNING '[POINTS] Loyalty points updated. New balance: %', current_points;
-        
-        INSERT INTO loyalty_transactions (
-            user_id, order_id, points_change, current_points,
-            transaction_type, description, expires_at
-        ) VALUES (
-            NEW.user_id, NEW.id, points_to_award, current_points,
-            'earned', 'Points earned for order #' || NEW.order_number,
-            NOW() + INTERVAL '365 days'
-        );
-        
-        RAISE WARNING '[POINTS] Transaction recorded: +% points', points_to_award;
-        
-        SELECT tier INTO new_tier
-        FROM loyalty_tiers WHERE min_points <= current_points
-        ORDER BY min_points DESC LIMIT 1;
-        
-        UPDATE loyalty_points SET tier = new_tier, updated_at = NOW()
-        WHERE user_id = NEW.user_id AND tier != new_tier;
-        
-        RAISE WARNING '[POINTS] Tier check: current=%, new=%', current_points, new_tier;
-    EXCEPTION WHEN OTHERS THEN
-        RAISE WARNING '[POINTS ERROR] %', SQLERRM;
-        points_to_award := 0;
-    END;
-    
-        -- ============================================
-    -- PART 4: AWARD DRAW ENTRIES
-    -- ============================================
-    BEGIN
-        IF NEW.draw_entries_awarded IS NOT NULL AND NEW.draw_entries_awarded > 0 THEN
-            RAISE WARNING '[DRAW] Entries already awarded: %', NEW.draw_entries_awarded;
-        ELSE
-            RAISE WARNING '[DRAW] Looking for active draws...';
-            
-            SELECT d.* INTO v_draw
-            FROM draws d
-            WHERE d.status = 'open'
-              AND d.entry_starts_at <= NOW()
-              AND d.entry_ends_at >= NOW()
-              AND (d.entry_calculation->'purchase'->>'enabled')::boolean = true
-            ORDER BY 
-                CASE WHEN EXISTS (
-                    SELECT 1 FROM draw_entries de WHERE de.draw_id = d.id AND de.user_id = NEW.user_id
-                ) THEN 1 ELSE 2 END,
-                d.entry_ends_at ASC
-            LIMIT 1;
-            
-            IF FOUND THEN
-                RAISE WARNING '[DRAW] Found draw: % (id=%)', v_draw.name, v_draw.id;
-                
-                -- ✅ Use COALESCE for all JSON extractions (safety net for broken draw configs)
-                v_entry_count := FLOOR(
-                    NEW.total_amount * 
-                    COALESCE((v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric, 0.05)
-                );
-                
-                RAISE WARNING '[DRAW] Raw entry count: % (amount=% * rate=%)', 
-                    v_entry_count, NEW.total_amount, 
-                    COALESCE((v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric, 0.05);
-                
-                IF NEW.total_amount >= COALESCE((v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric, 10) THEN
-                    v_entry_count := LEAST(
-                        v_entry_count, 
-                        COALESCE((v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer, 5000)
-                    );
-                    
-                    RAISE WARNING '[DRAW] After max cap: % entries', v_entry_count;
-                    
-                    IF v_entry_count > 0 THEN
-                        INSERT INTO draw_entries (draw_id, user_id, entry_count, entry_method, source_id, metadata)
-                        VALUES (v_draw.id, NEW.user_id, v_entry_count, 'purchase', NEW.id::text, jsonb_build_object(
-                            'order_id', NEW.id, 'order_amount', NEW.total_amount,
-                            'order_number', NEW.order_number, 'awarded_at', NOW()
-                        ))
-                        RETURNING id INTO v_entry_id;
-                        
-                        RAISE WARNING '[DRAW] Draw entry created (id=%), creating % tickets...', v_entry_id, v_entry_count;
-                        
-                        FOR i IN 1..v_entry_count LOOP
-                            INSERT INTO draw_tickets (draw_id, user_id, entry_id, ticket_number)
-                            VALUES (v_draw.id, NEW.user_id, v_entry_id, i);
-                        END LOOP;
-                        
-                        RAISE WARNING '[DRAW] % tickets created', v_entry_count;
-                        
-                        INSERT INTO draw_live_ticker (draw_id, user_name, entry_count, entry_method)
-                        SELECT v_draw.id, COALESCE(u.full_name, 'Customer'), v_entry_count, 'purchase'
-                        FROM users u WHERE u.id = NEW.user_id;
-                        
-                        v_entries_awarded := v_entry_count;
-                    ELSE
-                        RAISE WARNING '[DRAW] Entry count is 0, skipping';
-                        v_entries_awarded := 0;
-                    END IF;
-                ELSE
-                    RAISE WARNING '[DRAW] Order amount % below minimum %', 
-                        NEW.total_amount, 
-                        COALESCE((v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric, 10);
-                    v_entries_awarded := 0;
-                END IF;
-            ELSE
-                RAISE WARNING '[DRAW] No active draw found';
-                v_entries_awarded := 0;
-            END IF;
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        RAISE WARNING '[DRAW ERROR] %', SQLERRM;
-        v_entries_awarded := 0;
-    END;
-    
-    -- ============================================
-    -- SINGLE ORDER UPDATE
-    -- ============================================
-    BEGIN
-        RAISE WARNING '[UPDATE ORDER] Updating order % with % points and % entries', 
-            NEW.id, points_to_award, v_entries_awarded;
-        
-        UPDATE orders
-        SET 
-            loyalty_points_earned = points_to_award,
-            draw_entries_awarded = CASE WHEN v_entries_awarded > 0 THEN v_entries_awarded ELSE 0 END,
-            draw_id = CASE WHEN v_entries_awarded > 0 AND v_draw.id IS NOT NULL THEN v_draw.id ELSE NULL END,
-            draw_entry_details = CASE WHEN v_entries_awarded > 0 AND v_draw.id IS NOT NULL THEN 
-                jsonb_build_object(
-                    'draw_name', v_draw.name,
-                    'draw_id', v_draw.id,
-                    'draw_time', v_draw.draw_time,
-                    'entries_awarded', v_entries_awarded,
-                    'calculation', jsonb_build_object(
-                        'order_amount', NEW.total_amount,
-                        'entries_per_ksh', COALESCE((v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric, 0.05),
-                        'min_purchase', COALESCE((v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric, 10),
-                        'max_entries', COALESCE((v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer, 5000)
-                    ),
-                    'awarded_at', NOW()
-                )
-            ELSE NULL
-            END,
-            updated_at = NOW()
-        WHERE id = NEW.id;
-        
-        GET DIAGNOSTICS v_entry_count = ROW_COUNT;
-        RAISE WARNING '[UPDATE ORDER] Rows updated: %', v_entry_count;
-        
-        IF v_entry_count = 0 THEN
-            RAISE WARNING '[UPDATE ORDER] WARNING: No rows updated! Check if order id=% exists', NEW.id;
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        RAISE WARNING '[UPDATE ORDER ERROR] %', SQLERRM;
-    END;
-
-    -- ============================================
-    -- PART 5 & 6: Challenges and Team Spending
-    -- ============================================
-    BEGIN
-        PERFORM process_purchase_challenge(NEW.id);
-        RAISE WARNING '[CHALLENGES] Purchase challenges processed';
-    EXCEPTION WHEN OTHERS THEN
-        RAISE WARNING '[CHALLENGES ERROR] %', SQLERRM;
-    END;
-    
-    BEGIN
-        PERFORM process_team_spending(NEW.id, NEW.user_id, NEW.total_amount);
-        RAISE WARNING '[TEAM] Team spending processed';
-    EXCEPTION WHEN OTHERS THEN
-        RAISE WARNING '[TEAM ERROR] %', SQLERRM;
-    END;
-    
-    RAISE WARNING '[COMPLETE] Order % fully processed', NEW.id;
-    
+    PERFORM create_business_loyalty_record(NEW.user_id, NEW.business_id);
     RETURN NEW;
 END;
 $$;
 
--- Recreate trigger
-DROP TRIGGER IF EXISTS orders_award_points ON orders;
-CREATE TRIGGER orders_award_points
-    AFTER UPDATE ON orders
+DROP TRIGGER IF EXISTS activation_create_loyalty ON customer_business_activations;
+CREATE TRIGGER activation_create_loyalty
+    AFTER INSERT ON customer_business_activations
     FOR EACH ROW
-    EXECUTE FUNCTION award_loyalty_points();
+    EXECUTE FUNCTION create_loyalty_on_activation();
 
+-- Create loyalty records for existing activations
+INSERT INTO loyalty_points (user_id, business_id, tier, points, points_earned, points_redeemed)
+SELECT cba.user_id, cba.business_id, 'bronze', 0, 0, 0
+FROM customer_business_activations cba
+WHERE NOT EXISTS (
+    SELECT 1 FROM loyalty_points lp 
+    WHERE lp.user_id = cba.user_id AND lp.business_id = cba.business_id
+)
+ON CONFLICT (user_id, business_id) DO NOTHING;
 
--- Also create a scheduled function to deactivate expired accounts
--- Run this via pg_cron or a scheduled edge function every hour
-CREATE OR REPLACE FUNCTION deactivate_expired_accounts()
+-- Deactivate expired accounts
+CREATE OR REPLACE FUNCTION deactivate_expired_activations()
 RETURNS INTEGER
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -1338,241 +286,17 @@ AS $$
 DECLARE
     v_count INTEGER;
 BEGIN
-    -- Deactivate users whose 30-day activation has expired
-    -- But only if they haven't made another purchase that would extend it
-    WITH expired_users AS (
-        SELECT u.id
-        FROM users u
-        WHERE u.status = 'active'
-        AND (u.metadata->>'activation_expires_at')::TIMESTAMPTZ < NOW()
-        -- Don't deactivate if they have a more recent order
-        AND NOT EXISTS (
-            SELECT 1 FROM orders o
-            WHERE o.user_id = u.id
-            AND o.payment_status = 'paid'
-            AND o.status = 'completed'
-            AND o.updated_at > (u.metadata->>'activation_expires_at')::TIMESTAMPTZ - INTERVAL '30 days'
-        )
-    )
-    UPDATE users u
-    SET 
-        status = 'inactive',
-        metadata = COALESCE(u.metadata, '{}'::jsonb) || jsonb_build_object(
-            'deactivated_at', NOW()::TEXT,
-            'deactivation_reason', '30-day activation expired'
-        ),
-        updated_at = NOW()
-    FROM expired_users eu
-    WHERE u.id = eu.id;
+    UPDATE customer_business_activations
+    SET is_active = FALSE
+    WHERE is_active = TRUE AND expires_at < NOW();
     
     GET DIAGNOSTICS v_count = ROW_COUNT;
-    
-    RAISE NOTICE 'Deactivated % expired accounts', v_count;
-    
     RETURN v_count;
 END;
 $$;
 
--- Keep this function for admin cashbacks and direct redemptions
-CREATE OR REPLACE FUNCTION redeem_loyalty_points(
-    p_user_id uuid,
-    p_points_to_redeem integer,
-    p_description text DEFAULT 'Points redemption'
-)
-RETURNS json
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    loyalty_record RECORD;
-    discount_amount numeric(10,2);
-    transaction_id uuid;
-    result json;
-BEGIN
-    -- Validate input
-    IF p_points_to_redeem <= 0 THEN
-        RETURN json_build_object('success', false, 'message', 'Points to redeem must be positive');
-    END IF;
-    
-    IF p_points_to_redeem % 100 != 0 THEN
-        RETURN json_build_object('success', false, 'message', 'Points must be redeemed in multiples of 100');
-    END IF;
-    
-    -- Get loyalty record
-    SELECT * INTO loyalty_record
-    FROM loyalty_points
-    WHERE user_id = p_user_id
-    FOR UPDATE;
-    
-    IF NOT FOUND THEN
-        RETURN json_build_object('success', false, 'message', 'No loyalty account found');
-    END IF;
-    
-    -- Check if user has enough points
-    IF loyalty_record.points < p_points_to_redeem THEN
-        RETURN json_build_object('success', false, 'message', 'Insufficient points');
-    END IF;
-    
-    -- Calculate discount amount (1 point = 0.10 KES)
-    discount_amount := p_points_to_redeem / 10.0;
-    
-    -- Update loyalty points
-    UPDATE loyalty_points
-    SET 
-        points = points - p_points_to_redeem,
-        points_redeemed = points_redeemed + p_points_to_redeem,
-        updated_at = now()
-    WHERE user_id = p_user_id
-    RETURNING * INTO loyalty_record;
-    
-    -- Create transaction record
-    INSERT INTO loyalty_transactions (
-        user_id,
-        points_change,
-        current_points,
-        transaction_type,
-        description,
-        metadata
-    ) VALUES (
-        p_user_id,
-        -p_points_to_redeem,
-        loyalty_record.points,
-        'redeemed',
-        p_description,
-        json_build_object(
-            'discount_amount', discount_amount,
-            'points_redeemed', p_points_to_redeem,
-            'redemption_type', 'direct'
-        )
-    ) RETURNING id INTO transaction_id;
-    
-    result := json_build_object(
-        'success', true,
-        'message', 'Points redeemed successfully',
-        'points_redeemed', p_points_to_redeem,
-        'discount_amount', discount_amount,
-        'remaining_points', loyalty_record.points,
-        'transaction_id', transaction_id,
-        'redemption_type', 'direct'
-    );
-    
-    RETURN result;
-END;
-$$;
-
--- Function to cancel a pending redemption (if user changes mind)
-CREATE OR REPLACE FUNCTION cancel_loyalty_redemption(p_redemption_code text)
-RETURNS json
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    redemption_record RECORD;
-    result json;
-BEGIN
-    -- Get redemption record
-    SELECT * INTO redemption_record
-    FROM loyalty_redemptions
-    WHERE metadata->>'redemption_code' = p_redemption_code
-      AND status = 'pending'
-    FOR UPDATE;
-    
-    IF NOT FOUND THEN
-        RETURN json_build_object(
-            'success', false, 
-            'message', 'Invalid or already processed redemption code'
-        );
-    END IF;
-    
-    -- Update redemption status
-    UPDATE loyalty_redemptions
-    SET 
-        status = 'cancelled',
-        updated_at = now(),
-        metadata = metadata || jsonb_build_object(
-            'cancelled_at', now(),
-            'cancelled_by', 'user'
-        )
-    WHERE id = redemption_record.id;
-    
-    result := json_build_object(
-        'success', true,
-        'message', 'Redemption cancelled successfully',
-        'points_freed', redemption_record.points_used
-    );
-    
-    RETURN result;
-END;
-$$;
-
--- Function to get user's active redemptions
-CREATE OR REPLACE FUNCTION get_user_active_redemptions(p_user_id uuid)
-RETURNS json
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    active_redemptions json;
-BEGIN
-    SELECT COALESCE(json_agg(
-        json_build_object(
-            'id', id,
-            'redemption_code', metadata->>'redemption_code',
-            'points_used', points_used,
-            'discount_amount', discount_amount,
-            'status', status,
-            'created_at', created_at,
-            'expires_at', metadata->>'expires_at'
-        )
-    ), '[]'::json) INTO active_redemptions
-    FROM loyalty_redemptions
-    WHERE user_id = p_user_id
-      AND status IN ('pending', 'applied')
-      AND (metadata->>'expires_at')::timestamptz > now()
-    ORDER BY created_at DESC;
-    
-    RETURN json_build_object(
-        'success', true,
-        'active_redemptions', active_redemptions
-    );
-END;
-$$;
-
--- Create function to deduct loyalty points
-CREATE OR REPLACE FUNCTION deduct_loyalty_points(
-  p_user_id UUID,
-  p_points INT,
-  p_source TEXT,
-  p_source_id UUID
-)
-RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_current_points INT;
-BEGIN
-  SELECT points INTO v_current_points FROM loyalty_points WHERE user_id = p_user_id;
-  
-  UPDATE loyalty_points
-  SET points = points - p_points,
-      points_redeemed = points_redeemed + p_points,
-      updated_at = NOW()
-  WHERE user_id = p_user_id;
-    
-  INSERT INTO loyalty_transactions (user_id, points_change, current_points, transaction_type, source_id)
-  VALUES (p_user_id, -p_points, v_current_points - p_points, p_source, p_source_id);
-END;
-$$;
-
-CREATE POLICY "Allow admin access" ON loyalty_points FOR ALL 
-USING (public.is_admin());
-
-CREATE POLICY "Allow admin access" ON loyalty_tiers FOR ALL 
-USING (public.is_admin());
-
-CREATE POLICY "Allow admin access" ON loyalty_transactions FOR ALL 
-USING (public.is_admin());
-
-CREATE POLICY "Allow admin access" ON loyalty_redemptions FOR ALL 
-USING (public.is_admin());
+-- Grant permissions
+GRANT EXECUTE ON FUNCTION create_business_loyalty_record(UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION award_engagement_points(UUID, UUID, INTEGER, TEXT, TEXT, JSONB) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_business_loyalty_summary(UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_customer_points_summary(UUID) TO authenticated;

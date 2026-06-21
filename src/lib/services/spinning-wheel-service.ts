@@ -7,7 +7,7 @@ import {
   PrizeSegment,
   SpinAttempt,
   UserSpinAllocation,
-} from "@/types/spinning_wheel";
+} from "@/types/spinning-wheel";
 import { PointsService } from "./points-service";
 import { SupabaseClient } from "@supabase/supabase-js";
 

@@ -6,241 +6,211 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import {
   Sparkles,
   RotateCcw,
   Gift,
   Users,
-  Radio,
-  Store,
-  Ticket,
-  Trophy,
   ArrowRight,
   Star,
   Shield,
-  QrCode,
   Smartphone,
   Brain,
-  Zap,
   TrendingUp,
   Check,
   ChevronRight,
-  Play,
-  Pause,
-  Volume2,
-  VolumeX,
   Coffee,
   Scissors,
   UtensilsCrossed,
   ShoppingBag,
   Building2,
   Music,
-  Heart,
+  Timer,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatKES } from "@/lib/utils";
+import Footer from "@/components/layout/Footer";
 import { DemoWheel } from "@/components/landing/demo-wheel";
+import Header from "@/components/layout/Header";
 
-// ─── Demo Spin Wheel (mini) ────────────────────────────
-function MiniWheel() {
-  const [spinning, setSpinning] = useState(false);
-  const [rotation, setRotation] = useState(0);
-  const [result, setResult] = useState<string | null>(null);
+// ─── Product Suite ─────────────────────────────────────
+const PRODUCT_SUITE = [
+  {
+    icon: RotateCcw,
+    title: "Spin & Win",
+    tagline: "Daily habit builder",
+    description:
+      "Customers spin your branded wheel from their phones. Every spin captures their email. They come back daily for another chance to win.",
+    benefit: "47 emails captured this week",
+    color: "from-purple-500 to-pink-500",
+    bgGlow: "bg-purple-500/10 dark:bg-purple-500/10",
+    step: "Print QR → Customer scans → Spins → You get email",
+  },
+  {
+    icon: Brain,
+    title: "Live Trivia",
+    tagline: "Community event builder",
+    description:
+      "Host trivia nights with a professional broadcast display. Customers answer from their phones. Leaderboard projects behind you.",
+    benefit: "Friday nights are now packed",
+    color: "from-blue-500 to-cyan-500",
+    bgGlow: "bg-blue-500/10 dark:bg-blue-500/10",
+    step: "Set questions → Share code → Go live → Crowd goes wild",
+  },
+  {
+    icon: Gift,
+    title: "Prize Draws",
+    tagline: "Purchase incentive builder",
+    description:
+      "Every receipt becomes a raffle entry. More purchases = more entries. Broadcast the draw live. Turn transactions into excitement.",
+    benefit: "Sales up 30% during draw periods",
+    color: "from-amber-500 to-orange-500",
+    bgGlow: "bg-amber-500/10 dark:bg-amber-500/10",
+    step: "Set prize → Give codes on receipts → Draw live → Winner announced",
+  },
+];
 
-  const segments = [
-    { label: "Free Coffee", color: "#8B5CF6" },
-    { label: "10% Off", color: "#EC4899" },
-    { label: "Free Donut", color: "#F59E0B" },
-    { label: "Try Again", color: "#10B981" },
-    { label: "Free Latte", color: "#3B82F6" },
-    { label: "20% Off", color: "#EF4444" },
-  ];
-
-  const handleDemoSpin = () => {
-    if (spinning) return;
-    setSpinning(true);
-    setResult(null);
-    const spins = 5 + Math.floor(Math.random() * 3);
-    const target = Math.floor(Math.random() * segments.length);
-    const segmentAngle = 360 / segments.length;
-    const targetAngle =
-      360 * spins + (360 - target * segmentAngle - segmentAngle / 2);
-    setRotation((prev) => prev + targetAngle);
-
-    setTimeout(() => {
-      setResult(segments[target].label);
-      setSpinning(false);
-    }, 4000);
-  };
-
-  return (
-    <div className="relative w-64 h-64 mx-auto">
-      {/* Pointer */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 z-20">
-        <div className="w-0 h-0 border-l-[10px] border-r-[10px] border-t-[20px] border-l-transparent border-r-transparent border-t-purple-500 drop-shadow-lg" />
-      </div>
-
-      {/* Wheel */}
-      <motion.div
-        className="w-full h-full rounded-full relative overflow-hidden border-4 border-purple-500/30 shadow-2xl"
-        style={{ boxShadow: "0 0 40px rgba(139, 92, 246, 0.2)" }}
-        animate={{ rotate: rotation }}
-        transition={{ duration: 4, ease: [0.15, 0.85, 0.25, 1] }}
-      >
-        {segments.map((seg, i) => {
-          const angle = (i * 60 * Math.PI) / 180;
-          const nextAngle = ((i + 1) * 60 * Math.PI) / 180;
-          return (
-            <div
-              key={i}
-              className="absolute inset-0 flex items-center justify-center"
-              style={{
-                clipPath: `polygon(50% 50%, ${50 + 50 * Math.cos(angle)}% ${50 + 50 * Math.sin(angle)}%, ${50 + 50 * Math.cos(nextAngle)}% ${50 + 50 * Math.sin(nextAngle)}%)`,
-                backgroundColor: seg.color,
-              }}
-            >
-              <span
-                className="text-white text-[10px] font-bold absolute whitespace-nowrap"
-                style={{
-                  left: "60%",
-                  top: "50%",
-                  transform: "translate(-50%, -50%) rotate(90deg)",
-                  textShadow: "0 1px 2px rgba(0,0,0,0.3)",
-                }}
-              >
-                {seg.label}
-              </span>
-            </div>
-          );
-        })}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-inner">
-          <Sparkles className="h-5 w-5 text-purple-500" />
-        </div>
-      </motion.div>
-
-      {result && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="absolute -bottom-12 left-1/2 -translate-x-1/2 bg-purple-600 text-white px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap shadow-lg"
-        >
-          🎉 {result}!
-        </motion.div>
-      )}
-    </div>
-  );
-}
-
-// ─── Business Types ─────────────────────────────────────
 const BUSINESS_TYPES = [
   {
     icon: Coffee,
     label: "Coffee Shops",
-    desc: "Receipt codes for loyalty spins",
+    useCase: "Receipt codes for daily spins & monthly draws",
   },
   {
     icon: UtensilsCrossed,
     label: "Restaurants",
-    desc: "Trivia nights & happy hour games",
+    useCase: "Trivia nights & happy hour spin-to-win",
   },
   {
     icon: Scissors,
     label: "Salons & Barbers",
-    desc: "Post-appointment spin-to-win",
+    useCase: "Post-appointment spins & product giveaways",
   },
   {
     icon: ShoppingBag,
     label: "Retail Stores",
-    desc: "In-store engagement events",
+    useCase: "Holiday draws & in-store engagement events",
   },
   {
     icon: Building2,
     label: "Hotels & Venues",
-    desc: "Guest entertainment & events",
+    useCase: "Guest entertainment & loyalty programs",
   },
   {
     icon: Music,
     label: "Bars & Nightlife",
-    desc: "Live trivia & drink giveaways",
+    useCase: "Live trivia, drink giveaways & weekend draws",
   },
 ];
 
-// ─── Testimonials ───────────────────────────────────────
+const RESULTS = [
+  { metric: "300%", label: "Average email list growth", icon: TrendingUp },
+  { metric: "30%", label: "Increase in repeat visits", icon: Users },
+  { metric: "5 min", label: "Setup time", icon: Timer },
+  { metric: "0", label: "App downloads required", icon: Smartphone },
+];
+
 const TESTIMONIALS = [
   {
     quote:
-      "We run trivia every Friday now. Customers love seeing their name on the big screen. We've doubled our Friday night traffic.",
+      "I was giving away free coffees to regulars anyway. Now I get their email too. My list went from 0 to 200 in a month.",
     name: "Sarah K.",
     business: "Brew & Bean Coffee",
-    type: "Coffee Shop",
+    icon: Coffee,
   },
   {
     quote:
-      "I print codes on every receipt. Customers come back just to spin. My email list has grown 300% in two months.",
+      "We run trivia every Friday. Customers bring friends. Sales have doubled on Friday nights since we started.",
     name: "James M.",
-    business: "Fresh Cuts Barbershop",
-    type: "Barber Shop",
+    business: "Tony's Pizza",
+    icon: UtensilsCrossed,
   },
   {
     quote:
-      "We projected the leaderboard during our anniversary event. People were cheering. It felt like a game show in our store.",
+      "The holiday draw was insane. People were buying extra just to get more entries. Best December we've ever had.",
     name: "Grace W.",
     business: "Savvy Styles Boutique",
-    type: "Retail Store",
+    icon: ShoppingBag,
   },
 ];
 
-// ─── Pricing Cards (compact) ────────────────────────────
-const PLANS = [
-  {
-    name: "Starter",
-    price: 29,
-    desc: "For small businesses getting started",
-    highlight: false,
-  },
-  {
-    name: "Pro",
-    price: 79,
-    desc: "For growing businesses with regular events",
-    highlight: true,
-  },
-  {
-    name: "Enterprise",
-    price: 199,
-    desc: "For chains and high-volume venues",
-    highlight: false,
-  },
-];
-
-// ─── FAQ ────────────────────────────────────────────────
 const FAQ = [
   {
-    q: "Do my customers need to download an app?",
-    a: "No. Everything works in a phone browser. They just scan a QR code or visit a link.",
+    q: "How does this actually bring customers back?",
+    a: "When someone spins and wins '10% Off', they have to come back to claim it. When they enter a draw, they check back to see if they won. Trivia nights become a weekly ritual. Each tool creates a reason to return.",
+  },
+  {
+    q: "Do customers need to download anything?",
+    a: "No. Everything works in a phone browser. They scan a QR code or visit a link. That's it.",
+  },
+  {
+    q: "Who owns the customer emails?",
+    a: "You do. Every email captured through spins, trivia, or draws belongs to your business. Export anytime. We never market to them.",
   },
   {
     q: "How do customers find my business on Engage?",
     a: "They don't browse. You give them a code or QR link. No code, no access. Your customers stay yours.",
   },
   {
-    q: "Who owns the customer data?",
-    a: "You do. Every email collected is yours. Export anytime. We never market to your customers.",
+    q: "Can I run all three—spins, trivia, and draws?",
+    a: "Yes. They work together. Spins build daily habits. Trivia builds community. Draws drive purchases. Use one or all three.",
+  },
+];
+
+const KES_TO_USD_RATE = 130;
+
+// Update your PLANS array
+const PLANS = [
+  {
+    name: "Starter",
+    price: 3999, // KES
+    usdPrice: Math.round(3999 / KES_TO_USD_RATE),
+    desc: "For small businesses getting started",
+    features: [
+      "1 spin game",
+      "1 trivia challenge",
+      "1 active draw",
+      "500 engagements/mo",
+      "Basic branding",
+      "CSV export",
+    ],
+    highlight: false,
   },
   {
-    q: "Can I customize the look?",
-    a: "Yes. Your logo, colors, and branding appear on your spin page and live display.",
+    name: "Pro",
+    price: 9999, // KES
+    usdPrice: Math.round(9999 / KES_TO_USD_RATE),
+    desc: "For growing businesses running regular campaigns",
+    features: [
+      "3 spin games",
+      "3 trivia challenges",
+      "3 active draws",
+      "5,000 engagements/mo",
+      "Full branding",
+      "Analytics dashboard",
+      "Bulk code generation",
+    ],
+    highlight: true,
   },
   {
-    q: "What about prizes?",
-    a: "You decide the prizes. Free coffee, discounts, products. You fulfill them however you like.",
+    name: "Enterprise",
+    price: 24999, // KES
+    usdPrice: Math.round(24999 / KES_TO_USD_RATE),
+    desc: "For chains and high-volume venues",
+    features: [
+      "Unlimited everything",
+      "25,000 engagements/mo",
+      "Multiple locations",
+      "API access",
+      "Dedicated support",
+      "Advanced analytics",
+    ],
+    highlight: false,
   },
 ];
 
 // ─── Main Component ─────────────────────────────────────
 export default function LandingPage() {
-  const [videoPlaying, setVideoPlaying] = useState(false);
-  const [muted, setMuted] = useState(true);
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
   const heroRef = useRef(null);
   const { scrollYProgress } = useScroll({
@@ -248,101 +218,60 @@ export default function LandingPage() {
     offset: ["start start", "end start"],
   });
   const heroOpacity = useTransform(scrollYProgress, [0, 1], [1, 0]);
-  const heroScale = useTransform(scrollYProgress, [0, 1], [1, 0.95]);
 
   return (
-    <div className="min-h-screen bg-gray-950">
+    <div className="min-h-screen bg-white dark:bg-gray-950">
       {/* ─── NAV ─────────────────────────────────────── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-black/50 backdrop-blur-xl">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-purple-400" />
-            <span className="text-white font-bold text-lg">Engage</span>
-          </Link>
-          <div className="hidden md:flex items-center gap-6">
-            <Link
-              href="/how-it-works"
-              className="text-white/60 hover:text-white text-sm transition-colors"
-            >
-              How It Works
-            </Link>
-            <Link
-              href="/pricing"
-              className="text-white/60 hover:text-white text-sm transition-colors"
-            >
-              Pricing
-            </Link>
-            <Link
-              href="/about"
-              className="text-white/60 hover:text-white text-sm transition-colors"
-            >
-              About
-            </Link>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/spin"
-              className="text-white/60 hover:text-white text-sm transition-colors"
-            >
-              Enter Code
-            </Link>
-            <Button
-              asChild
-              size="sm"
-              className="bg-gradient-to-r from-purple-600 to-pink-600"
-            >
-              <Link href="/business/signup">Start Free Trial</Link>
-            </Button>
-          </div>
-        </div>
-      </nav>
-
+      <Header />
       {/* ─── HERO ────────────────────────────────────── */}
-      <section ref={heroRef} className="relative pt-32 pb-20 overflow-hidden">
-        {/* Background glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-purple-500/10 rounded-full blur-3xl" />
-        <div className="absolute top-1/4 right-0 w-[400px] h-[400px] bg-pink-500/10 rounded-full blur-3xl" />
+      <section
+        ref={heroRef}
+        className="relative pt-32 pb-24 overflow-hidden bg-gray-50 dark:bg-transparent"
+      >
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-purple-100 dark:bg-purple-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 right-0 w-[400px] h-[400px] bg-pink-100 dark:bg-pink-500/10 rounded-full blur-3xl" />
+        {/* Background image that covers the whole section with overflow */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-110 opacity-10"
+          style={{ backgroundImage: "url('/images/you-win-banner.jpg')" }}
+        />
 
         <motion.div
-          style={{ opacity: heroOpacity, scale: heroScale }}
+          style={{ opacity: heroOpacity }}
           className="container mx-auto px-4 relative z-10"
         >
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Left: Text */}
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
               >
-                <Badge className="mb-4 bg-purple-500/20 text-purple-300 text-sm px-4 py-1.5 border-0">
-                  🎉 New: Live Trivia Mode
+                <Badge className="mb-6 bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 text-sm py-1.5 border-0">
+                  🎉 Spins · Trivia · Draws · & Expanding
                 </Badge>
               </motion.div>
-
               <motion.h1
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight"
+                className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white leading-tight"
               >
-                Turn your business into a{" "}
-                <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
-                  live game show
+                Customers who play{" "}
+                <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 bg-clip-text text-transparent">
+                  come back
                 </span>
               </motion.h1>
-
               <motion.p
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="text-lg text-white/50 mt-6 leading-relaxed max-w-lg"
+                className="text-lg text-gray-500 dark:text-white/50 mt-6 leading-relaxed max-w-lg"
               >
-                Customers spin your wheel from their phones. You project the
-                leaderboard behind you. No app download. No complex setup. Just
-                engagement that fills your venue.
+                Give your customers a reason to return. Spin wheels, trivia
+                nights, and prize draws. You capture their phone and emails.
+                They come back to claim prizes. Everyone wins.
               </motion.p>
-
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -362,162 +291,166 @@ export default function LandingPage() {
                   asChild
                   variant="outline"
                   size="lg"
-                  className="border-white/10 text-white h-14"
+                  className="border-gray-200 dark:border-white/10 text-gray-700 dark:text-white h-14"
                 >
-                  <Link href="/how-it-works">
-                    <Play className="h-4 w-4 mr-2" /> See How It Works
-                  </Link>
+                  <Link href="#how-it-works">See How It Works</Link>
                 </Button>
               </motion.div>
-
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.6 }}
-                className="flex items-center gap-6 mt-8 text-sm text-white/40"
+                className="flex items-center gap-6 mt-8 text-xs sm:text-sm text-gray-400 dark:text-white/40"
               >
                 <span className="flex items-center gap-1">
-                  <Check className="h-4 w-4 text-green-400" /> 14-day free trial
+                  <Check className="h-4 w-4 text-green-500" /> 14-day free trial
                 </span>
                 <span className="flex items-center gap-1">
-                  <Check className="h-4 w-4 text-green-400" /> No credit card
+                  <Check className="h-4 w-4 text-green-500" /> No credit card
                 </span>
                 <span className="flex items-center gap-1">
-                  <Check className="h-4 w-4 text-green-400" /> Setup in minutes
+                  <Check className="h-4 w-4 text-green-500" /> Setup in 5
+                  minutes
                 </span>
               </motion.div>
             </div>
-
-            {/* Right: Demo Wheel */}
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.3, duration: 0.6 }}
-              className="flex flex-col items-center gap-4"
             >
               <DemoWheel />
-              <p className="text-white/30 text-xs mt-2">
-                This is a demo. Spin to see how it works!
-              </p>
             </motion.div>
           </div>
         </motion.div>
       </section>
-
-      {/* ─── SOCIAL PROOF ────────────────────────────── */}
-      <section className="border-t border-white/5 py-12">
-        <div className="container mx-auto px-4 text-center">
-          <p className="text-white/30 text-sm mb-6">
-            Trusted by businesses across Kenya
-          </p>
-          <div className="flex flex-wrap justify-center gap-8">
-            {[
-              "Brew & Bean",
-              "Fresh Cuts",
-              "Savvy Styles",
-              "The Daily Grind",
-              "Glamour Salon",
-              "Tony's Pizza",
-            ].map((name) => (
-              <span key={name} className="text-white/20 font-semibold text-sm">
-                {name}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── HOW IT WORKS ────────────────────────────── */}
-      <section className="border-t border-white/5 py-24">
+      {/* ─── RESULTS BAR ─────────────────────────────── */}
+      <section className="border-t border-gray-100 dark:border-white/5 py-12">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <Badge className="mb-4 bg-purple-500/20 text-purple-300 border-0">
-              How It Works
-            </Badge>
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              From setup to live event in minutes
-            </h2>
-            <p className="text-white/40 max-w-xl mx-auto">
-              No technical skills needed. No app for customers to download.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            {[
-              {
-                step: "1",
-                icon: Store,
-                title: "Create Your Page",
-                desc: "Set your branding, configure prizes, and generate access codes. Takes less than 5 minutes.",
-              },
-              {
-                step: "2",
-                icon: QrCode,
-                title: "Share With Customers",
-                desc: "Print a QR code for your counter, put codes on receipts, or share on social media.",
-              },
-              {
-                step: "3",
-                icon: Radio,
-                title: "Go Live",
-                desc: "Project the leaderboard behind you. Customers play from their phones. You capture their emails.",
-              },
-            ].map((item, i) => (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
+            {RESULTS.map((result, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.15 }}
+                transition={{ delay: i * 0.1 }}
                 className="text-center"
               >
-                <div className="w-16 h-16 rounded-2xl bg-purple-500/10 flex items-center justify-center mx-auto mb-4">
-                  <span className="text-purple-400 font-bold text-xl">
-                    {item.step}
-                  </span>
-                </div>
-                <h3 className="text-white font-semibold text-lg mb-2">
-                  {item.title}
-                </h3>
-                <p className="text-white/40 text-sm leading-relaxed">
-                  {item.desc}
+                <result.icon className="h-5 w-5 text-purple-500 mx-auto mb-2" />
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                  {result.metric}
+                </p>
+                <p className="text-gray-400 dark:text-white/40 text-xs mt-1">
+                  {result.label}
                 </p>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
-
-      {/* ─── WHO IT'S FOR ────────────────────────────── */}
-      <section className="border-t border-white/5 py-24">
+      {/* ─── PRODUCT SUITE ───────────────────────────── */}
+      <section
+        id="how-it-works"
+        className="border-t border-gray-100 dark:border-white/5 py-24 bg-gray-50/50 dark:bg-transparent"
+      >
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Built for every local business
+            <Badge className="mb-4 bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 border-0">
+              The Platform
+            </Badge>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Three tools. One goal:{" "}
+              <span className="text-purple-600 dark:text-purple-400">
+                bring them back.
+              </span>
             </h2>
-            <p className="text-white/40 max-w-xl mx-auto">
-              If you have customers and want to engage them better, Engage works
-              for you.
+            <p className="text-gray-500 dark:text-white/40 max-w-xl mx-auto">
+              Choose what works for your business. Use one or combine all three.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            {PRODUCT_SUITE.map((product, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.15 }}
+              >
+                <Card className="bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 hover:border-purple-300 dark:hover:border-white/20 transition-all h-full group shadow-sm dark:shadow-none">
+                  <CardContent className="p-6 flex flex-col h-full">
+                    <div
+                      className={cn(
+                        "w-14 h-14 rounded-2xl flex items-center justify-center mb-5",
+                        product.bgGlow,
+                      )}
+                    >
+                      <product.icon
+                        className={cn(
+                          "h-7 w-7",
+                          product.color.split(" ")[0].replace("from-", "text-"),
+                        )}
+                      />
+                    </div>
+                    <Badge className="mb-3 bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-white/40 border-0 self-start text-xs">
+                      {product.tagline}
+                    </Badge>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">
+                      {product.title}
+                    </h3>
+                    <p className="text-gray-500 dark:text-white/50 text-sm leading-relaxed flex-1">
+                      {product.description}
+                    </p>
+                    <div className="mt-4 p-3 rounded-lg bg-gray-50 dark:bg-white/5">
+                      <p className="text-gray-400 dark:text-white/30 text-xs font-mono">
+                        {product.step}
+                      </p>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/5 flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-green-500" />
+                      <span className="text-green-600 dark:text-green-400 text-sm font-medium">
+                        {product.benefit}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+      {/* ─── WHO IT'S FOR ────────────────────────────── */}
+      <section className="border-t border-gray-100 dark:border-white/5 py-24">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Built for{" "}
+              <span className="text-purple-600 dark:text-purple-400">your</span>{" "}
+              business
+            </h2>
+            <p className="text-gray-500 dark:text-white/40 max-w-xl mx-auto">
+              If customers walk through your door, Engage works for you.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
             {BUSINESS_TYPES.map((biz, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, scale: 0.9 }}
+                initial={{ opacity: 0, scale: 0.95 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.05 }}
               >
-                <Card className="bg-white/5 border-white/10 hover:bg-white/10 transition-colors text-center h-full">
-                  <CardContent className="p-4">
-                    <biz.icon className="h-6 w-6 text-purple-400 mx-auto mb-2" />
-                    <p className="text-white font-medium text-sm">
+                <Card className="bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors text-center h-full shadow-sm dark:shadow-none">
+                  <CardContent className="p-5">
+                    <biz.icon className="h-6 w-6 text-purple-500 mx-auto mb-3" />
+                    <p className="text-gray-900 dark:text-white font-medium">
                       {biz.label}
                     </p>
-                    <p className="text-white/30 text-xs mt-1 hidden md:block">
-                      {biz.desc}
+                    <p className="text-gray-400 dark:text-white/30 text-xs mt-2 leading-relaxed">
+                      {biz.useCase}
                     </p>
                   </CardContent>
                 </Card>
@@ -526,16 +459,14 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
       {/* ─── TESTIMONIALS ────────────────────────────── */}
-      <section className="border-t border-white/5 py-24">
+      <section className="border-t border-gray-100 dark:border-white/5 py-24 bg-gray-50/50 dark:bg-transparent">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Loved by businesses
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Real businesses, real results
             </h2>
           </div>
-
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {TESTIMONIALS.map((t, i) => (
               <motion.div
@@ -545,7 +476,7 @@ export default function LandingPage() {
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
               >
-                <Card className="bg-white/5 border-white/10 h-full">
+                <Card className="bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 h-full shadow-sm dark:shadow-none">
                   <CardContent className="p-6 flex flex-col h-full">
                     <div className="flex gap-1 mb-4">
                       {[...Array(5)].map((_, j) => (
@@ -555,14 +486,21 @@ export default function LandingPage() {
                         />
                       ))}
                     </div>
-                    <p className="text-white/70 text-sm leading-relaxed flex-1">
+                    <p className="text-gray-600 dark:text-white/70 text-sm leading-relaxed flex-1">
                       "{t.quote}"
                     </p>
-                    <div className="mt-4 pt-4 border-t border-white/5">
-                      <p className="text-white font-medium text-sm">{t.name}</p>
-                      <p className="text-white/40 text-xs">
-                        {t.business} · {t.type}
-                      </p>
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-white/5 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center">
+                        <t.icon className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="text-gray-900 dark:text-white font-medium text-sm">
+                          {t.name}
+                        </p>
+                        <p className="text-gray-400 dark:text-white/40 text-xs">
+                          {t.business}
+                        </p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -572,21 +510,24 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── PRICING ─────────────────────────────────── */}
-      <section className="border-t border-white/5 py-24">
+      {/* ─── UPDATED PRICING SECTION ─── */}
+      <section className="border-t border-gray-100 dark:border-white/5 py-24">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <Badge className="mb-4 bg-green-500/20 text-green-300 border-0">
+            <Badge className="mb-4 bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-300 border-0">
               Pricing
             </Badge>
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Simple, transparent pricing
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Pay for usage, not features
             </h2>
-            <p className="text-white/40 max-w-xl mx-auto">
-              14-day free trial on any plan. No credit card required.
+            <p className="text-gray-500 dark:text-white/40 max-w-xl mx-auto">
+              All plans include spins, trivia, and draws. 14-day free trial.
+            </p>
+            <p className="text-sm text-gray-400 dark:text-white/20 mt-3">
+              💳 All prices in KES. International cards charged in USD at
+              prevailing exchange rate.
             </p>
           </div>
-
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {PLANS.map((plan, i) => (
               <motion.div
@@ -598,33 +539,53 @@ export default function LandingPage() {
               >
                 <Card
                   className={cn(
-                    "h-full border transition-all",
+                    "h-full border transition-all shadow-sm dark:shadow-none",
                     plan.highlight
-                      ? "border-purple-500/50 bg-purple-500/5 scale-105"
-                      : "border-white/10 bg-white/5",
+                      ? "border-purple-300 dark:border-purple-500/50 bg-purple-50/50 dark:bg-purple-500/5 scale-105"
+                      : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/5",
                   )}
                 >
-                  <CardContent className="p-6 flex flex-col h-full text-center">
+                  <CardContent className="flex flex-col h-full relative pt-8">
                     {plan.highlight && (
-                      <Badge className="mb-3 bg-purple-500/20 text-purple-300 border-0 mx-auto">
+                      <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 border-0">
                         Most Popular
                       </Badge>
                     )}
-                    <h3 className="text-white font-bold text-lg">
+                    <h3 className="text-gray-900 dark:text-white font-bold text-xl">
                       {plan.name}
                     </h3>
-                    <p className="text-4xl font-bold text-white mt-4">
-                      ${plan.price}
-                      <span className="text-white/40 text-lg">/mo</span>
+                    <div className="mt-4">
+                      <span className="text-4xl font-bold text-gray-900 dark:text-white">
+                        {formatKES(plan.price)}
+                      </span>
+                      <span className="text-gray-400 dark:text-white/40 text-lg">
+                        /mo
+                      </span>
+                      <p className="text-sm text-gray-400 dark:text-white/30 mt-1">
+                        ≈ ${plan.usdPrice} USD
+                      </p>
+                    </div>
+                    <p className="text-gray-500 dark:text-white/40 text-sm mt-1">
+                      {plan.desc}
                     </p>
-                    <p className="text-white/40 text-sm mt-2">{plan.desc}</p>
+                    <ul className="mt-6 space-y-3 flex-1">
+                      {plan.features.map((f, j) => (
+                        <li
+                          key={j}
+                          className="flex items-center gap-2 text-sm text-gray-600 dark:text-white/60"
+                        >
+                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
                     <Button
                       asChild
                       className={cn(
-                        "mt-6",
+                        "mt-6 w-full",
                         plan.highlight
                           ? "bg-gradient-to-r from-purple-600 to-pink-600"
-                          : "bg-white/10 hover:bg-white/20 text-white",
+                          : "bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 text-gray-900 dark:text-white",
                       )}
                     >
                       <Link href="/business/signup">Start Free Trial</Link>
@@ -636,43 +597,30 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
       {/* ─── DATA OWNERSHIP ──────────────────────────── */}
-      <section className="border-t border-white/5 py-24">
+      <section className="border-t border-gray-100 dark:border-white/5 py-24 bg-gray-50/50 dark:bg-transparent">
         <div className="container mx-auto px-4 max-w-3xl text-center">
-          <Shield className="h-12 w-12 text-purple-400 mx-auto mb-6" />
-          <h2 className="text-3xl font-bold text-white mb-4">
+          <div className="w-16 h-16 rounded-2xl bg-purple-100 dark:bg-purple-500/10 flex items-center justify-center mx-auto mb-6">
+            <Shield className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
             Your customers. Your data.
           </h2>
-          <p className="text-white/50 leading-relaxed mb-8 max-w-xl mx-auto">
-            We're a tool for businesses, not a marketplace. Customers only
-            access your experience with a code you give them. Every email
-            collected belongs to you. We never market to your customers or sell
-            their data.{" "}
-            <span className="text-white/70">
-              They're your customers, not ours.
+          <p className="text-gray-500 dark:text-white/50 leading-relaxed mb-8 max-w-xl mx-auto">
+            Every email captured through spins, trivia, and draws belongs to
+            you—not us. Export your customer list anytime. We never email your
+            customers or sell their data.
+            <span className="text-gray-700 dark:text-white/70">
+              {" "}
+              They're your customers, period.
             </span>
           </p>
-          <div className="grid grid-cols-3 gap-4 max-w-md mx-auto">
-            {["You own the data", "Export anytime", "We never market"].map(
-              (text, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-2 text-sm text-white/60"
-                >
-                  <Check className="h-4 w-4 text-green-400 flex-shrink-0" />
-                  {text}
-                </div>
-              ),
-            )}
-          </div>
         </div>
       </section>
-
       {/* ─── FAQ ─────────────────────────────────────── */}
-      <section className="border-t border-white/5 py-24">
+      <section className="border-t border-gray-100 dark:border-white/5 py-24">
         <div className="container mx-auto px-4 max-w-2xl">
-          <h2 className="text-3xl font-bold text-white text-center mb-12">
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white text-center mb-12">
             Frequently asked questions
           </h2>
           <div className="space-y-3">
@@ -685,13 +633,15 @@ export default function LandingPage() {
               >
                 <button
                   onClick={() => setFaqOpen(faqOpen === i ? null : i)}
-                  className="w-full p-4 rounded-xl bg-white/5 border border-white/10 text-left hover:bg-white/10 transition-colors"
+                  className="w-full p-5 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-left hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-white font-medium">{item.q}</span>
+                    <span className="text-gray-900 dark:text-white font-medium pr-4">
+                      {item.q}
+                    </span>
                     <ChevronRight
                       className={cn(
-                        "h-4 w-4 text-white/40 transition-transform",
+                        "h-4 w-4 text-gray-400 dark:text-white/40 transition-transform flex-shrink-0",
                         faqOpen === i && "rotate-90",
                       )}
                     />
@@ -700,7 +650,7 @@ export default function LandingPage() {
                     <motion.p
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
-                      className="text-white/50 text-sm mt-3 leading-relaxed"
+                      className="text-gray-500 dark:text-white/50 text-sm mt-4 leading-relaxed"
                     >
                       {item.a}
                     </motion.p>
@@ -711,21 +661,19 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
       {/* ─── CTA ─────────────────────────────────────── */}
-      <section className="border-t border-white/5 py-24">
+      <section className="border-t border-gray-100 dark:border-white/5 py-24">
         <div className="container mx-auto px-4 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">
-              Ready to engage your customers?
+            <h2 className="text-3xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+              Ready to make your customers come back?
             </h2>
-            <p className="text-lg text-white/40 mb-8 max-w-lg mx-auto">
-              Start your 14-day free trial. Set up in minutes. Your customers
-              will love it.
+            <p className="text-lg text-gray-500 dark:text-white/40 mb-8 max-w-lg mx-auto">
+              Spins. Trivia. Draws. One platform. Start your 14-day free trial.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button
@@ -741,13 +689,13 @@ export default function LandingPage() {
                 asChild
                 variant="outline"
                 size="lg"
-                className="border-white/10 text-white h-14"
+                className="border-gray-200 dark:border-white/10 text-gray-700 dark:text-white h-14"
               >
-                <Link href="/spin">I Have a Code</Link>
+                <Link href="/code-entry">I Have a Code</Link>
               </Button>
             </div>
-            <p className="text-white/30 text-sm mt-6">
-              No credit card required · 14-day trial · Cancel anytime
+            <p className="text-gray-400 dark:text-white/30 text-sm mt-6">
+              No credit card · 14-day trial · Cancel anytime
             </p>
           </motion.div>
         </div>

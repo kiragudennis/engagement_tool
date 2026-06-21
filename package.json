@@ -82,5 +82,10 @@
     "tw-animate-css": "^1.3.6",
     "typescript": "^5",
     "ws": "^8.20.1"
+  },
+  "allowScripts": {
+    "@sentry/cli@2.58.6": true,
+    "sharp@0.34.5": true,
+    "unrs-resolver@1.12.2": true
   }
 }

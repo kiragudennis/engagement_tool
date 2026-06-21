@@ -42,7 +42,7 @@ CREATE TABLE businesses (
 -- Add payment tracking to businesses
 ALTER TABLE businesses ADD COLUMN IF NOT EXISTS last_payment_at TIMESTAMPTZ;
 ALTER TABLE businesses ADD COLUMN IF NOT EXISTS next_billing_at TIMESTAMPTZ;
-ALTER TABLE businesses ADD COLUMN IF NOT EXISTS payment_method TEXT CHECK (payment_method IN ('mpesa', 'paypal', 'card', 'none'));
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS payment_method TEXT CHECK (payment_method IN ('mpesa', 'paystack', 'card', 'none'));
 
 -- Payment transactions
 CREATE TABLE IF NOT EXISTS business_payments (
@@ -89,7 +89,7 @@ CREATE TABLE access_codes (
     description TEXT,
     
     -- What this code unlocks
-    unlocks TEXT NOT NULL DEFAULT 'spin' CHECK (unlocks IN ('spin', 'trivia', 'both')),
+    unlocks TEXT NOT NULL DEFAULT 'spin' CHECK (unlocks IN ('spin', 'trivia', 'draw', 'both', 'spin_draw', 'trivia_draw', 'all')),
     
     -- Limits
     max_uses INTEGER, -- NULL = unlimited
@@ -106,6 +106,11 @@ CREATE TABLE access_codes (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add indexes for performance
+CREATE INDEX idx_access_codes_code ON access_codes(code);
+CREATE INDEX idx_access_codes_business_id ON access_codes(business_id);
+CREATE INDEX idx_access_codes_valid_until ON access_codes(valid_until) WHERE is_active = true;
 
 -- 4. Code usage tracking
 CREATE TABLE access_code_usage (
@@ -138,66 +143,11 @@ CREATE TABLE customer_business_activations (
     UNIQUE(user_id, business_id)
 );
 
--- Customer engagement points
-CREATE TABLE IF NOT EXISTS customer_points (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
-    
-    points INTEGER DEFAULT 0,
-    lifetime_points INTEGER DEFAULT 0,
-    
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    
-    UNIQUE(user_id, business_id)
-);
-
--- Points transactions
-CREATE TABLE IF NOT EXISTS customer_points_transactions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
-    
-    points_change INTEGER NOT NULL,
-    points_balance INTEGER NOT NULL,
-    action TEXT NOT NULL CHECK (action IN ('spin', 'trivia_answer', 'trivia_correct', 'daily_visit', 'referral', 'redeemed')),
-    description TEXT,
-    
-    metadata JSONB DEFAULT '{}',
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Points redemption options (set by platform, not business)
-CREATE TABLE IF NOT EXISTS points_redemption_options (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL,
-    description TEXT,
-    points_required INTEGER NOT NULL,
-    reward_type TEXT CHECK (reward_type IN ('extra_spin', 'boost', 'badge', 'highlight')),
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Insert default redemption options
-INSERT INTO points_redemption_options (name, description, points_required, reward_type) VALUES
-    ('Extra Spin', 'Get an extra spin at any business', 50, 'extra_spin'),
-    ('Profile Boost', 'Get highlighted on the live leaderboard', 100, 'highlight'),
-    ('Golden Ticket', 'Auto-entry into any trivia challenge', 200, 'boost'),
-    ('VIP Badge', 'Show off your VIP status to businesses', 500, 'badge');
-
 -- 6. Add to users table
 ALTER TABLE users 
 ADD COLUMN IF NOT EXISTS home_business_id UUID REFERENCES businesses(id),
 ADD COLUMN IF NOT EXISTS created_via_code_id UUID REFERENCES access_codes(id),
 ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE;
-
--- 7. Add business_id to existing tables
-ALTER TABLE spin_games ADD COLUMN IF NOT EXISTS business_id UUID REFERENCES businesses(id) ON DELETE CASCADE;
-ALTER TABLE challenges ADD COLUMN IF NOT EXISTS business_id UUID REFERENCES businesses(id) ON DELETE CASCADE;
-ALTER TABLE challenge_participants ADD COLUMN IF NOT EXISTS business_id UUID REFERENCES businesses(id) ON DELETE CASCADE;
-ALTER TABLE challenge_trivia_questions ADD COLUMN IF NOT EXISTS business_id UUID REFERENCES businesses(id) ON DELETE CASCADE;
-ALTER TABLE challenge_live_ticker ADD COLUMN IF NOT EXISTS business_id UUID REFERENCES businesses(id) ON DELETE CASCADE;
 
 -- 8. Indexes
 CREATE INDEX idx_businesses_slug ON businesses(slug);
@@ -210,11 +160,8 @@ CREATE INDEX idx_activations_user ON customer_business_activations(user_id, is_a
 CREATE INDEX idx_activations_business ON customer_business_activations(business_id, is_active);
 CREATE INDEX idx_activations_expiry ON customer_business_activations(expires_at) WHERE is_active = TRUE;
 CREATE INDEX idx_users_home_business ON users(home_business_id);
-CREATE INDEX idx_spin_games_business ON spin_games(business_id, is_active);
-CREATE INDEX idx_challenges_business ON challenges(business_id, status);
 
 -- 9. Functions
-
 CREATE OR REPLACE FUNCTION increment_business_spin_count(p_business_id UUID)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -236,75 +183,6 @@ BEGIN
 END;
 $$;
 
--- Function to award points for engagement
-CREATE OR REPLACE FUNCTION award_engagement_points(
-    p_user_id UUID,
-    p_business_id UUID,
-    p_action TEXT,
-    p_points INTEGER DEFAULT 10
-)
-RETURNS INTEGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    v_current_points INTEGER;
-BEGIN
-    -- Upsert points
-    INSERT INTO customer_points (user_id, business_id, points, lifetime_points)
-    VALUES (p_user_id, p_business_id, p_points, p_points)
-    ON CONFLICT (user_id, business_id) DO UPDATE
-    SET 
-        points = customer_points.points + p_points,
-        lifetime_points = customer_points.lifetime_points + p_points,
-        updated_at = NOW()
-    RETURNING points INTO v_current_points;
-    
-    -- Record transaction
-    INSERT INTO customer_points_transactions (
-        user_id, business_id, points_change, points_balance, action, description
-    ) VALUES (
-        p_user_id, p_business_id, p_points, v_current_points, p_action,
-        CASE p_action
-            WHEN 'spin' THEN 'Points for spinning the wheel'
-            WHEN 'trivia_answer' THEN 'Points for answering trivia'
-            WHEN 'trivia_correct' THEN 'Bonus points for correct answer'
-            WHEN 'daily_visit' THEN 'Daily visit bonus'
-            WHEN 'referral' THEN 'Points for referring a friend'
-            ELSE 'Points earned'
-        END
-    );
-    
-    RETURN v_current_points;
-END;
-$$;
-
--- Get customer's points summary
-CREATE OR REPLACE FUNCTION get_customer_points_summary(p_user_id UUID)
-RETURNS TABLE (
-    business_name TEXT,
-    business_slug TEXT,
-    points INTEGER,
-    lifetime_points INTEGER,
-    last_earned_at TIMESTAMPTZ
-)
-LANGUAGE plpgsql
-STABLE
-AS $$
-BEGIN
-    RETURN QUERY
-    SELECT 
-        b.name,
-        b.slug,
-        cp.points,
-        cp.lifetime_points,
-        cp.updated_at
-    FROM customer_points cp
-    JOIN businesses b ON b.id = cp.business_id
-    WHERE cp.user_id = p_user_id
-    ORDER BY cp.points DESC;
-END;
-$$;
 
 -- Validate and redeem a code
 CREATE OR REPLACE FUNCTION redeem_access_code(
@@ -321,6 +199,10 @@ DECLARE
     v_activation customer_business_activations%ROWTYPE;
     v_user_uses INTEGER;
     v_activation_days INTEGER;
+    v_draw RECORD;
+    v_challenge RECORD;
+    v_redirect_url TEXT;
+    v_draw_entered BOOLEAN := FALSE;
 BEGIN
     -- Find and validate code
     SELECT * INTO v_code
@@ -365,7 +247,7 @@ BEGIN
     -- Get activation duration for this business
     v_activation_days := COALESCE(v_business.activation_duration_days, 30);
     
-    -- Upsert activation
+    -- ─── UPSERT CUSTOMER ACTIVATION ─────────────────────
     SELECT * INTO v_activation
     FROM customer_business_activations
     WHERE user_id = p_user_id AND business_id = v_code.business_id;
@@ -391,7 +273,7 @@ BEGIN
         );
     END IF;
     
-    -- Record usage
+    -- ─── RECORD USAGE ───────────────────────────────────
     INSERT INTO access_code_usage (code_id, user_id)
     VALUES (v_code.id, p_user_id);
     
@@ -408,17 +290,97 @@ BEGIN
         onboarding_completed = TRUE
     WHERE id = p_user_id;
     
+    -- ─── AUTO-ENTER DRAWS ───────────────────────────────
+    -- If this code unlocks draws, find and enter the customer
+    IF v_code.unlocks IN ('draw', 'spin_draw', 'trivia_draw', 'all') THEN
+        -- Find the active draw linked to this code
+        SELECT d.id, d.name, d.prize_name, d.entry_ends_at
+        INTO v_draw
+        FROM draws d
+        WHERE d.access_code_id = v_code.id
+        AND d.status = 'open'
+        AND d.entry_starts_at <= NOW()
+        AND d.entry_ends_at >= NOW()
+        LIMIT 1;
+        
+        -- If no draw linked directly, find any open draw for this business
+        IF NOT FOUND THEN
+            SELECT d.id, d.name, d.prize_name, d.entry_ends_at
+            INTO v_draw
+            FROM draws d
+            WHERE d.business_id = v_code.business_id
+            AND d.status = 'open'
+            AND d.entry_starts_at <= NOW()
+            AND d.entry_ends_at >= NOW()
+            ORDER BY d.entry_ends_at ASC
+            LIMIT 1;
+        END IF;
+        
+        -- Enter customer into the draw
+        IF FOUND THEN
+            -- Check if already entered
+            IF NOT EXISTS (
+                SELECT 1 FROM draw_entries
+                WHERE draw_id = v_draw.id AND user_id = p_user_id
+            ) THEN
+                -- Add draw entry
+                INSERT INTO draw_entries (
+                    draw_id, user_id, entry_count, entry_method, source_id, metadata
+                ) VALUES (
+                    v_draw.id, p_user_id, 
+                    COALESCE(v_code.max_uses_per_user, 1), -- entries from code config
+                    'code', v_code.id::TEXT,
+                    jsonb_build_object(
+                        'code', v_code.code,
+                        'code_type', v_code.type,
+                        'entered_at', NOW()
+                    )
+                );
+                
+                -- Create individual tickets
+                FOR i IN 1..COALESCE(v_code.max_uses_per_user, 1) LOOP
+                    INSERT INTO draw_tickets (draw_id, user_id, ticket_number)
+                    VALUES (v_draw.id, p_user_id, i);
+                END LOOP;
+                
+                -- Add to live ticker
+                INSERT INTO draw_live_ticker (draw_id, user_name, entry_count, entry_method)
+                SELECT v_draw.id, COALESCE(u.full_name, 'Customer'), 
+                       COALESCE(v_code.max_uses_per_user, 1), 'code'
+                FROM users u WHERE u.id = p_user_id;
+                
+                v_draw_entered := TRUE;
+            END IF;
+        END IF;
+    END IF;
+    
+    -- ─── DETERMINE REDIRECT URL ─────────────────────────
+    -- Priority: draw > trivia > spin (or combination)
+    IF v_code.unlocks IN ('draw', 'spin_draw') THEN
+        v_redirect_url := '/' || v_business.slug || '/spin';
+    ELSIF v_code.unlocks IN ('trivia', 'trivia_draw') THEN
+        v_redirect_url := '/' || v_business.slug || '/trivia';
+    ELSIF v_code.unlocks = 'all' THEN
+        v_redirect_url := '/' || v_business.slug || '/spin';
+    ELSE
+        -- 'spin' or default
+        v_redirect_url := '/' || v_business.slug || '/spin';
+    END IF;
+    
     RETURN json_build_object(
         'success', true,
         'business_id', v_business.id,
         'business_name', v_business.name,
         'business_slug', v_business.slug,
+        'business_logo', v_business.logo_url,
+        'business_color', v_business.brand_color,
         'expires_at', NOW() + (v_activation_days || ' days')::INTERVAL,
         'unlocks', v_code.unlocks,
-        'redirect_url', '/' || v_business.slug || CASE 
-            WHEN v_code.unlocks = 'trivia' THEN '/trivia'
-            ELSE '/spin'
-        END
+        'redirect_url', v_redirect_url,
+        'draw_entered', v_draw_entered,
+        'draw_name', v_draw.name,
+        'draw_prize', v_draw.prize_name,
+        'draw_ends_at', v_draw.entry_ends_at
     );
 END;
 $$;
@@ -446,39 +408,6 @@ BEGIN
 END;
 $$;
 
--- Get user's active businesses
-CREATE OR REPLACE FUNCTION get_user_active_businesses(p_user_id UUID)
-RETURNS TABLE (
-    business_id UUID,
-    business_name TEXT,
-    business_slug TEXT,
-    logo_url TEXT,
-    brand_color TEXT,
-    expires_at TIMESTAMPTZ,
-    spins_used INTEGER,
-    is_active BOOLEAN
-)
-LANGUAGE plpgsql
-STABLE
-AS $$
-BEGIN
-    RETURN QUERY
-    SELECT 
-        b.id,
-        b.name,
-        b.slug,
-        b.logo_url,
-        b.brand_color,
-        cba.expires_at,
-        cba.spins_used,
-        cba.is_active
-    FROM customer_business_activations cba
-    JOIN businesses b ON b.id = cba.business_id
-    WHERE cba.user_id = p_user_id
-    ORDER BY cba.is_active DESC, cba.last_activity_at DESC;
-END;
-$$;
-
 -- Deactivate expired activations
 CREATE OR REPLACE FUNCTION deactivate_expired_activations()
 RETURNS INTEGER
@@ -499,4 +428,264 @@ $$;
 -- Grant permissions
 GRANT EXECUTE ON FUNCTION redeem_access_code(TEXT, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION is_user_active_with_business(UUID, UUID) TO authenticated;
+
+-- ============================================
+-- ENGAGE PLATFORM: Fixed Functions
+-- (Using loyalty_points instead of dropped customer_points tables)
+-- ============================================
+
+-- ============================================
+-- 1. award_engagement_points - FIXED
+-- ============================================
+DROP FUNCTION IF EXISTS award_engagement_points(UUID, UUID, TEXT, INTEGER);
+
+CREATE OR REPLACE FUNCTION award_engagement_points(
+    p_user_id UUID,
+    p_business_id UUID,
+    p_points INTEGER DEFAULT 10,
+    p_action_type TEXT DEFAULT 'daily_visit',
+    p_description TEXT DEFAULT NULL,
+    p_metadata JSONB DEFAULT '{}'
+)
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_current_points INTEGER;
+    v_tier TEXT;
+BEGIN
+    -- Ensure loyalty record exists for this business
+    INSERT INTO loyalty_points (user_id, business_id, tier, points, points_earned, points_redeemed)
+    VALUES (p_user_id, p_business_id, 'bronze', p_points, p_points, 0)
+    ON CONFLICT (user_id, business_id) DO UPDATE
+    SET 
+        points = loyalty_points.points + p_points,
+        points_earned = loyalty_points.points_earned + p_points,
+        updated_at = NOW()
+    RETURNING points INTO v_current_points;
+    
+    -- Record transaction
+    INSERT INTO loyalty_transactions (
+        user_id, business_id, points_change, current_points,
+        transaction_type, description, metadata
+    ) VALUES (
+        p_user_id, p_business_id, p_points, v_current_points,
+        p_action_type,
+        COALESCE(p_description, 
+            CASE p_action_type
+                WHEN 'spin_win' THEN 'Points for spinning the wheel'
+                WHEN 'trivia_correct' THEN 'Correct trivia answer'
+                WHEN 'trivia_answer' THEN 'Trivia participation'
+                WHEN 'daily_visit' THEN 'Daily visit bonus'
+                WHEN 'draw_entry' THEN 'Entered a prize draw'
+                WHEN 'draw_consolation' THEN 'Consolation points from draw'
+                WHEN 'referral_bonus' THEN 'Referral bonus'
+                ELSE 'Engagement points earned'
+            END
+        ),
+        p_metadata
+    );
+    
+    -- Check and update tier
+    SELECT tier INTO v_tier
+    FROM loyalty_tiers
+    WHERE min_points <= v_current_points
+    ORDER BY min_points DESC
+    LIMIT 1;
+    
+    IF v_tier IS NOT NULL THEN
+        UPDATE loyalty_points
+        SET tier = v_tier, updated_at = NOW()
+        WHERE user_id = p_user_id AND business_id = p_business_id AND tier != v_tier;
+    END IF;
+    
+    RETURN v_current_points;
+END;
+$$;
+
+-- ============================================
+-- 2. get_customer_points_summary - FIXED
+-- ============================================
+DROP FUNCTION IF EXISTS get_customer_points_summary(UUID);
+
+CREATE OR REPLACE FUNCTION get_customer_points_summary(p_user_id UUID)
+RETURNS TABLE (
+    business_id UUID,
+    business_name TEXT,
+    business_slug TEXT,
+    business_logo TEXT,
+    business_color TEXT,
+    points INTEGER,
+    tier TEXT,
+    lifetime_points INTEGER,
+    last_earned_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+STABLE
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        b.id,
+        b.name,
+        b.slug,
+        b.logo_url,
+        b.brand_color,
+        COALESCE(lp.points, 0),
+        COALESCE(lp.tier, 'bronze'),
+        COALESCE(lp.points_earned, 0),
+        lp.updated_at
+    FROM businesses b
+    INNER JOIN customer_business_activations cba ON cba.business_id = b.id
+    LEFT JOIN loyalty_points lp ON lp.user_id = p_user_id AND lp.business_id = b.id
+    WHERE cba.user_id = p_user_id AND cba.is_active = TRUE
+    ORDER BY COALESCE(lp.points, 0) DESC;
+END;
+$$;
+
+-- ============================================
+-- 3. redeem_access_code - FIXED (no changes needed, already correct)
+-- This function uses customer_business_activations and access_codes - both still exist
+-- ============================================
+-- (Keep the existing redeem_access_code function as-is - it's already correct)
+
+-- ============================================
+-- 4. is_user_active_with_business - No changes needed
+-- ============================================
+-- (Keep as-is - uses customer_business_activations which still exists)
+
+-- ============================================
+-- 5. get_user_active_businesses - FIXED (add loyalty info)
+-- ============================================
+DROP FUNCTION IF EXISTS get_user_active_businesses(UUID);
+
+CREATE OR REPLACE FUNCTION get_user_active_businesses(p_user_id UUID)
+RETURNS TABLE (
+    business_id UUID,
+    business_name TEXT,
+    business_slug TEXT,
+    logo_url TEXT,
+    brand_color TEXT,
+    expires_at TIMESTAMPTZ,
+    spins_used INTEGER,
+    is_active BOOLEAN,
+    loyalty_points INTEGER,
+    loyalty_tier TEXT
+)
+LANGUAGE plpgsql
+STABLE
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        b.id,
+        b.name,
+        b.slug,
+        b.logo_url,
+        b.brand_color,
+        cba.expires_at,
+        cba.spins_used,
+        cba.is_active,
+        COALESCE(lp.points, 0),
+        COALESCE(lp.tier, 'bronze')
+    FROM customer_business_activations cba
+    JOIN businesses b ON b.id = cba.business_id
+    LEFT JOIN loyalty_points lp ON lp.user_id = p_user_id AND lp.business_id = b.id
+    WHERE cba.user_id = p_user_id
+    ORDER BY cba.is_active DESC, cba.last_activity_at DESC;
+END;
+$$;
+
+-- ============================================
+-- 6. create_business_loyalty_record - Helper
+-- ============================================
+CREATE OR REPLACE FUNCTION create_business_loyalty_record(
+    p_user_id UUID,
+    p_business_id UUID
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    INSERT INTO loyalty_points (user_id, business_id, tier, points, points_earned, points_redeemed)
+    VALUES (p_user_id, p_business_id, 'bronze', 0, 0, 0)
+    ON CONFLICT (user_id, business_id) DO NOTHING;
+END;
+$$;
+
+-- ============================================
+-- 7. Auto-create loyalty on activation trigger
+-- ============================================
+CREATE OR REPLACE FUNCTION create_loyalty_on_activation()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    PERFORM create_business_loyalty_record(NEW.user_id, NEW.business_id);
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS activation_create_loyalty ON customer_business_activations;
+CREATE TRIGGER activation_create_loyalty
+    AFTER INSERT ON customer_business_activations
+    FOR EACH ROW
+    EXECUTE FUNCTION create_loyalty_on_activation();
+
+-- ============================================
+-- 8. Process referral on activation - FIXED
+-- ============================================
+DROP FUNCTION IF EXISTS process_referral_on_activation(UUID, UUID);
+
+CREATE OR REPLACE FUNCTION process_referral_on_activation(
+    p_user_id UUID,
+    p_business_id UUID
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_referral referrals%ROWTYPE;
+BEGIN
+    -- Find pending referral for this user
+    SELECT * INTO v_referral
+    FROM referrals
+    WHERE referred_user_id = p_user_id
+    AND status = 'joined'
+    AND conversion_type IN ('signup', 'activation')
+    LIMIT 1;
+    
+    IF NOT FOUND THEN RETURN; END IF;
+    
+    -- Mark as completed
+    UPDATE referrals
+    SET status = 'completed',
+        completed_at = NOW(),
+        updated_at = NOW()
+    WHERE id = v_referral.id;
+    
+    -- Award points to referrer using loyalty system
+    PERFORM award_engagement_points(
+        v_referral.referrer_id,
+        p_business_id,
+        COALESCE(v_referral.reward_points, 100),
+        'referral_bonus',
+        'Referral bonus: friend activated their account',
+        jsonb_build_object('referral_id', v_referral.id, 'referred_user_id', p_user_id)
+    );
+END;
+$$;
+
+-- ============================================
+-- 9. Grant permissions
+-- ============================================
+GRANT EXECUTE ON FUNCTION award_engagement_points(UUID, UUID, INTEGER, TEXT, TEXT, JSONB) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_customer_points_summary(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION redeem_access_code(TEXT, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION is_user_active_with_business(UUID, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_user_active_businesses(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION create_business_loyalty_record(UUID, UUID) TO authenticated;

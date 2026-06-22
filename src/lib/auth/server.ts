@@ -1,3 +1,4 @@
+// src/lib/auth/server.ts
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
@@ -41,7 +42,12 @@ export async function requireUser() {
 export async function requireBusinessAdmin(businessSlug: string) {
   const { user, supabase, error } = await requireUser();
   if (error || !user) {
-    return { user: null, business: null, admin: null, error: "Unauthorized" as const };
+    return {
+      user: null,
+      business: null,
+      admin: null,
+      error: "Unauthorized" as const,
+    };
   }
 
   const { data: business } = await supabaseAdmin
@@ -51,7 +57,12 @@ export async function requireBusinessAdmin(businessSlug: string) {
     .single();
 
   if (!business) {
-    return { user, business: null, admin: null, error: "Business not found" as const };
+    return {
+      user,
+      business: null,
+      admin: null,
+      error: "Business not found" as const,
+    };
   }
 
   const { data: admin } = await supabaseAdmin

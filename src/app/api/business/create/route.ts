@@ -1,6 +1,5 @@
 // app/api/business/create/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import {
   businessSignupSchema,
@@ -8,10 +7,7 @@ import {
 } from "@/lib/schemas/business-schema";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createSessionForUser, findUserIdByEmail } from "@/lib/auth/server";
-
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
+import { resend } from "@/lib/limit";
 
 export async function POST(req: NextRequest) {
   try {

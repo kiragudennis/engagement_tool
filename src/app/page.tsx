@@ -177,26 +177,23 @@ export default function LandingPage() {
       {/* ─── NAV ─────────────────────────────────────── */}
       <Header />
       {/* ─── HERO ────────────────────────────────────── */}
-      <section
-  ref={heroRef}
-  className="relative pt-32 pb-24 overflow-hidden"
->
-  {/* Background image with theme-aware overlay */}
-  <div
-    className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-110"
-    style={{ backgroundImage: "url('/images/happy-people-banner.jpg')" }}
-  />
-  
-  {/* Theme-aware overlay - light mode */}
-  <div className="absolute inset-0 bg-white/50 dark:hidden" />
-  
-  {/* Theme-aware overlay - dark mode */}
-  <div className="absolute inset-0 hidden dark:block bg-black/60" />
-  
-  {/* Decorative blur effects */}
-  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-purple-400/20 rounded-full blur-3xl" />
-  <div className="absolute top-1/4 right-0 w-[400px] h-[400px] bg-pink-100 dark:bg-pink-400/20 rounded-full blur-3xl" />
-  
+      <section ref={heroRef} className="relative pt-32 pb-24 overflow-hidden">
+        {/* Background image with theme-aware overlay */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-110"
+          style={{ backgroundImage: "url('/images/happy-people-banner.jpg')" }}
+        />
+
+        {/* Theme-aware overlay - light mode */}
+        <div className="absolute inset-0 bg-white/50 dark:hidden" />
+
+        {/* Theme-aware overlay - dark mode */}
+        <div className="absolute inset-0 hidden dark:block bg-black/60" />
+
+        {/* Decorative blur effects */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-purple-400/20 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 right-0 w-[400px] h-[400px] bg-pink-100 dark:bg-pink-400/20 rounded-full blur-3xl" />
+
         <motion.div
           style={{ opacity: heroOpacity }}
           className="container mx-auto px-4 relative z-10"
@@ -216,7 +213,7 @@ export default function LandingPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white leading-tight"
+                className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight"
               >
                 Customers who play{" "}
                 <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 bg-clip-text text-transparent">
@@ -224,48 +221,48 @@ export default function LandingPage() {
                 </span>
               </motion.h1>
               <motion.p
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ delay: 0.3 }}
-  className="text-lg mt-6 leading-relaxed max-w-lg
-    text-gray-600 dark:text-gray-300"
->
-  Give your customers a reason to return.{' '}
-  <span className="relative inline-block">
-    Spin wheels
-    <motion.span
-      className="absolute bottom-0 left-0 w-full h-[3px] bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
-      initial={{ width: 0 }}
-      animate={{ width: '100%' }}
-      transition={{ delay: 0.8, duration: 0.8 }}
-    />
-  </span>
-  ,{' '}
-  <span className="relative inline-block">
-    trivia nights
-    <motion.span
-      className="absolute bottom-0 left-0 w-full h-[3px] bg-gradient-to-r from-pink-500 to-amber-500 rounded-full"
-      initial={{ width: 0 }}
-      animate={{ width: '100%' }}
-      transition={{ delay: 1.0, duration: 0.8 }}
-    />
-  </span>
-  , and{' '}
-  <span className="relative inline-block">
-    prize draws
-    <motion.span
-      className="absolute bottom-0 left-0 w-full h-[3px] bg-gradient-to-r from-amber-500 to-purple-500 rounded-full"
-      initial={{ width: 0 }}
-      animate={{ width: '100%' }}
-      transition={{ delay: 1.2, duration: 0.8 }}
-    />
-  </span>
-  . You capture their phone and emails.
-  They come back to claim prizes.{' '}
-  <span className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-400 dark:to-pink-400">
-    Everyone wins.
-  </span>
-</motion.p>
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="text-lg mt-6 leading-relaxed max-w-lg
+                font-semibold"
+              >
+                Give your customers a reason to return.{" "}
+                <span className="relative inline-block">
+                  Spin wheels
+                  <motion.span
+                    className="absolute bottom-0 left-0 w-full h-[3px] bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: "100%" }}
+                    transition={{ delay: 0.8, duration: 0.8 }}
+                  />
+                </span>
+                ,{" "}
+                <span className="relative inline-block">
+                  trivia nights
+                  <motion.span
+                    className="absolute bottom-0 left-0 w-full h-[3px] bg-gradient-to-r from-pink-500 to-amber-500 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: "100%" }}
+                    transition={{ delay: 1.0, duration: 0.8 }}
+                  />
+                </span>
+                , and{" "}
+                <span className="relative inline-block">
+                  prize draws
+                  <motion.span
+                    className="absolute bottom-0 left-0 w-full h-[3px] bg-gradient-to-r from-amber-500 to-purple-500 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: "100%" }}
+                    transition={{ delay: 1.2, duration: 0.8 }}
+                  />
+                </span>
+                . You capture their phone and emails. They come back to claim
+                prizes.{" "}
+                <span className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-400 dark:to-pink-400">
+                  Everyone wins.
+                </span>
+              </motion.p>
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -567,14 +564,14 @@ export default function LandingPage() {
                         .filter((f) => f.included)
                         .slice(0, 6)
                         .map((f, j) => (
-                        <li
-                          key={j}
-                          className="flex items-center gap-2 text-sm text-gray-600 dark:text-white/60"
-                        >
-                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                          {f.text}
-                        </li>
-                      ))}
+                          <li
+                            key={j}
+                            className="flex items-center gap-2 text-sm text-gray-600 dark:text-white/60"
+                          >
+                            <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                            {f.text}
+                          </li>
+                        ))}
                     </ul>
                     <Button
                       asChild
@@ -585,7 +582,9 @@ export default function LandingPage() {
                           : "bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 text-gray-900 dark:text-white",
                       )}
                     >
-                      <Link href={`/business/signup?plan=${plan.id}`}>Start Free Trial</Link>
+                      <Link href={`/business/signup?plan=${plan.id}`}>
+                        Start Free Trial
+                      </Link>
                     </Button>
                   </CardContent>
                 </Card>

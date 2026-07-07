@@ -43,6 +43,7 @@ CREATE TABLE businesses (
 ALTER TABLE businesses ADD COLUMN IF NOT EXISTS last_payment_at TIMESTAMPTZ;
 ALTER TABLE businesses ADD COLUMN IF NOT EXISTS next_billing_at TIMESTAMPTZ;
 ALTER TABLE businesses ADD COLUMN IF NOT EXISTS payment_method TEXT CHECK (payment_method IN ('mpesa', 'paystack', 'card', 'none'));
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS type TEXT CHECK (type IN ('retail', 'restaurant', 'service', 'event', 'other')) DEFAULT 'retail';
 
 -- Payment transactions
 CREATE TABLE IF NOT EXISTS business_payments (
@@ -52,7 +53,7 @@ CREATE TABLE IF NOT EXISTS business_payments (
     amount NUMERIC NOT NULL,
     currency TEXT DEFAULT 'USD',
     plan TEXT NOT NULL,
-    billing_cycle TEXT CHECK (billing_cycle IN ('monthly', 'annual')),
+    billing_cycle TEXT CHECK (billing_cycle IN ('monthly', 'annual', 'one_time')) DEFAULT 'monthly',
     
     payment_method TEXT NOT NULL CHECK (payment_method IN ('mpesa', 'paypal', 'card')),
     payment_reference TEXT,

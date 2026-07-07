@@ -96,13 +96,6 @@ export async function proxy(request: NextRequest) {
         return NextResponse.redirect(billingUrl);
       }
     }
-
-    if (user && !path.startsWith("/api")) {
-      await supabaseAdmin.from("page_views").insert({
-        path,
-        user_id: user.id,
-      });
-    }
   } catch (error) {
     console.error("Middleware error:", error);
   }

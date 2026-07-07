@@ -1,4 +1,9 @@
-import { getPaystackPlanCode, getPriceKes, PLANS } from "@/lib/config/plans";
+import {
+  EARLY_ACCESS_PLANS,
+  getPaystackPlanCode,
+  getPriceKes,
+  PLANS,
+} from "@/lib/config/plans";
 
 const PAYSTACK_API = "https://api.paystack.co";
 
@@ -11,11 +16,27 @@ function paystackHeaders() {
 
 export function getSubscriptionAmountKes(
   plan: string,
-  cycle: "monthly" | "annual",
+  cycle: "monthly" | "annual" | "lifetime",
 ): number {
-  const def = PLANS.find((p) => p.id === plan);
-  if (!def) return 0;
+  let def: any = PLANS.find((p) => p.id === plan);
+
+  if (!def) {
+    def = EARLY_ACCESS_PLANS.find((p) => p.id === plan);
+  }
+
+  if (!def) {
+    return 0;
+  }
+
   return cycle === "annual" ? def.priceKes * 10 : def.priceKes;
+}
+
+export async function getLifetimeAmountKes(plan: string): Promise<number> {
+  const def = EARLY_ACCESS_PLANS.find((p) => p.id === plan);
+  if (!def) {
+    return 0;
+  }
+  return def.priceKes;
 }
 
 export async function paystackCreateCustomer(email: string, name: string) {
@@ -70,7 +91,7 @@ export async function paystackInitializeTransaction(params: {
 
 export function resolvePaystackPlanCode(
   plan: string,
-  cycle: "monthly" | "annual",
+  cycle: "monthly" | "annual" | "lifetime",
 ): string | undefined {
   return getPaystackPlanCode(plan, cycle);
 }

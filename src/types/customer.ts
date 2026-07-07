@@ -93,6 +93,7 @@ export interface ProfileData {
   business_name?: string;
   business_type?: string;
   business_customer?: boolean;
+  business_slug?: string;
 
   // preferences
   receive_offers?: boolean;

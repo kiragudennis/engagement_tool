@@ -1,6 +1,5 @@
 // app/api/billing/mpesa/subscribe/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireBusinessAdmin } from "@/lib/auth/server";
 import {
@@ -10,20 +9,26 @@ import {
   paystackInitializeTransaction,
   resolvePaystackPlanCode,
 } from "@/lib/services/paystack";
-
-const schema = z.object({
-  businessId: z.string().uuid(),
-  plan: z.enum(["starter", "pro", "enterprise"]),
-  billingCycle: z.enum(["monthly", "annual"]),
-  email: z.string().email(),
-  fullName: z.string().min(1),
-});
+import { checkBotId } from "botid/server";
+import { secureRatelimit } from "@/lib/limit";
+import { schema } from "@/lib/utils";
 
 export async function POST(req: NextRequest) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
+  const { success } = await secureRatelimit(req);
+  if (!success) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+
   try {
     const body = await req.json();
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
+      console.log("Validation failed:", parsed.error.flatten().fieldErrors);
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
@@ -44,13 +49,25 @@ export async function POST(req: NextRequest) {
 
     const auth = await requireBusinessAdmin(business.slug);
     if (auth.error) {
+      console.log("Authorization failed:", auth.error);
       return NextResponse.json({ error: auth.error }, { status: 403 });
     }
 
     const amountKes = getSubscriptionAmountKes(plan, billingCycle);
     const planCode = resolvePaystackPlanCode(plan, billingCycle);
 
-    const { data: payment } = await supabaseAdmin
+    console.log(
+      "Creating payment record for business:",
+      businessId,
+      "plan:",
+      plan,
+      "billingCycle:",
+      billingCycle,
+      "amountKes:",
+      amountKes,
+    );
+
+    const { data: payment, error: bsError } = await supabaseAdmin
       .from("business_payments")
       .insert({
         business_id: businessId,
@@ -63,6 +80,8 @@ export async function POST(req: NextRequest) {
       })
       .select()
       .single();
+
+    console.log("Payment record created:", payment, "Error:", bsError);
 
     const customerRes = await paystackCreateCustomer(email, fullName);
     const customerCode =

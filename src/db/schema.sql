@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
     home_business_id UUID REFERENCES businesses(id),
     created_via_code_id UUID REFERENCES access_codes(id),
     onboarding_completed BOOLEAN DEFAULT FALSE,
+
     
     -- Account status (for 30-day activation)
     status TEXT DEFAULT 'inactive' CHECK (status IN ('active', 'inactive', 'suspended', 'banned')),
@@ -41,6 +42,16 @@ CREATE INDEX IF NOT EXISTS idx_users_status_active ON users(status) WHERE status
 CREATE INDEX IF NOT EXISTS idx_users_home_business ON users(home_business_id);
 CREATE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code);
 CREATE INDEX IF NOT EXISTS idx_users_referred_by ON users(referred_by);
+
+-- Add new columns for users
+-- Add new columns for users
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS business_slug TEXT REFERENCES businesses(slug) ON DELETE SET NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS business_name TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS business_type TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS receive_offers BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS receive_newsletter BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS country TEXT;
 
 -- ============================================
 -- 2. REFERRALS TABLE (simplified for business context)

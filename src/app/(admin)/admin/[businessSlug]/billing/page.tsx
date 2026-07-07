@@ -86,17 +86,14 @@ export default function AdminBillingPage() {
   const router = useRouter();
   const { supabase, profile } = useAuth();
 
-  // Check if coming from signup flow
+  // Check if coming from signup flow with plan params
   const planParam = searchParams.get("plan") || "";
   const businessIdParam = searchParams.get("businessId") || "";
-  const isNewSetup = !!planParam && !!businessIdParam;
-  const isEarlyBird = planParam.startsWith("early-");
+  const isSignupFlow = !!planParam && !!businessIdParam;
 
-  const [loading, setLoading] = useState(!isNewSetup);
+  const [loading, setLoading] = useState(true);
   const [business, setBusiness] = useState<any>(null);
-  const [step, setStep] = useState<"billing" | "checkout" | "done">(
-    isNewSetup ? "checkout" : "billing",
-  );
+  const [step, setStep] = useState<"billing" | "checkout" | "done">("billing");
   const [selectedPlan, setSelectedPlan] = useState<string>(planParam || "pro");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">(
     "monthly",
@@ -106,8 +103,9 @@ export default function AdminBillingPage() {
   const [processing, setProcessing] = useState(false);
   const [codeCount, setCodeCount] = useState(0);
 
-  // Determine plan
-  const earlyBirdPlan = isEarlyBird ? EARLY_BIRD_PLANS[planParam] : null;
+  // Determine plan type
+  const isEarlyBird = selectedPlan.startsWith("early-");
+  const earlyBirdPlan = isEarlyBird ? EARLY_BIRD_PLANS[selectedPlan] : null;
   const monthlyPlan = !isEarlyBird
     ? MONTHLY_PLANS[selectedPlan] || MONTHLY_PLANS.pro
     : null;
@@ -125,10 +123,10 @@ export default function AdminBillingPage() {
       minimumFractionDigits: 0,
     }).format(amount);
 
-  // Load business data
+  // ─── Load business ────────────────────────────────────
   useEffect(() => {
     const load = async () => {
-      const slug = window.location.pathname.split("/")[2]; // Extract slug from URL
+      const slug = window.location.pathname.split("/")[2];
       if (!slug) return;
 
       const { data: biz } = await supabase
@@ -143,7 +141,7 @@ export default function AdminBillingPage() {
       }
       setBusiness(biz);
 
-      if (!isNewSetup) {
+      if (!isSignupFlow) {
         setSelectedPlan(biz.plan !== "trial" ? biz.plan : "pro");
         const { count } = await supabase
           .from("access_codes")
@@ -152,11 +150,17 @@ export default function AdminBillingPage() {
         setCodeCount(count || 0);
       }
 
+      // If coming from signup, show checkout immediately
+      if (isSignupFlow) {
+        setStep("checkout");
+      }
+
       setLoading(false);
     };
     load();
-  }, [supabase, router, isNewSetup]);
+  }, [supabase, router, isSignupFlow]);
 
+  // ─── Handle Payment ───────────────────────────────────
   const handlePay = async () => {
     if (!business || !profile) return;
     setProcessing(true);
@@ -168,7 +172,7 @@ export default function AdminBillingPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             businessId: business.id,
-            plan: isEarlyBird ? planParam : selectedPlan,
+            plan: selectedPlan,
             billingCycle: isEarlyBird ? "lifetime" : billingCycle,
             email: profile.email,
             fullName: profile.full_name || profile.email,
@@ -193,7 +197,7 @@ export default function AdminBillingPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             businessId: business.id,
-            plan: isEarlyBird ? planParam : selectedPlan,
+            plan: selectedPlan,
             billingCycle: isEarlyBird ? "lifetime" : billingCycle,
             phoneNumber,
             isEarlyBird,
@@ -211,6 +215,12 @@ export default function AdminBillingPage() {
     }
   };
 
+  // ─── Navigate to checkout ─────────────────────────────
+  const goToCheckout = (planId: string) => {
+    setSelectedPlan(planId);
+    setStep("checkout");
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-950">
@@ -224,6 +234,7 @@ export default function AdminBillingPage() {
     business?.engagements_this_month ?? business?.spins_this_month ?? 0;
   const isTrial = business?.subscription_status === "trial";
   const isActive = business?.subscription_status === "active";
+  const PlanIcon = isEarlyBird ? earlyBirdPlan?.icon : Sparkles;
 
   // ─── Done State ───────────────────────────────────────
   if (step === "done") {
@@ -255,15 +266,20 @@ export default function AdminBillingPage() {
     );
   }
 
-  // ─── Checkout View (for new signups with early bird) ──
-  if (step === "checkout" && isNewSetup) {
-    const PlanIcon = isEarlyBird ? earlyBirdPlan?.icon : Sparkles;
-
+  // ─── Checkout View ────────────────────────────────────
+  if (step === "checkout") {
     return (
       <div className="min-h-screen bg-gray-950">
         <div className="border-b border-white/10 bg-black/50 backdrop-blur">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setStep("billing")}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
               <div
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
                 style={{ backgroundColor: business?.brand_color || "#8B5CF6" }}
@@ -271,7 +287,9 @@ export default function AdminBillingPage() {
                 {business?.name?.[0]}
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">Complete Setup</h1>
+                <h1 className="text-xl font-bold text-white">
+                  {isSignupFlow ? "Complete Setup" : "Checkout"}
+                </h1>
                 <p className="text-white/40 text-sm">{business?.name}</p>
               </div>
             </div>
@@ -290,7 +308,7 @@ export default function AdminBillingPage() {
                     : "bg-purple-500/5 border-purple-500/20",
                 )}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div
                       className={cn(
@@ -327,6 +345,32 @@ export default function AdminBillingPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* Billing cycle toggle for monthly plans */}
+                {!isEarlyBird && (
+                  <div className="flex gap-2">
+                    <Button
+                      variant={
+                        billingCycle === "monthly" ? "default" : "outline"
+                      }
+                      size="sm"
+                      onClick={() => setBillingCycle("monthly")}
+                      className="flex-1"
+                    >
+                      Monthly
+                    </Button>
+                    <Button
+                      variant={
+                        billingCycle === "annual" ? "default" : "outline"
+                      }
+                      size="sm"
+                      onClick={() => setBillingCycle("annual")}
+                      className="flex-1"
+                    >
+                      Annual (Save 17%)
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {/* Payment Method */}
@@ -392,15 +436,17 @@ export default function AdminBillingPage() {
               </p>
 
               {/* Skip for trial */}
-              <div className="text-center pt-4 border-t border-white/10">
-                <Button
-                  variant="ghost"
-                  onClick={() => router.push(`/admin/${business?.slug}`)}
-                  className="text-white/40 hover:text-white/60"
-                >
-                  Skip for now — start 14-day free trial
-                </Button>
-              </div>
+              {isSignupFlow && (
+                <div className="text-center pt-4 border-t border-white/10">
+                  <Button
+                    variant="ghost"
+                    onClick={() => router.push(`/admin/${business?.slug}`)}
+                    className="text-white/40 hover:text-white/60"
+                  >
+                    Skip for now — start 14-day free trial
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -444,7 +490,7 @@ export default function AdminBillingPage() {
         {/* Early Bird Lifetime Deals */}
         {isTrial && (
           <Card className="bg-gradient-to-r from-amber-500/5 to-yellow-500/5 border-amber-500/20">
-            <CardContent className="p-6">
+            <CardContent>
               <div className="flex items-center gap-2 mb-4">
                 <Flame className="h-5 w-5 text-amber-400" />
                 <h2 className="text-white font-semibold text-lg">
@@ -458,7 +504,7 @@ export default function AdminBillingPage() {
                 Pay once, use forever. Lock in your price before these deals are
                 gone.
               </p>
-              <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="grid sm:grid-cols-3 gap-3 mb-4">
                 {[
                   {
                     id: "early-bronze",
@@ -485,10 +531,7 @@ export default function AdminBillingPage() {
                 ].map((eb) => (
                   <button
                     key={eb.id}
-                    onClick={() => {
-                      setSelectedPlan(eb.id);
-                      setStep("checkout");
-                    }}
+                    onClick={() => goToCheckout(eb.id)}
                     className={cn(
                       "p-4 rounded-xl border-2 text-center transition-all hover:scale-105",
                       eb.color,
@@ -520,6 +563,40 @@ export default function AdminBillingPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Monthly Plans */}
+        <Card className="bg-white/5 border-white/10">
+          <CardContent>
+            <h2 className="text-white font-semibold text-lg mb-4">
+              Monthly Plans
+            </h2>
+            <div className="grid sm:grid-cols-3 gap-3 mb-6">
+              {Object.entries(MONTHLY_PLANS).map(([id, plan]) => (
+                <button
+                  key={id}
+                  onClick={() => goToCheckout(id)}
+                  className={cn(
+                    "p-4 rounded-xl border-2 text-left transition-all",
+                    selectedPlan === id
+                      ? "border-purple-500 bg-purple-500/10"
+                      : "border-white/10 bg-white/5 hover:border-white/20",
+                  )}
+                >
+                  <p className="text-white font-bold">{plan.name}</p>
+                  <p className="text-white/60 text-sm mt-1">
+                    KES {plan.monthlyKes.toLocaleString()}/mo
+                  </p>
+                  <p className="text-white/30 text-xs">
+                    or KES {plan.annualKes.toLocaleString()}/mo billed annually
+                  </p>
+                </button>
+              ))}
+            </div>
+            <a href="/pricing" className="ext-sm hover:underline">
+              See full comparison →
+            </a>
+          </CardContent>
+        </Card>
 
         {/* Current Plan */}
         <Card className="bg-white/5 border-white/10">

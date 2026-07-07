@@ -5,6 +5,7 @@ import { supabaseAdmin } from "./supabase/admin";
 import { Resend } from "resend";
 import { createClient } from "./supabase/server";
 import { getPaystackPlanCode } from "./config/plans";
+import axios from "axios";
 
 // ✅ Shared Redis instance
 export const redis = new Redis({
@@ -272,3 +273,29 @@ export async function processEmailQueue(): Promise<{
 }
 
 export const getPlanCode = getPaystackPlanCode;
+
+export const generateToken = async () => {
+  const secret = process.env.MPESA_CONSUMER_SECRET;
+  const key = process.env.MPESA_CONSUMER_KEY;
+  const auth = Buffer.from(key + ":" + secret).toString("base64");
+  try {
+    const response = await fetch(
+      "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials",
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Basic ${auth}`,
+        },
+      },
+    );
+
+    // Parse response body as JSON and read access_token
+    const json = await response.json();
+    const token = json.access_token;
+
+    return token;
+  } catch (error) {
+    console.log("Token Error generated", error);
+    throw error; // Re-throw the error to handle it in the calling function
+  }
+};

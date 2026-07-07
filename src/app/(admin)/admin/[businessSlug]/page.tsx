@@ -149,7 +149,7 @@ export default function BusinessAdminDashboard() {
     loadDashboard();
   }, [loadDashboard]);
 
-  const publicUrl = `engagespin.com/${businessSlug}/spin`;
+  const publicUrl = `engagespin.com/${businessSlug}/code-entry`;
 
   if (loading) {
     return (
@@ -289,7 +289,7 @@ export default function BusinessAdminDashboard() {
 
         {/* Main Tabs */}
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="bg-white/5 border border-white/10">
+          <TabsList className="flex bg-white/5 border border-white/10 overflow-x-auto">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="spin">Spin Game</TabsTrigger>
             <TabsTrigger value="codes">Access Codes</TabsTrigger>
@@ -304,7 +304,7 @@ export default function BusinessAdminDashboard() {
                 <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
                   <QrCode className="h-5 w-5" /> Your Public Page
                 </h3>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                   <code className="flex-1 p-3 rounded-lg bg-black/30 text-yellow-400 font-mono text-sm">
                     {publicUrl}
                   </code>

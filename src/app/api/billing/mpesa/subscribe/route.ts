@@ -1,28 +1,48 @@
 // app/api/billing/mpesa/subscribe/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireBusinessAdmin } from "@/lib/auth/server";
-import {
-  activateBusinessSubscription,
-  getSubscriptionAmountKes,
-} from "@/lib/services/paystack";
+import { getSubscriptionAmountKes } from "@/lib/services/paystack";
+import { checkBotId } from "botid/server";
+import { generateToken, secureRatelimit } from "@/lib/limit";
+import { schema } from "@/lib/utils";
 
 const MPESA_API = "https://api.safaricom.co.ke";
-
-const schema = z.object({
-  businessId: z.string().uuid(),
-  plan: z.enum(["starter", "pro", "enterprise"]),
-  billingCycle: z.enum(["monthly", "annual"]),
-  phoneNumber: z.string().min(9),
-});
 
 async function mpesaSTKPush(
   amountKes: number,
   phoneNumber: string,
   paymentId: string,
   plan: string,
+  token: string,
 ) {
+  // Convert currency to KES if needed (using totals.total)
+  // let amountKES = totals.total;
+  // const currency = totals.currency || "KES"; // Assuming currency is in totals
+
+  // if (currency !== "KES") {
+  //   try {
+  //     const access_key = process.env.EXCHANGE_API_KEY;
+  //     const endpoint = process.env.ENDPOINT;
+
+  //     const res = await fetch(
+  //       `https://api.exchangerate.host/${endpoint}?access_key=${access_key}&from=${currency}&to=KES&amount=${amountKES}`,
+  //       { next: { revalidate: 3600 * 12 } },
+  //     );
+  //     const json = await res.json();
+  //     const rate = json.result;
+
+  //     if (!rate) throw new Error("Rate missing");
+  //     amountKES = Math.round(rate);
+  //   } catch (err) {
+  //     console.error(
+  //       "Exchange rate fetch failed, defaulting to hardcoded rate",
+  //       err,
+  //     );
+  //     amountKES = Math.round(totals.total * 131); // fallback
+  //   }
+  // }
+
   const timestamp = new Date()
     .toISOString()
     .replace(/[-:T.]/g, "")
@@ -30,16 +50,6 @@ async function mpesaSTKPush(
   const password = Buffer.from(
     `${process.env.MPESA_SHORTCODE}${process.env.MPESA_PASSKEY}${timestamp}`,
   ).toString("base64");
-
-  const auth = Buffer.from(
-    `${process.env.MPESA_CONSUMER_KEY}:${process.env.MPESA_CONSUMER_SECRET}`,
-  ).toString("base64");
-
-  const tokenRes = await fetch(
-    `${MPESA_API}/oauth/v1/generate?grant_type=client_credentials`,
-    { headers: { Authorization: `Basic ${auth}` } },
-  );
-  const { access_token } = await tokenRes.json();
 
   const formattedPhone = phoneNumber
     .replace(/\s/g, "")
@@ -49,7 +59,7 @@ async function mpesaSTKPush(
   const stkRes = await fetch(`${MPESA_API}/mpesa/stkpush/v1/processrequest`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${access_token}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -61,7 +71,7 @@ async function mpesaSTKPush(
       PartyA: formattedPhone,
       PartyB: process.env.MPESA_SHORTCODE,
       PhoneNumber: formattedPhone,
-      CallBackURL: `${process.env.NEXT_PUBLIC_URL}/api/webhooks/mpesa/subscription`,
+      CallBackURL: `${process.env.NEXT_PUBLIC_SITE_LIVE_URL}/api/webhooks/mpesa/subscription`,
       AccountReference: `ENGAGE-${plan}`,
       TransactionDesc: `Engage ${plan} subscription`,
     }),
@@ -71,10 +81,22 @@ async function mpesaSTKPush(
 }
 
 export async function POST(req: NextRequest) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
+  const { success } = await secureRatelimit(req);
+  if (!success) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
   try {
     const body = await req.json();
+    console.log("Received M-Pesa subscription request:", body);
+
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
+      console.error("Validation failed:", parsed.error.flatten().fieldErrors);
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
@@ -100,7 +122,7 @@ export async function POST(req: NextRequest) {
 
     const amountKes = getSubscriptionAmountKes(plan, billingCycle);
 
-    const { data: payment } = await supabaseAdmin
+    const { data: payment, error: errorPayment } = await supabaseAdmin
       .from("business_payments")
       .insert({
         business_id: businessId,
@@ -115,11 +137,23 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
 
+    console.log("Created payment record:", payment, "Error:", errorPayment);
+
+    if (!payment) {
+      return NextResponse.json(
+        { error: "Failed to create payment record" },
+        { status: 500 },
+      );
+    }
+
+    const token = await generateToken();
+
     const { response: stkResponse, formattedPhone } = await mpesaSTKPush(
       amountKes,
       phoneNumber,
       payment!.id,
       plan,
+      token,
     );
 
     if (stkResponse.CheckoutRequestID) {

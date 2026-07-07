@@ -154,9 +154,9 @@ export default function BusinessSettingsPage() {
     setLoading(false);
   }, [businessSlug, supabase, router]);
 
-  //   useEffect(() => {
-  //     loadData();
-  //   }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // ─── Save Settings ────────────────────────────────────
   const handleSave = async () => {
@@ -317,28 +317,33 @@ export default function BusinessSettingsPage() {
 
       <div className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="bg-white/5 border border-white/10 mb-6">
-            <TabsTrigger value="general">
-              <Store className="h-4 w-4 mr-2" />
-              General
-            </TabsTrigger>
-            <TabsTrigger value="branding">
-              <Palette className="h-4 w-4 mr-2" />
-              Branding
-            </TabsTrigger>
-            <TabsTrigger value="engagement">
-              <Users className="h-4 w-4 mr-2" />
-              Engagement
-            </TabsTrigger>
-            <TabsTrigger value="team">
-              <Users className="h-4 w-4 mr-2" />
-              Team
-            </TabsTrigger>
-            <TabsTrigger value="danger">
-              <AlertTriangle className="h-4 w-4 mr-2" />
-              Danger
-            </TabsTrigger>
-          </TabsList>
+          {/* Scrollable wrapper */}
+          <div className="relative w-full">
+            <div className="overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+              <TabsList className="bg-white/5 border border-white/10 mb-6 inline-flex w-max min-w-full">
+                <TabsTrigger value="general" className="flex-shrink-0">
+                  <Store className="h-4 w-4 mr-2" />
+                  General
+                </TabsTrigger>
+                <TabsTrigger value="branding" className="flex-shrink-0">
+                  <Palette className="h-4 w-4 mr-2" />
+                  Branding
+                </TabsTrigger>
+                <TabsTrigger value="engagement" className="flex-shrink-0">
+                  <Users className="h-4 w-4 mr-2" />
+                  Engagement
+                </TabsTrigger>
+                <TabsTrigger value="team" className="flex-shrink-0">
+                  <Users className="h-4 w-4 mr-2" />
+                  Team
+                </TabsTrigger>
+                <TabsTrigger value="danger" className="flex-shrink-0">
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Danger
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          </div>
 
           {/* ─── GENERAL ──────────────────────────────────── */}
           <TabsContent value="general" className="space-y-6">

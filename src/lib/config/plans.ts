@@ -2,8 +2,15 @@ import { Sparkles, Crown, Zap, type LucideIcon } from "lucide-react";
 
 export const KES_TO_USD_RATE = 129;
 
-export type PlanId = "trial" | "starter" | "pro" | "enterprise";
-export type BillingCycle = "monthly" | "annual";
+export type PlanId =
+  | "trial"
+  | "starter"
+  | "pro"
+  | "enterprise"
+  | "early_bronze"
+  | "early_silver"
+  | "early_gold";
+export type BillingCycle = "monthly" | "annual" | "lifetime";
 
 export interface PlanLimits {
   maxEngagementsPerMonth: number;
@@ -40,7 +47,14 @@ export interface PlanDefinition {
   paystackPlanCodes: {
     monthly: string;
     annual: string;
+    lifetime?: string;
   };
+}
+
+export interface EarlyAccessPlanDefinition {
+  id: PlanId;
+  name: string;
+  priceKes: number;
 }
 
 const UNLIMITED = 999;
@@ -97,6 +111,48 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     maxTriviaQuestions: UNLIMITED,
     maxCodes: UNLIMITED,
     maxAdminUsers: 10,
+    canRemoveBranding: true,
+    canUseCustomDomain: true,
+    hasApiAccess: true,
+    hasAnalytics: true,
+  },
+  early_bronze: {
+    maxEngagementsPerMonth: 1000,
+    maxSpinGames: 1,
+    maxTriviaChallenges: 1,
+    maxActiveDraws: 1,
+    maxPrizeSlots: 6,
+    maxTriviaQuestions: 20,
+    maxCodes: 10,
+    maxAdminUsers: 1,
+    canRemoveBranding: false,
+    canUseCustomDomain: false,
+    hasApiAccess: false,
+    hasAnalytics: false,
+  },
+  early_silver: {
+    maxEngagementsPerMonth: 5000,
+    maxSpinGames: 3,
+    maxTriviaChallenges: 3,
+    maxActiveDraws: 3,
+    maxPrizeSlots: 12,
+    maxTriviaQuestions: 100,
+    maxCodes: 50,
+    maxAdminUsers: 3,
+    canRemoveBranding: true,
+    canUseCustomDomain: true,
+    hasApiAccess: false,
+    hasAnalytics: true,
+  },
+  early_gold: {
+    maxEngagementsPerMonth: 10000,
+    maxSpinGames: 5,
+    maxTriviaChallenges: 5,
+    maxActiveDraws: 5,
+    maxPrizeSlots: 18,
+    maxTriviaQuestions: 200,
+    maxCodes: 100,
+    maxAdminUsers: 5,
     canRemoveBranding: true,
     canUseCustomDomain: true,
     hasApiAccess: true,
@@ -207,6 +263,24 @@ export const PLANS: PlanDefinition[] = [
   },
 ];
 
+export const EARLY_ACCESS_PLANS: EarlyAccessPlanDefinition[] = [
+  {
+    id: "early_bronze",
+    name: "Early Bronze",
+    priceKes: 2999,
+  },
+  {
+    id: "early_silver",
+    name: "Early Silver",
+    priceKes: 6999,
+  },
+  {
+    id: "early_gold",
+    name: "Early Gold",
+    priceKes: 14999,
+  },
+];
+
 export function getPlanLimits(plan: string): PlanLimits {
   return PLAN_LIMITS[plan as PlanId] || PLAN_LIMITS.trial;
 }
@@ -215,14 +289,16 @@ export function getPaystackPlanCode(
   plan: string,
   cycle: BillingCycle,
 ): string | undefined {
-  const def = PLANS.find((p) => p.id === plan);
+  let def: any = PLANS.find((p) => p.id === plan);
+
+  if (!def) {
+    def = EARLY_ACCESS_PLANS.find((p) => p.id === plan);
+  }
+
   return def?.paystackPlanCodes[cycle];
 }
 
-export function getPriceKes(
-  plan: PlanDefinition,
-  cycle: BillingCycle,
-): number {
+export function getPriceKes(plan: PlanDefinition, cycle: BillingCycle): number {
   return cycle === "annual"
     ? Math.round((plan.priceKes * 10) / 12)
     : plan.priceKes;

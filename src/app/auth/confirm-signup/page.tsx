@@ -324,7 +324,7 @@ export default function ConfirmSignupPage() {
                       international
                       defaultCountry="KE"
                       value={phone}
-                      onChange={(value) => setPhone(value ?? "")}
+                      onChange={(value: string) => setPhone(value ?? "")}
                       placeholder="712 345 678"
                       disabled={submitting}
                       className={cn(

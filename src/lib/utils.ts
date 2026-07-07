@@ -7,6 +7,7 @@ import {
   ShippingCalculationResult,
 } from "@/types/store";
 import axios from "axios";
+import z from "zod";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -72,6 +73,25 @@ export function formatPhoneNumber(phone: string): string {
     return "+" + digits; // Assume it's already in international format
   }
 }
+
+export const schema = z.object({
+  email: z.email(),
+  fullName: z.string().min(1),
+  businessId: z.uuid(),
+  plan: z.enum([
+    "starter",
+    "pro",
+    "enterprise",
+    "early-bronze",
+    "early-silver",
+    "early-gold",
+    "early_bronze",
+    "early_silver",
+    "early_gold",
+  ]),
+  billingCycle: z.enum(["monthly", "annual", "lifetime"]),
+  phoneNumber: z.string().min(9),
+});
 
 export function calculateOrderTotals(
   cartItems: CartItem[],

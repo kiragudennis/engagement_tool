@@ -1,15 +1,25 @@
 // app/api/business/create/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import {
   businessSignupSchema,
   generateSlug,
 } from "@/lib/schemas/business-schema";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createSessionForUser, findUserIdByEmail } from "@/lib/auth/server";
-import { resend } from "@/lib/limit";
+import { resend, secureRatelimit } from "@/lib/limit";
+import { checkBotId } from "botid/server";
 
 export async function POST(req: NextRequest) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
+  const { success } = await secureRatelimit(req);
+  if (!success) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+
   try {
     const body = await req.json();
 
@@ -68,19 +78,6 @@ export async function POST(req: NextRequest) {
       userId = existingId;
     }
 
-    // Ensure user exists in public.users
-    await supabaseAdmin.from("users").upsert(
-      {
-        id: userId,
-        email,
-        full_name: fullName,
-        role: "customer",
-        status: "active",
-        onboarding_completed: false,
-      },
-      { onConflict: "id" },
-    );
-
     // Create business
     const { data: business, error: businessError } = await supabaseAdmin
       .from("businesses")
@@ -109,6 +106,22 @@ export async function POST(req: NextRequest) {
     }
 
     console.log("Business created successfully:", business);
+
+    // Ensure user exists in public.users
+    await supabaseAdmin.from("users").upsert(
+      {
+        id: userId,
+        email,
+        full_name: fullName,
+        role: "business",
+        status: "active",
+        business_name: business.name,
+        business_type: business.type,
+        business_slug: business.slug,
+        onboarding_completed: true,
+      },
+      { onConflict: "id" },
+    );
 
     // Add user as owner
     await supabaseAdmin.from("business_admins").insert({

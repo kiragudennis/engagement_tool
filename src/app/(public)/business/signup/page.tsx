@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/lib/context/AuthContext";
 
 function generateSlug(name: string): string {
   return name
@@ -41,8 +42,11 @@ export default function BusinessSignupPage() {
   });
   const [businessSlug, setBusinessSlug] = useState("");
   const searchParams = useSearchParams();
+  const planParam = searchParams.get("plan") || "";
+  const isEarlyBird = planParam.startsWith("early-");
   const router = useRouter();
   const [businessId, setBusinessId] = useState<string | null>(null);
+  const { profile } = useAuth();
 
   const handleSubmit = async () => {
     if (!formData.businessName.trim()) {
@@ -99,11 +103,14 @@ export default function BusinessSignupPage() {
     }
   };
 
+  // redirect logged-in users to dashboard
+  if (profile && profile.role === "business" && profile.business_slug) {
+    router.push(`/admin/${profile.business_slug}`);
+    return null;
+  }
+
   // ─── Done State ───────────────────────────────────────
   if (step === "done") {
-    const planParam = searchParams.get("plan") || "";
-    const isEarlyBird = planParam.startsWith("early-");
-
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 flex items-center justify-center p-4">
         <motion.div

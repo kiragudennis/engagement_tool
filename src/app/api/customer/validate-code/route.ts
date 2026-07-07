@@ -36,22 +36,26 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const business = codeData.businesses as {
+    const business = (codeData.businesses as unknown as {
       id: string;
       name: string;
       slug: string;
       logo_url: string | null;
       brand_color: string;
-    };
+    }[])
+      ? Array.isArray(codeData.businesses)
+        ? codeData.businesses[0]
+        : codeData.businesses
+      : null;
 
     const result: Record<string, unknown> = {
-      business_name: business.name,
-      business_slug: business.slug,
-      business_logo: business.logo_url,
-      business_color: business.brand_color,
+      business_name: business?.name,
+      business_slug: business?.slug,
+      business_logo: business?.logo_url,
+      business_color: business?.brand_color,
       unlocks: codeData.unlocks,
       code: codeData.code,
-      redirect_url: `/${business.slug}/spin`,
+      redirect_url: `/${business?.slug}/spin`,
     };
 
     if (codeData.unlocks === "draw" || codeData.unlocks === "both") {
@@ -66,7 +70,7 @@ export async function GET(req: NextRequest) {
         result.draw_name = draw.name;
         result.draw_prize = draw.prize_name;
         result.draw_ends_at = draw.entry_ends_at;
-        result.redirect_url = `/${business.slug}/draw/${draw.id}`;
+        result.redirect_url = `/${business?.slug}/draw/${draw.id}`;
       }
     }
 
@@ -74,7 +78,7 @@ export async function GET(req: NextRequest) {
       const { data: challenge } = await supabaseAdmin
         .from("challenges")
         .select("id, name, starts_at")
-        .eq("business_id", business.id)
+        .eq("business_id", business?.id)
         .eq("challenge_type", "trivia")
         .in("status", ["active", "live"])
         .order("starts_at", { ascending: false })
@@ -84,7 +88,7 @@ export async function GET(req: NextRequest) {
       if (challenge) {
         result.trivia_name = challenge.name;
         result.trivia_time = challenge.starts_at;
-        result.redirect_url = `/${business.slug}/trivia/${challenge.id}`;
+        result.redirect_url = `/${business?.slug}/trivia/${challenge.id}`;
       }
     }
 
@@ -98,6 +102,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     console.error("Validate code error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

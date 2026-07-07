@@ -2,7 +2,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
 function generateSlug(name: string): string {
   return name
@@ -31,7 +31,6 @@ function generateSlug(name: string): string {
 }
 
 export default function BusinessSignupPage() {
-  const router = useRouter();
   const [step, setStep] = useState<"form" | "creating" | "done">("form");
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -41,6 +40,9 @@ export default function BusinessSignupPage() {
     password: "",
   });
   const [businessSlug, setBusinessSlug] = useState("");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [businessId, setBusinessId] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     if (!formData.businessName.trim()) {
@@ -87,6 +89,7 @@ export default function BusinessSignupPage() {
         throw new Error(data.error || "Failed to create business");
       }
 
+      setBusinessId(data.business.id);
       setBusinessSlug(data.business.slug);
       setStep("done");
       toast.success("Business created! Check your email for details.");
@@ -98,6 +101,9 @@ export default function BusinessSignupPage() {
 
   // ─── Done State ───────────────────────────────────────
   if (step === "done") {
+    const planParam = searchParams.get("plan") || "";
+    const isEarlyBird = planParam.startsWith("early-");
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 flex items-center justify-center p-4">
         <motion.div
@@ -107,36 +113,55 @@ export default function BusinessSignupPage() {
         >
           <CheckCircle className="h-20 w-20 text-green-400 mx-auto mb-4" />
           <h1 className="text-3xl font-bold text-white mb-2">
-            You're all set!
+            Business Created!
           </h1>
           <p className="text-purple-300 mb-2">
-            Your business is ready to engage customers.
+            {isEarlyBird
+              ? "Now let's lock in your lifetime price."
+              : "Your 14-day free trial is active. No credit card required."}
           </p>
           <Card className="bg-black/50 border-white/10 mt-6">
             <CardContent className="p-4 text-center space-y-3">
               <div>
                 <p className="text-white/60 text-sm mb-1">Your public page:</p>
                 <p className="text-yellow-400 font-mono text-lg">
-                  engagespin.com/{businessSlug}/spin
+                  engagespin.com/{businessSlug}/code-entry
                 </p>
               </div>
-              <div>
-                <p className="text-white/60 text-sm mb-1">Your dashboard:</p>
-                <p className="text-purple-400 font-mono text-sm">
-                  engagespin.com/admin/{businessSlug}
-                </p>
-              </div>
+              {!isEarlyBird && (
+                <div>
+                  <p className="text-white/60 text-sm mb-1">Your dashboard:</p>
+                  <p className="text-purple-400 font-mono text-sm">
+                    engagespin.com/admin/{businessSlug}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
-          <Button
-            onClick={() => {
-              window.location.href = `/admin/${businessSlug}`;
-            }}
-            className="mt-6 gap-2"
-            size="lg"
-          >
-            Go to Dashboard <ArrowRight className="h-4 w-4" />
-          </Button>
+
+          <div className="flex flex-col gap-3 mt-6">
+            {isEarlyBird ? (
+              <Button
+                onClick={() =>
+                  (window.location.href = `/admin/${businessSlug}/billing?plan=${planParam}&businessId=${businessId}&slug=${businessSlug}`)
+                }
+                className="gap-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-black"
+                size="lg"
+              >
+                Continue to Payment <ArrowRight className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                onClick={() =>
+                  (window.location.href = `/admin/${businessSlug}`)
+                }
+                className="gap-2"
+                size="lg"
+              >
+                Go to Dashboard <ArrowRight className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </motion.div>
       </div>
     );
@@ -176,7 +201,7 @@ export default function BusinessSignupPage() {
               {formData.businessName && (
                 <p className="text-xs text-white/40 mt-1">
                   Your page: engagespin.com/
-                  {generateSlug(formData.businessName)}/spin
+                  {generateSlug(formData.businessName)}/code-entry
                 </p>
               )}
             </div>

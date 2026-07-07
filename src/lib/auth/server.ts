@@ -12,6 +12,8 @@ export async function findUserIdByEmail(email: string): Promise<string | null> {
     .select("id")
     .eq("email", email.toLowerCase())
     .maybeSingle();
+
+  console.log("findUserIdByEmail:", email, "found user ID:", userRow?.id);
   return userRow?.id ?? null;
 }
 

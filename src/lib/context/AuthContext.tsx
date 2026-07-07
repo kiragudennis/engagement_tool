@@ -70,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (!data) {
+          supabase.auth.signOut();
           console.warn("No user found with that ID.");
           return;
         }

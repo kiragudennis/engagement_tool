@@ -10,25 +10,16 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
 import {
-  Store,
   Gift,
   Ticket,
   Users,
-  TrendingUp,
-  Clock,
   QrCode,
   Copy,
   ExternalLink,
   Loader2,
-  Sparkles,
   Settings,
-  Plus,
   ChevronRight,
   RotateCcw,
-  Trophy,
-  Calendar,
-  BarChart3,
-  Download,
   Zap,
   Brain,
 } from "lucide-react";
@@ -219,7 +210,7 @@ export default function BusinessAdminDashboard() {
                 className="gap-1 border-white/10 text-white/70"
                 asChild
               >
-                <Link href={`/${businessSlug}/spin`} target="_blank">
+                <Link href={`/${businessSlug}/code-entry`} target="_blank">
                   <ExternalLink className="h-3 w-3" /> View Page
                 </Link>
               </Button>
@@ -346,7 +337,7 @@ export default function BusinessAdminDashboard() {
                     ? "Customize your wheel"
                     : "Set up your first spin game"
                 }
-                href={`/admin/${businessSlug}/spin`}
+                href={`/admin/${businessSlug}/code-entry`}
                 color={business.brand_color}
               />
               <QuickActionCard

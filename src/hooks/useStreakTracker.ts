@@ -4,27 +4,9 @@
 import { useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/lib/context/AuthContext";
 
-const STREAK_CHECKED_KEY = "streak_checked_date";
 const SESSION_START_KEY = "session_start_time";
 const LAST_HEARTBEAT_KEY = "last_heartbeat_time";
 const TOTAL_SITE_SECONDS_KEY = "total_site_seconds";
-
-function getCookie(name: string): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.match(
-    new RegExp(
-      `(?:^|; )${name.replace(/([.$?*|{}()\[\]\\\/+^])/g, "\\$1")}=([^;]*)`,
-    ),
-  );
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-function setCookie(name: string, value: string, days: number = 365) {
-  if (typeof document === "undefined") return;
-  const d = new Date();
-  d.setTime(d.getTime() + days * 864e5);
-  document.cookie = `${name}=${encodeURIComponent(value)};expires=${d.toUTCString()};path=/;SameSite=Lax`;
-}
 
 function getStorageNumber(key: string): number {
   if (typeof window === "undefined") return 0;
@@ -39,13 +21,11 @@ function setStorageNumber(key: string, value: number) {
 export function useStreakTracker() {
   const { supabase, profile } = useAuth();
   const heartbeatInterval = useRef<NodeJS.Timeout | null>(null);
-  const streakInterval = useRef<NodeJS.Timeout | null>(null);
   const sessionStart = useRef<number>(Date.now());
   const lastHeartbeat = useRef<number>(Date.now());
   const isMounted = useRef(true);
-  const hasCheckedToday = useRef(false);
 
-  // Send heartbeat to server - STABLE reference
+  // Send heartbeat to record site activity
   const sendHeartbeat = useCallback(async () => {
     if (!profile?.id || !supabase || !isMounted.current) return;
 
@@ -66,6 +46,7 @@ export function useStreakTracker() {
 
       lastHeartbeat.current = now;
 
+      // Also track locally
       const currentTotal = getStorageNumber(TOTAL_SITE_SECONDS_KEY);
       setStorageNumber(
         TOTAL_SITE_SECONDS_KEY,
@@ -73,45 +54,12 @@ export function useStreakTracker() {
       );
       localStorage.setItem(LAST_HEARTBEAT_KEY, now.toString());
     } catch (error) {
-      console.error("Heartbeat error:", error);
+      // Silently fail - activity tracking is non-critical
+      console.debug("Heartbeat skipped:", error);
     }
-  }, [profile?.id, supabase]); // Dependencies are stable
+  }, [profile?.id, supabase]);
 
-  // Check and update streaks - STABLE reference
-  const checkStreakChallenges = useCallback(async () => {
-    if (!profile?.id || !supabase || !isMounted.current) return;
-
-    // Prevent multiple checks on same day
-    const today = new Date().toDateString();
-    if (hasCheckedToday.current) return;
-
-    const lastChecked = getCookie(STREAK_CHECKED_KEY);
-    if (lastChecked === today) return;
-
-    hasCheckedToday.current = true;
-    setCookie(STREAK_CHECKED_KEY, today, 1);
-
-    try {
-      const { data, error } = await supabase.rpc("check_and_update_streak", {
-        p_user_id: profile.id,
-      });
-
-      if (error) {
-        console.error("Streak check error:", error);
-        hasCheckedToday.current = false; // Reset on error
-        return;
-      }
-
-      if (data?.results?.length > 0) {
-        console.log("Streaks updated:", data.results);
-      }
-    } catch (error) {
-      console.error("Streak check error:", error);
-      hasCheckedToday.current = false;
-    }
-  }, [profile?.id, supabase]); // Dependencies are stable
-
-  // Initialize tracking - runs only once
+  // Initialize tracking
   useEffect(() => {
     if (!profile?.id) return;
 
@@ -127,46 +75,24 @@ export function useStreakTracker() {
     }
 
     lastHeartbeat.current = Date.now();
-    hasCheckedToday.current = false;
 
     // Send heartbeat every 60 seconds
-    heartbeatInterval.current = setInterval(() => {
-      sendHeartbeat();
-    }, 60000);
-
-    // Check streaks on mount and every 30 minutes (but only once per day)
-    checkStreakChallenges();
-    streakInterval.current = setInterval(() => {
-      // Reset daily check flag to allow re-check on new day
-      const lastChecked = getCookie(STREAK_CHECKED_KEY);
-      const today = new Date().toDateString();
-      if (lastChecked !== today) {
-        hasCheckedToday.current = false;
-        checkStreakChallenges();
-      }
-    }, 1800000);
+    heartbeatInterval.current = setInterval(sendHeartbeat, 60000);
 
     // Handle visibility change
     const handleVisibilityChange = () => {
       if (document.hidden) {
+        // Send final heartbeat before hiding
         sendHeartbeat();
         if (heartbeatInterval.current) {
           clearInterval(heartbeatInterval.current);
           heartbeatInterval.current = null;
         }
       } else {
+        // Resume tracking when visible
         lastHeartbeat.current = Date.now();
         if (!heartbeatInterval.current) {
-          heartbeatInterval.current = setInterval(() => {
-            sendHeartbeat();
-          }, 60000);
-        }
-        // Check streak on visibility change, but only if not checked today
-        const lastChecked = getCookie(STREAK_CHECKED_KEY);
-        const today = new Date().toDateString();
-        if (lastChecked !== today) {
-          hasCheckedToday.current = false;
-          checkStreakChallenges();
+          heartbeatInterval.current = setInterval(sendHeartbeat, 60000);
         }
       }
     };
@@ -180,10 +106,6 @@ export function useStreakTracker() {
       if (heartbeatInterval.current) {
         clearInterval(heartbeatInterval.current);
         heartbeatInterval.current = null;
-      }
-      if (streakInterval.current) {
-        clearInterval(streakInterval.current);
-        streakInterval.current = null;
       }
 
       document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -208,7 +130,7 @@ export function useStreakTracker() {
           });
       }
     };
-  }, [profile?.id, sendHeartbeat, checkStreakChallenges, supabase]); // Dependencies are stable now
+  }, [profile?.id, sendHeartbeat, supabase]);
 
-  return { checkStreakChallenges, sendHeartbeat };
+  return { sendHeartbeat };
 }

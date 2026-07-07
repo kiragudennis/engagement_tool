@@ -161,6 +161,76 @@ CREATE INDEX idx_activations_business ON customer_business_activations(business_
 CREATE INDEX idx_activations_expiry ON customer_business_activations(expires_at) WHERE is_active = TRUE;
 CREATE INDEX idx_users_home_business ON users(home_business_id);
 
+-- 8b. RLS policies
+-- Businesses table: Only allow business owners/admins to view/edit their own business
+CREATE POLICY business_admins_policy ON businesses
+    USING (EXISTS (
+        SELECT 1 FROM business_admins ba
+        WHERE ba.business_id = businesses.id
+        AND ba.user_id = auth.uid()
+    ));
+
+-- Customer activations: Only allow users to view their own activations
+CREATE POLICY user_activations_policy ON customer_business_activations
+    USING (user_id = auth.uid());
+
+-- Access codes: Only allow business admins to manage codes for their business
+CREATE POLICY access_codes_policy ON access_codes
+    USING (EXISTS (
+        SELECT 1 FROM business_admins ba
+        WHERE ba.business_id = access_codes.business_id
+        AND ba.user_id = auth.uid()
+    ));
+
+-- Completely rewrite the business_admins policies with a simpler, non-recursive approach
+
+-- 1. Users can see their own admin records
+CREATE POLICY "users_view_own_admin_records" ON business_admins
+    FOR SELECT
+    USING (user_id = auth.uid());
+
+-- 2. Users who are owners can see all admins in their businesses
+CREATE POLICY "owners_view_all_admins" ON business_admins
+    FOR SELECT
+    USING (
+        auth.uid() IN (
+            SELECT user_id 
+            FROM business_admins AS owner_check
+            WHERE owner_check.business_id = business_admins.business_id
+            AND owner_check.role = 'owner'
+        )
+    );
+
+-- 3. Only owners can insert/update/delete admin records
+CREATE POLICY "owners_manage_admins" ON business_admins
+    FOR ALL
+    USING (
+        auth.uid() IN (
+            SELECT user_id 
+            FROM business_admins AS owner_check
+            WHERE owner_check.business_id = business_admins.business_id
+            AND owner_check.role = 'owner'
+        )
+    )
+    WITH CHECK (
+        auth.uid() IN (
+            SELECT user_id 
+            FROM business_admins AS owner_check
+            WHERE owner_check.business_id = business_admins.business_id
+            AND owner_check.role = 'owner'
+        )
+    );
+
+-- 4. Users can accept invites (update their own record)
+CREATE POLICY "users_accept_invites" ON business_admins
+    FOR UPDATE
+    USING (user_id = auth.uid())
+    WITH CHECK (
+        user_id = auth.uid()
+        AND accepted_at IS NOT NULL
+        AND role IN ('admin', 'host')
+    );
+
 -- 9. Functions
 CREATE OR REPLACE FUNCTION increment_business_spin_count(p_business_id UUID)
 RETURNS VOID

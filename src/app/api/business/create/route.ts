@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (existingBusiness) {
+      console.log("Business slug already taken:", slug);
       return NextResponse.json(
         { error: "This business name is already taken" },
         { status: 409 },
@@ -42,34 +43,29 @@ export async function POST(req: NextRequest) {
 
     let userId: string;
 
-    // Try to create the user account
-    const { data: authData, error: authError } =
-      await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { full_name: fullName },
-      });
+    const existingId = await findUserIdByEmail(email);
+    if (!existingId) {
+      // Try to create the user account
+      const { data: authData, error: authError } =
+        await supabaseAdmin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { full_name: fullName },
+        });
 
-    if (authError) {
-      if (
-        authError.message?.includes("already been registered") ||
-        authError.message?.includes("already exists")
-      ) {
-        const existingId = await findUserIdByEmail(email);
-        if (!existingId) {
-          return NextResponse.json(
-            { error: "Failed to find existing account. Try logging in first." },
-            { status: 500 },
-          );
-        }
-        userId = existingId;
-      } else {
-        console.error("Auth error:", authError);
-        return NextResponse.json({ error: authError.message }, { status: 400 });
+      console.log("Auth creation response:", authData, authError);
+      if (authError) {
+        console.error("User creation failed:", authError);
+        return NextResponse.json(
+          { error: "Failed to create user account" },
+          { status: 500 },
+        );
       }
-    } else {
+
       userId = authData.user!.id;
+    } else {
+      userId = existingId;
     }
 
     // Ensure user exists in public.users
@@ -80,7 +76,7 @@ export async function POST(req: NextRequest) {
         full_name: fullName,
         role: "customer",
         status: "active",
-        onboarding_completed: true,
+        onboarding_completed: false,
       },
       { onConflict: "id" },
     );
@@ -112,6 +108,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    console.log("Business created successfully:", business);
+
     // Add user as owner
     await supabaseAdmin.from("business_admins").insert({
       business_id: business.id,
@@ -136,9 +134,9 @@ export async function POST(req: NextRequest) {
     if (resend) {
       try {
         await resend.emails.send({
-          from: "Engage <welcome@engagespin.com>",
+          from: "Engage <welcome@notifications.engagespin.com>",
           to: email,
-          subject: `🎉 Welcome to Engage, ${fullName}!`,
+          subject: `🎉 Welcome to EngageSpin, ${fullName}!`,
           html: `
             <!DOCTYPE html>
             <html>

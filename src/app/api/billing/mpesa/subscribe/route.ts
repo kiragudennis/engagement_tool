@@ -1,3 +1,4 @@
+// app/api/billing/mpesa/subscribe/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -86,7 +87,10 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (!business) {
-      return NextResponse.json({ error: "Business not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Business not found" },
+        { status: 404 },
+      );
     }
 
     const auth = await requireBusinessAdmin(business.slug);
@@ -123,7 +127,11 @@ export async function POST(req: NextRequest) {
         .from("business_payments")
         .update({
           transaction_id: stkResponse.CheckoutRequestID,
-          metadata: { ...stkResponse, phone: formattedPhone, payment_id: payment!.id },
+          metadata: {
+            ...stkResponse,
+            phone: formattedPhone,
+            payment_id: payment!.id,
+          },
         })
         .eq("id", payment!.id);
 
@@ -141,6 +149,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("M-Pesa subscribe error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

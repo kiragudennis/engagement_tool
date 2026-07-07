@@ -131,15 +131,15 @@ CREATE POLICY "Anyone can view live ticker" ON spin_live_ticker
     FOR SELECT USING (true);
 
 -- Admin policies (scoped to business)
+drop policy if exists "Admins can manage own games" on spin_games;
+drop policy if exists "Admins can manage own attempts" on spin_attempts;
 CREATE POLICY "Admins can manage own games" ON spin_games
     FOR ALL USING (
-        public.is_admin() AND 
         business_id IN (SELECT business_id FROM business_admins WHERE user_id = auth.uid())
     );
 
 CREATE POLICY "Admins can manage own attempts" ON spin_attempts
     FOR ALL USING (
-        public.is_admin() AND 
         business_id IN (SELECT business_id FROM business_admins WHERE user_id = auth.uid())
     );
 

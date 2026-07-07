@@ -1,93 +1,163 @@
+// app/(admin)/admin/[businessSlug]/billing/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getPlanLimits } from "@/lib/config/plans";
-import {
-  PLANS,
-  getPriceKes,
-  formatKES,
-  kesToUsd,
-} from "@/lib/config/plans";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { motion } from "framer-motion";
 import {
-  ArrowLeft,
   Loader2,
-  Crown,
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle,
+  Shield,
   CreditCard,
   Smartphone,
+  Sparkles,
+  Infinity,
+  Crown,
+  Rocket,
+  Store,
+  Flame,
   AlertTriangle,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { UsageMeter } from "@/components/billing/UsageMeter";
+
+// ─── Plan definitions ───────────────────────────────────
+const EARLY_BIRD_PLANS: Record<
+  string,
+  { name: string; priceKes: number; icon: any; color: string }
+> = {
+  "early-bronze": {
+    name: "Bronze Lifetime",
+    priceKes: 100_000,
+    icon: Sparkles,
+    color: "from-amber-500 to-orange-500",
+  },
+  "early-silver": {
+    name: "Silver Lifetime",
+    priceKes: 250_000,
+    icon: Crown,
+    color: "from-gray-400 to-gray-500",
+  },
+  "early-gold": {
+    name: "Gold Lifetime",
+    priceKes: 500_000,
+    icon: Rocket,
+    color: "from-yellow-400 to-yellow-600",
+  },
+};
+
+const MONTHLY_PLANS: Record<
+  string,
+  { name: string; monthlyKes: number; annualKes: number }
+> = {
+  starter: { name: "Starter", monthlyKes: 2_900, annualKes: 2_420 },
+  pro: { name: "Pro", monthlyKes: 9_900, annualKes: 8_250 },
+  enterprise: { name: "Enterprise", monthlyKes: 25_900, annualKes: 21_580 },
+};
 
 const PAYMENT_METHODS = [
   {
     id: "paystack",
     name: "Card / Bank",
     icon: CreditCard,
-    description: "Paystack — international cards",
+    desc: "Paystack — international cards",
   },
   {
     id: "mpesa",
     name: "M-Pesa",
     icon: Smartphone,
-    description: "STK push to your phone",
+    desc: "STK push to your phone",
   },
 ];
 
-export default function BillingPage() {
-  const { businessSlug } = useParams<{ businessSlug: string }>();
+export default function AdminBillingPage() {
   const searchParams = useSearchParams();
-  const { supabase, profile } = useAuth();
   const router = useRouter();
+  const { supabase, profile } = useAuth();
 
+  // Check if coming from signup flow
+  const planParam = searchParams.get("plan") || "";
+  const businessIdParam = searchParams.get("businessId") || "";
+  const isNewSetup = !!planParam && !!businessIdParam;
+  const isEarlyBird = planParam.startsWith("early-");
+
+  const [loading, setLoading] = useState(!isNewSetup);
   const [business, setBusiness] = useState<any>(null);
-  const [codeCount, setCodeCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [selectedPlan, setSelectedPlan] = useState<string>("starter");
+  const [step, setStep] = useState<"billing" | "checkout" | "done">(
+    isNewSetup ? "checkout" : "billing",
+  );
+  const [selectedPlan, setSelectedPlan] = useState<string>(planParam || "pro");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">(
     "monthly",
   );
   const [paymentMethod, setPaymentMethod] = useState("paystack");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [codeCount, setCodeCount] = useState(0);
 
-  const loadData = useCallback(async () => {
-    if (!businessSlug) return;
-    const { data: biz } = await supabase
-      .from("businesses")
-      .select("*")
-      .eq("slug", businessSlug)
-      .single();
+  // Determine plan
+  const earlyBirdPlan = isEarlyBird ? EARLY_BIRD_PLANS[planParam] : null;
+  const monthlyPlan = !isEarlyBird
+    ? MONTHLY_PLANS[selectedPlan] || MONTHLY_PLANS.pro
+    : null;
 
-    if (!biz) return;
-    setBusiness(biz);
-    setSelectedPlan(
-      searchParams.get("upgrade") || (biz.plan !== "trial" ? biz.plan : "pro"),
-    );
+  const price = isEarlyBird
+    ? earlyBirdPlan!.priceKes
+    : billingCycle === "annual"
+      ? monthlyPlan?.annualKes || 9_900
+      : monthlyPlan?.monthlyKes || 9_900;
 
-    const { count } = await supabase
-      .from("access_codes")
-      .select("*", { count: "exact", head: true })
-      .eq("business_id", biz.id);
+  const formatKES = (amount: number) =>
+    new Intl.NumberFormat("en-KE", {
+      style: "currency",
+      currency: "KES",
+      minimumFractionDigits: 0,
+    }).format(amount);
 
-    setCodeCount(count || 0);
-    setLoading(false);
-  }, [businessSlug, supabase, searchParams]);
-
+  // Load business data
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    const load = async () => {
+      const slug = window.location.pathname.split("/")[2]; // Extract slug from URL
+      if (!slug) return;
 
-  const handleCheckout = async () => {
+      const { data: biz } = await supabase
+        .from("businesses")
+        .select("*")
+        .eq("slug", slug)
+        .single();
+
+      if (!biz) {
+        router.push("/business/signup");
+        return;
+      }
+      setBusiness(biz);
+
+      if (!isNewSetup) {
+        setSelectedPlan(biz.plan !== "trial" ? biz.plan : "pro");
+        const { count } = await supabase
+          .from("access_codes")
+          .select("*", { count: "exact", head: true })
+          .eq("business_id", biz.id);
+        setCodeCount(count || 0);
+      }
+
+      setLoading(false);
+    };
+    load();
+  }, [supabase, router, isNewSetup]);
+
+  const handlePay = async () => {
     if (!business || !profile) return;
     setProcessing(true);
 
@@ -98,10 +168,11 @@ export default function BillingPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             businessId: business.id,
-            plan: selectedPlan,
-            billingCycle,
+            plan: isEarlyBird ? planParam : selectedPlan,
+            billingCycle: isEarlyBird ? "lifetime" : billingCycle,
             email: profile.email,
             fullName: profile.full_name || profile.email,
+            isEarlyBird,
           }),
         });
         const data = await res.json();
@@ -122,14 +193,16 @@ export default function BillingPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             businessId: business.id,
-            plan: selectedPlan,
-            billingCycle,
+            plan: isEarlyBird ? planParam : selectedPlan,
+            billingCycle: isEarlyBird ? "lifetime" : billingCycle,
             phoneNumber,
+            isEarlyBird,
           }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "M-Pesa failed");
         toast.success(data.message || "Check your phone for M-Pesa prompt");
+        setStep("done");
       }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Checkout failed");
@@ -151,11 +224,191 @@ export default function BillingPage() {
     business?.engagements_this_month ?? business?.spins_this_month ?? 0;
   const isTrial = business?.subscription_status === "trial";
   const isActive = business?.subscription_status === "active";
-  const selectedPlanDef = PLANS.find((p) => p.id === selectedPlan);
-  const price = selectedPlanDef
-    ? getPriceKes(selectedPlanDef, billingCycle)
-    : 0;
 
+  // ─── Done State ───────────────────────────────────────
+  if (step === "done") {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0.8 }}
+          animate={{ scale: 1 }}
+          className="text-center max-w-md"
+        >
+          <CheckCircle className="h-20 w-20 text-green-400 mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-white mb-2">
+            Payment Initiated!
+          </h1>
+          <p className="text-purple-300 mb-4">
+            {paymentMethod === "mpesa"
+              ? "Check your phone for the M-Pesa prompt to complete payment."
+              : "Your payment is being processed."}
+          </p>
+          <Button
+            onClick={() => router.push(`/admin/${business?.slug}`)}
+            className="gap-2"
+            size="lg"
+          >
+            Go to Dashboard <ArrowRight className="h-4 w-4" />
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ─── Checkout View (for new signups with early bird) ──
+  if (step === "checkout" && isNewSetup) {
+    const PlanIcon = isEarlyBird ? earlyBirdPlan?.icon : Sparkles;
+
+    return (
+      <div className="min-h-screen bg-gray-950">
+        <div className="border-b border-white/10 bg-black/50 backdrop-blur">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center gap-4">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+                style={{ backgroundColor: business?.brand_color || "#8B5CF6" }}
+              >
+                {business?.name?.[0]}
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white">Complete Setup</h1>
+                <p className="text-white/40 text-sm">{business?.name}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="container mx-auto px-4 py-8 max-w-lg">
+          <Card className="bg-white/5 border-white/10">
+            <CardContent className="p-6 space-y-6">
+              {/* Plan Summary */}
+              <div
+                className={cn(
+                  "p-4 rounded-xl border",
+                  isEarlyBird
+                    ? "bg-amber-500/5 border-amber-500/20"
+                    : "bg-purple-500/5 border-purple-500/20",
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center",
+                        isEarlyBird ? "bg-amber-500/10" : "bg-purple-500/10",
+                      )}
+                    >
+                      {PlanIcon && (
+                        <PlanIcon
+                          className={cn(
+                            "h-5 w-5",
+                            isEarlyBird ? "text-amber-400" : "text-purple-400",
+                          )}
+                        />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-white font-bold">
+                        {isEarlyBird ? earlyBirdPlan?.name : monthlyPlan?.name}
+                      </p>
+                      {isEarlyBird && (
+                        <Badge className="bg-amber-500/20 text-amber-400 text-xs border-0 mt-0.5">
+                          <Infinity className="h-3 w-3 mr-1" /> Lifetime
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-white">
+                      {formatKES(price)}
+                    </p>
+                    <p className="text-white/40 text-xs">
+                      {isEarlyBird ? "one-time" : "/mo + VAT"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <Label className="text-white mb-2 block">Payment Method</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  {PAYMENT_METHODS.map((method) => (
+                    <button
+                      key={method.id}
+                      onClick={() => setPaymentMethod(method.id)}
+                      className={cn(
+                        "p-4 rounded-xl border-2 text-center transition-all",
+                        paymentMethod === method.id
+                          ? "border-purple-500 bg-purple-500/10"
+                          : "border-white/10 bg-white/5 hover:border-white/20",
+                      )}
+                    >
+                      <method.icon
+                        className={cn(
+                          "h-6 w-6 mx-auto mb-1",
+                          paymentMethod === method.id
+                            ? "text-purple-400"
+                            : "text-white/40",
+                        )}
+                      />
+                      <p className="text-white text-sm font-medium">
+                        {method.name}
+                      </p>
+                      <p className="text-white/40 text-xs">{method.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {paymentMethod === "mpesa" && (
+                <div>
+                  <Label className="text-white">M-Pesa Phone Number</Label>
+                  <Input
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="0712 345 678"
+                    className="mt-1 bg-white/5 border-white/10 text-white"
+                  />
+                </div>
+              )}
+
+              <Button
+                onClick={handlePay}
+                disabled={processing}
+                className="w-full h-12 text-lg gap-2 bg-gradient-to-r from-purple-600 to-pink-600"
+              >
+                {processing ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <>
+                    Pay {formatKES(price)} <ArrowRight className="h-5 w-5" />
+                  </>
+                )}
+              </Button>
+
+              <p className="text-center text-white/20 text-xs">
+                Secured by Paystack. We don't store your card details.
+              </p>
+
+              {/* Skip for trial */}
+              <div className="text-center pt-4 border-t border-white/10">
+                <Button
+                  variant="ghost"
+                  onClick={() => router.push(`/admin/${business?.slug}`)}
+                  className="text-white/40 hover:text-white/60"
+                >
+                  Skip for now — start 14-day free trial
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Regular Billing View ─────────────────────────────
   return (
     <div className="min-h-screen bg-gray-950">
       <div className="border-b border-white/10 bg-black/50 backdrop-blur">
@@ -164,7 +417,7 @@ export default function BillingPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push(`/admin/${businessSlug}`)}
+              onClick={() => router.push(`/admin/${business?.slug}`)}
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
@@ -188,6 +441,87 @@ export default function BillingPage() {
           </Card>
         )}
 
+        {/* Early Bird Lifetime Deals */}
+        {isTrial && (
+          <Card className="bg-gradient-to-r from-amber-500/5 to-yellow-500/5 border-amber-500/20">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Flame className="h-5 w-5 text-amber-400" />
+                <h2 className="text-white font-semibold text-lg">
+                  Early Bird Lifetime Deals
+                </h2>
+                <Badge className="bg-amber-500/20 text-amber-400 border-0">
+                  Limited Time
+                </Badge>
+              </div>
+              <p className="text-white/50 text-sm mb-4">
+                Pay once, use forever. Lock in your price before these deals are
+                gone.
+              </p>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                {[
+                  {
+                    id: "early-bronze",
+                    name: "Bronze",
+                    price: "100K",
+                    desc: "Lifetime",
+                    color: "border-amber-500/30 bg-amber-500/5",
+                  },
+                  {
+                    id: "early-silver",
+                    name: "Silver",
+                    price: "250K",
+                    desc: "Lifetime",
+                    color: "border-gray-400/30 bg-gray-400/5",
+                    popular: true,
+                  },
+                  {
+                    id: "early-gold",
+                    name: "Gold",
+                    price: "500K",
+                    desc: "Lifetime",
+                    color: "border-yellow-500/30 bg-yellow-500/5",
+                  },
+                ].map((eb) => (
+                  <button
+                    key={eb.id}
+                    onClick={() => {
+                      setSelectedPlan(eb.id);
+                      setStep("checkout");
+                    }}
+                    className={cn(
+                      "p-4 rounded-xl border-2 text-center transition-all hover:scale-105",
+                      eb.color,
+                      eb.popular && "ring-1 ring-purple-500/50",
+                    )}
+                  >
+                    {eb.popular && (
+                      <Badge className="bg-purple-500/20 text-purple-400 text-xs border-0 mb-1">
+                        Best Value
+                      </Badge>
+                    )}
+                    <p className="text-white font-bold">{eb.name}</p>
+                    <p className="text-2xl font-bold text-white mt-1">
+                      KES {eb.price}
+                    </p>
+                    <p className="text-amber-400 text-xs mt-0.5 flex items-center justify-center gap-1">
+                      <Infinity className="h-3 w-3" />
+                      {eb.desc}
+                    </p>
+                  </button>
+                ))}
+              </div>
+              <a
+                href="/pricing/early-birds"
+                className="text-amber-400 text-sm hover:underline"
+              >
+                See full comparison →
+              </a>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Current Plan */}
         <Card className="bg-white/5 border-white/10">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-6">
@@ -216,7 +550,6 @@ export default function BillingPage() {
                 </p>
               )}
             </div>
-
             <UsageMeter
               label="Engagements this month"
               used={used}
@@ -229,100 +562,6 @@ export default function BillingPage() {
                 max={limits.maxCodes}
               />
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white/5 border-white/10">
-          <CardContent className="p-6">
-            <h2 className="text-white font-semibold text-lg mb-6">
-              {isActive ? "Change Plan" : "Choose Your Plan"}
-            </h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-              {PLANS.map((plan) => (
-                <button
-                  key={plan.id}
-                  onClick={() => setSelectedPlan(plan.id)}
-                  className={cn(
-                    "p-4 rounded-xl border-2 text-left transition-all",
-                    selectedPlan === plan.id
-                      ? "border-purple-500 bg-purple-500/10"
-                      : "border-white/10 bg-white/5 hover:border-white/20",
-                  )}
-                >
-                  <p className="text-white font-bold">{plan.name}</p>
-                  <p className="text-white/60 text-sm mt-1">
-                    {formatKES(getPriceKes(plan, billingCycle))}/mo
-                  </p>
-                  <p className="text-white/30 text-xs">
-                    ≈ ${kesToUsd(getPriceKes(plan, billingCycle))} USD
-                  </p>
-                </button>
-              ))}
-            </div>
-
-            <div className="flex gap-3 mb-6">
-              <Button
-                variant={billingCycle === "monthly" ? "default" : "outline"}
-                onClick={() => setBillingCycle("monthly")}
-                className="flex-1"
-              >
-                Monthly
-              </Button>
-              <Button
-                variant={billingCycle === "annual" ? "default" : "outline"}
-                onClick={() => setBillingCycle("annual")}
-                className="flex-1"
-              >
-                Annual (Save 17%)
-              </Button>
-            </div>
-
-            <Label className="text-white mb-2 block">Payment Method</Label>
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              {PAYMENT_METHODS.map((method) => (
-                <button
-                  key={method.id}
-                  onClick={() => setPaymentMethod(method.id)}
-                  className={cn(
-                    "p-4 rounded-xl border-2 text-center transition-all",
-                    paymentMethod === method.id
-                      ? "border-purple-500 bg-purple-500/10"
-                      : "border-white/10 bg-white/5",
-                  )}
-                >
-                  <method.icon className="h-6 w-6 mx-auto mb-1 text-purple-400" />
-                  <p className="text-white text-sm font-medium">{method.name}</p>
-                  <p className="text-white/40 text-xs">{method.description}</p>
-                </button>
-              ))}
-            </div>
-
-            {paymentMethod === "mpesa" && (
-              <div className="mb-6">
-                <Label className="text-white">M-Pesa Phone Number</Label>
-                <Input
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="0712 345 678"
-                  className="mt-1 bg-white/5 border-white/10 text-white"
-                />
-              </div>
-            )}
-
-            <Button
-              onClick={handleCheckout}
-              disabled={processing}
-              className="w-full h-12 text-lg bg-gradient-to-r from-purple-600 to-pink-600"
-            >
-              {processing ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <>
-                  Subscribe • {formatKES(price)}/mo (≈ ${kesToUsd(price)} USD)
-                </>
-              )}
-            </Button>
           </CardContent>
         </Card>
       </div>

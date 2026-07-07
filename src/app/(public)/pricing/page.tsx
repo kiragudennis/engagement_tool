@@ -7,13 +7,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Check,
-  RotateCcw,
-  Brain,
-  Gift,
-  ArrowRight,
-} from "lucide-react";
+import { Check, RotateCcw, Brain, Gift, ArrowRight, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   PLANS,
@@ -386,6 +380,15 @@ export default function PricingPage() {
             onClick={() => router.push("/spin")}
           >
             I Have a Code
+          </Button>
+          {/* Early Bird */}
+          <Button
+            variant="outline"
+            size="lg"
+            className="border-white/10 text-white"
+            onClick={() => router.push("/pricing/early-birds")}
+          >
+            Early Bird Pricing
           </Button>
         </div>
       </div>

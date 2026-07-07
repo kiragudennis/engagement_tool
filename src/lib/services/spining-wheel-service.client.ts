@@ -1,5 +1,4 @@
 // src/lib/services/spinning-wheel-service.client.ts
-import { getSupabaseClient } from "@/lib/supabase/client";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 export class SpinningWheelClientService {

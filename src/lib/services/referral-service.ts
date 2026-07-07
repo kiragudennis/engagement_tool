@@ -1,6 +1,5 @@
 // src/lib/services/referral-service.ts
 import { SupabaseClient } from "@supabase/supabase-js";
-import { DrawsService } from "./draws-service";
 
 export interface ReferralStats {
   total: number;
@@ -85,115 +84,6 @@ export class ReferralService {
       ip_address: ipAddress,
       user_agent: userAgent,
     });
-  }
-
-  /**
-   * Process referral when referred user signs up
-   */
-  async processReferralSignup(
-    referredUserId: string,
-    referredEmail: string,
-    referralCode: string,
-  ): Promise<{
-    referralId: string;
-    pointsAwarded: number;
-    drawEntriesAwarded: number;
-  }> {
-    // Find the referral record
-    const { data: referral, error: findError } = await this.supabase
-      .from("referrals")
-      .select("*")
-      .eq("referral_code", referralCode)
-      .eq("referred_email", referredEmail)
-      .eq("status", "pending")
-      .single();
-
-    if (findError || !referral) {
-      throw new Error("Invalid or expired referral code");
-    }
-
-    // Update referral record
-    const { data: updatedReferral, error: updateError } = await this.supabase
-      .from("referrals")
-      .update({
-        referred_user_id: referredUserId,
-        status: "joined",
-        updated_at: new Date().toISOString(),
-        metadata: {
-          ...referral.metadata,
-          signed_up_at: new Date().toISOString(),
-          referred_user_id: referredUserId,
-        },
-      })
-      .eq("id", referral.id)
-      .select()
-      .single();
-
-    if (updateError) throw updateError;
-
-    // Award points to referrer
-    let pointsAwarded = 0;
-    if (referral.reward_points > 0) {
-      const { data: pointsResult } = await this.supabase.rpc(
-        "award_referral_points",
-        {
-          p_referrer_id: referral.referrer_id,
-          p_points: referral.reward_points,
-          p_referral_id: referral.id,
-          p_type: "signup",
-        },
-      );
-      pointsAwarded = referral.reward_points;
-    }
-
-    // Award draw entries for active draws
-    let drawEntriesAwarded = 0;
-    const drawsService = new DrawsService(this.supabase);
-
-    const { data: activeDraws } = await this.supabase
-      .from("draws")
-      .select("id, entry_config")
-      .eq("status", "open")
-      .gte("entry_ends_at", new Date().toISOString());
-
-    if (activeDraws && activeDraws.length > 0) {
-      for (const draw of activeDraws) {
-        if (draw.entry_config?.referral?.enabled !== false) {
-          const entriesPerReferral =
-            draw.entry_config?.referral?.entries_per_referral || 5;
-          await drawsService.addReferralEntries(
-            draw.id,
-            referredUserId,
-            referral.id,
-          );
-          drawEntriesAwarded += entriesPerReferral;
-        }
-      }
-    }
-
-    // Update referral with draw entries info
-    await this.supabase
-      .from("referrals")
-      .update({
-        draw_entries_awarded: true,
-        draw_entries_count: drawEntriesAwarded,
-        draw_id: activeDraws?.[0]?.id,
-      })
-      .eq("id", referral.id);
-
-    // Create notifications
-    await this.createReferralNotifications(
-      referral.referrer_id,
-      referredUserId,
-      referral.reward_points,
-      drawEntriesAwarded,
-    );
-
-    return {
-      referralId: referral.id,
-      pointsAwarded,
-      drawEntriesAwarded,
-    };
   }
 
   /**

@@ -7,30 +7,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
 import {
-  User,
   Gift,
   Star,
-  Zap,
   Trophy,
-  Clock,
   Store,
-  Ticket,
   RotateCcw,
-  TrendingUp,
   ArrowRight,
   Loader2,
   Crown,
-  Sparkles,
   History,
-  Settings,
   LogOut,
-  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 
 export default function CustomerAccountPage() {
@@ -39,7 +30,6 @@ export default function CustomerAccountPage() {
   const [activeBusinesses, setActiveBusinesses] = useState<any[]>([]);
   const [pointsSummary, setPointsSummary] = useState<any[]>([]);
   const [spinHistory, setSpinHistory] = useState<any[]>([]);
-  const [triviaHistory, setTriviaHistory] = useState<any[]>([]);
   const [totalPoints, setTotalPoints] = useState(0);
   const [redemptionOptions, setRedemptionOptions] = useState<any[]>([]);
 

@@ -2,7 +2,7 @@
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Loyalty Rewards Program | Blessed Two Electricals",
+  title: "Loyalty Rewards Program",
   description:
     "Earn loyalty points with every purchase at Blessed Two Electricals. Redeem points for discounts on lighting products, get exclusive offers, and enjoy tier benefits.",
   keywords: [
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     "points redemption",
   ],
   openGraph: {
-    title: "Loyalty Rewards Program | Blessed Two Electricals",
+    title: "Loyalty Rewards Program",
     description:
       "Earn and redeem points for discounts on quality lighting solutions.",
   },

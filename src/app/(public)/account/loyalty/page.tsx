@@ -21,7 +21,6 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useCart } from "@/lib/context/StoreContext";
 import { useRouter } from "next/navigation";
 import { LoyaltyData, LoyaltyTransaction } from "@/types/store";
 import {
@@ -52,7 +51,6 @@ const TIER_ICONS: Record<string, React.ComponentType<any>> = {
 
 export default function LoyaltyPage() {
   const { supabase, profile } = useAuth();
-  const { cartItems } = useCart();
   const [loyaltyData, setLoyaltyData] = useState<LoyaltyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [redeeming, setRedeeming] = useState(false);
@@ -182,20 +180,6 @@ export default function LoyaltyPage() {
     }
   };
 
-  const handleContinueToCheckout = () => {
-    if (cartItems.length === 0) {
-      toast.error("Your cart is empty", {
-        description: "Add items to your cart before checking out",
-        action: {
-          label: "Browse Products",
-          onClick: () => router.push("/products"),
-        },
-      });
-      return;
-    }
-    router.push("/checkout");
-  };
-
   const handleClearRedemption = () => {
     localStorage.removeItem("loyalty_redemption");
     setPendingRedemption(null);
@@ -298,7 +282,8 @@ export default function LoyaltyPage() {
                       <span className="text-muted-foreground">points</span>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Worth KES {(displayPoints / pointsPerKsh).toFixed(2)} in discounts
+                      Worth KES {(displayPoints / pointsPerKsh).toFixed(2)} in
+                      discounts
                     </p>
                     {pendingRedemption && (
                       <p className="text-sm text-amber-600 mt-1">
@@ -476,14 +461,6 @@ export default function LoyaltyPage() {
                         KES {pendingRedemption.discount.toFixed(2)}
                       </p>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={handleContinueToCheckout}
-                      className="mt-4 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600"
-                    >
-                      <ShoppingBag className="h-4 w-4 mr-2" />
-                      Continue to Checkout
-                    </Button>
                   </div>
                 </div>
               ) : (
@@ -525,7 +502,9 @@ export default function LoyaltyPage() {
                       <Button
                         size="lg"
                         onClick={handleOpenRedeemDialog}
-                        disabled={loyaltyData.points < minRedeemPoints || redeeming}
+                        disabled={
+                          loyaltyData.points < minRedeemPoints || redeeming
+                        }
                       >
                         {redeeming ? (
                           <>
@@ -535,17 +514,6 @@ export default function LoyaltyPage() {
                         ) : (
                           "Redeem Points"
                         )}
-                      </Button>
-
-                      {/* Continue to checkout */}
-                      <Button
-                        size="lg"
-                        variant="outline"
-                        onClick={handleContinueToCheckout}
-                        className="ml-4"
-                      >
-                        <ShoppingBag className="h-4 w-4 mr-2" />
-                        Checkout
                       </Button>
                     </div>
                   </div>

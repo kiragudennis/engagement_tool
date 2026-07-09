@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
 
     const valid = await verifyPaystackWebhook(rawBody, signature);
     if (!valid) {
+      console.error("Invalid Paystack webhook signature");
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
@@ -19,10 +20,7 @@ export async function POST(req: NextRequest) {
     const eventType = event.event;
     const data = event.data;
 
-    if (
-      eventType === "charge.success" ||
-      eventType === "subscription.create"
-    ) {
+    if (eventType === "charge.success" || eventType === "subscription.create") {
       const metadata = data.metadata || {};
       const businessId = metadata.business_id;
       const plan = metadata.plan || metadata.plan_name;
@@ -41,14 +39,21 @@ export async function POST(req: NextRequest) {
       }
 
       if (businessId && plan) {
-        await activateBusinessSubscription({
-          businessId,
-          plan,
-          billingCycle,
-          paymentMethod: "paystack",
-          paystackCustomerCode: data.customer?.customer_code,
-          paystackSubscriptionCode: data.subscription_code,
-        });
+        const { data: activation, error: activationError } =
+          await activateBusinessSubscription({
+            businessId,
+            plan,
+            billingCycle,
+            paymentMethod: "paystack",
+            paystackCustomerCode: data.customer?.customer_code,
+            paystackSubscriptionCode: data.subscription_code,
+          });
+        console.log(
+          "Business subscription activated:",
+          activation,
+          "Error:",
+          activationError,
+        );
       }
     }
 

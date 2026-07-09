@@ -44,6 +44,17 @@ ALTER TABLE businesses ADD COLUMN IF NOT EXISTS last_payment_at TIMESTAMPTZ;
 ALTER TABLE businesses ADD COLUMN IF NOT EXISTS next_billing_at TIMESTAMPTZ;
 ALTER TABLE businesses ADD COLUMN IF NOT EXISTS payment_method TEXT CHECK (payment_method IN ('mpesa', 'paystack', 'card', 'none'));
 ALTER TABLE businesses ADD COLUMN IF NOT EXISTS type TEXT CHECK (type IN ('retail', 'restaurant', 'service', 'event', 'other')) DEFAULT 'retail';
+-- add paystack_customer_code, paystack_subscription_code, mpesa_phone
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS paystack_customer_code TEXT;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS paystack_subscription_code TEXT;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS mpesa_phone TEXT;
+-- Add early_bronze, early_silver, early_gold in plans
+ALTER TABLE businesses DROP CONSTRAINT IF EXISTS businesses_plan_check;
+
+-- Add the new constraint with updated values
+ALTER TABLE businesses ADD CONSTRAINT businesses_plan_check
+    CHECK (plan IN ('trial', 'starter', 'pro', 'enterprise', 'early_bronze', 'early_silver', 'early_gold'));
+
 
 -- Payment transactions
 CREATE TABLE IF NOT EXISTS business_payments (
@@ -66,6 +77,12 @@ CREATE TABLE IF NOT EXISTS business_payments (
     paid_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add payment_method TEXT NOT NULL CHECK (payment_method IN ('paystack', 'mpesa', 'paypal', 'card'))
+DROP CONSTRAINT IF EXISTS business_payments_payment_method_check ON business_payments;
+ALTER TABLE business_payments ADD CONSTRAINT business_payments_payment_method_check CHECK (payment_method IN
+    ('mpesa', 'paystack', 'paypal', 'card'));
+
 
 -- 2. Business admin users
 CREATE TABLE business_admins (

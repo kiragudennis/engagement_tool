@@ -22,6 +22,7 @@ export function getSubscriptionAmountKes(
 
   if (!def) {
     def = EARLY_ACCESS_PLANS.find((p) => p.id === plan);
+    console.log("Plan not found in PLANS, checking EARLY_ACCESS_PLANS:", def);
   }
 
   if (!def) {
@@ -112,7 +113,7 @@ export async function verifyPaystackWebhook(
 export async function activateBusinessSubscription(params: {
   businessId: string;
   plan: string;
-  billingCycle: "monthly" | "annual";
+  billingCycle: "monthly" | "annual" | "lifetime";
   paymentMethod: "paystack" | "mpesa" | "paypal";
   paystackCustomerCode?: string;
   paystackSubscriptionCode?: string;
@@ -121,10 +122,15 @@ export async function activateBusinessSubscription(params: {
   const { supabaseAdmin } = await import("@/lib/supabase/admin");
   const nextBilling = new Date();
   nextBilling.setMonth(
-    nextBilling.getMonth() + (params.billingCycle === "annual" ? 12 : 1),
+    nextBilling.getMonth() +
+      (params.billingCycle === "annual"
+        ? 12
+        : params.billingCycle === "lifetime"
+          ? 1200
+          : 1),
   );
 
-  await supabaseAdmin
+  const { data: sub, error: errorSub } = await supabaseAdmin
     .from("businesses")
     .update({
       plan: params.plan,
@@ -138,4 +144,6 @@ export async function activateBusinessSubscription(params: {
       updated_at: new Date().toISOString(),
     })
     .eq("id", params.businessId);
+
+  return { data: sub, error: errorSub };
 }

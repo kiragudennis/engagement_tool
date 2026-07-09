@@ -54,6 +54,19 @@ export async function POST(req: NextRequest) {
     }
 
     const amountKes = getSubscriptionAmountKes(plan, billingCycle);
+    console.log(
+      "Creating payment record for business:",
+      businessId,
+      "Amount KES:",
+      amountKes,
+      "Plan:",
+      plan,
+      "Billing Cycle:",
+      billingCycle,
+    );
+
+    if (amountKes === 0) return;
+
     const planCode = resolvePaystackPlanCode(plan, billingCycle);
 
     console.log(
@@ -106,7 +119,7 @@ export async function POST(req: NextRequest) {
         billingCycle,
         businessId,
         paymentId: payment!.id,
-        callbackUrl: `${process.env.NEXT_PUBLIC_URL}/admin/${business.slug}/billing/success`,
+        callbackUrl: `${process.env.NEXT_PUBLIC_SITE_LIVE_URL}/admin/${business.slug}/billing/success`,
       });
       if (!initRes.status) {
         return NextResponse.json(

@@ -92,7 +92,6 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json();
-    console.log("Received M-Pesa subscription request:", body);
 
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
@@ -136,8 +135,6 @@ export async function POST(req: NextRequest) {
       })
       .select()
       .single();
-
-    console.log("Created payment record:", payment, "Error:", errorPayment);
 
     if (!payment) {
       return NextResponse.json(

@@ -28,7 +28,7 @@ import {
   Timer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PLANS, formatKES, kesToUsd } from "@/lib/config/plans";
+import { PLANS, formatPrice } from "@/lib/config/plans";
 import { DemoWheel } from "@/components/landing/demo-wheel";
 import Header from "@/components/layout/Header";
 // import spinAnimation from "@/assets/lottie/spin-1.json";
@@ -547,13 +547,13 @@ export default function LandingPage() {
                     </h3>
                     <div className="mt-4">
                       <span className="text-4xl font-bold text-gray-900 dark:text-white">
-                        {formatKES(plan.priceKes)}
+                        {formatPrice(plan.price)}
                       </span>
                       <span className="text-gray-400 dark:text-white/40 text-lg">
                         /mo
                       </span>
                       <p className="text-sm text-gray-400 dark:text-white/30 mt-1">
-                        ≈ ${kesToUsd(plan.priceKes)} USD
+                        ≈ ... KES
                       </p>
                     </div>
                     <p className="text-gray-500 dark:text-white/40 text-sm mt-1">

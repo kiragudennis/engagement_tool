@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireBusinessAdmin } from "@/lib/auth/server";
-import { getSubscriptionAmountKes } from "@/lib/services/paystack";
+import { getSubscriptionAmount } from "@/lib/services/paystack";
 import { checkBotId } from "botid/server";
 import { generateToken, secureRatelimit } from "@/lib/limit";
 import { schema } from "@/lib/utils";
@@ -10,38 +10,34 @@ import { schema } from "@/lib/utils";
 const MPESA_API = "https://api.safaricom.co.ke";
 
 async function mpesaSTKPush(
-  amountKes: number,
+  amountUSD: number,
   phoneNumber: string,
   paymentId: string,
   plan: string,
   token: string,
 ) {
-  // Convert currency to KES if needed (using totals.total)
-  // let amountKES = totals.total;
-  // const currency = totals.currency || "KES"; // Assuming currency is in totals
+  // Convert USD to KES for M-Pesa
+  let amountKES: number;
 
-  // if (currency !== "KES") {
-  //   try {
-  //     const access_key = process.env.EXCHANGE_API_KEY;
-  //     const endpoint = process.env.ENDPOINT;
+  try {
+    const access_key = process.env.EXCHANGE_API_KEY;
+    const endpoint = process.env.ENDPOINT;
 
-  //     const res = await fetch(
-  //       `https://api.exchangerate.host/${endpoint}?access_key=${access_key}&from=${currency}&to=KES&amount=${amountKES}`,
-  //       { next: { revalidate: 3600 * 12 } },
-  //     );
-  //     const json = await res.json();
-  //     const rate = json.result;
+    const res = await fetch(
+      `https://api.exchangerate.host/${endpoint}?access_key=${access_key}&from=USD&to=KES&amount=${amountUSD}`,
+      { next: { revalidate: 3600 * 12 } },
+    );
+    const json = await res.json();
+    const rate = json.result;
 
-  //     if (!rate) throw new Error("Rate missing");
-  //     amountKES = Math.round(rate);
-  //   } catch (err) {
-  //     console.error(
-  //       "Exchange rate fetch failed, defaulting to hardcoded rate",
-  //       err,
-  //     );
-  //     amountKES = Math.round(totals.total * 131); // fallback
-  //   }
-  // }
+    if (!rate) throw new Error("Rate missing");
+    amountKES = Math.round(rate);
+  } catch (err) {
+    console.error("Exchange rate fetch failed, using fallback rate", err);
+    amountKES = Math.round(amountUSD * 131); // fallback rate
+  }
+
+  console.log(`M-Pesa STK Push: USD ${amountUSD} → KES ${amountKES}`);
 
   const timestamp = new Date()
     .toISOString()
@@ -67,17 +63,21 @@ async function mpesaSTKPush(
       Password: password,
       Timestamp: timestamp,
       TransactionType: "CustomerPayBillOnline",
-      Amount: Math.ceil(amountKes),
+      Amount: Math.ceil(amountKES),
       PartyA: formattedPhone,
       PartyB: process.env.MPESA_SHORTCODE,
       PhoneNumber: formattedPhone,
-      CallBackURL: `${process.env.NEXT_PUBLIC_SITE_LIVE_URL}/api/webhooks/mpesa/subscription`,
+      CallBackURL: `${process.env.NEXT_PUBLIC_SITE_LIVE_URL}/api/webhooks/mpesa/subscription?callback-secret=${process.env.MPESA_CALLBACK_SECRET}`,
       AccountReference: `ENGAGE-${plan}`,
       TransactionDesc: `Engage ${plan} subscription`,
     }),
   });
 
-  return { response: await stkRes.json(), formattedPhone };
+  return {
+    response: await stkRes.json(),
+    formattedPhone,
+    amountKES,
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -90,9 +90,9 @@ export async function POST(req: NextRequest) {
   if (!success) {
     return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
   }
+
   try {
     const body = await req.json();
-
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
       console.error("Validation failed:", parsed.error.flatten().fieldErrors);
@@ -119,24 +119,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: 403 });
     }
 
-    const amountKes = getSubscriptionAmountKes(plan, billingCycle);
+    // Get USD amount
+    const amountUSD = getSubscriptionAmount(plan, billingCycle);
 
-    const { data: payment, error: errorPayment } = await supabaseAdmin
+    // Create payment record in USD
+    const { data: payment, error: paymentError } = await supabaseAdmin
       .from("business_payments")
       .insert({
         business_id: businessId,
-        amount: amountKes,
-        currency: "KES",
+        amount: amountUSD,
+        currency: "USD", // Store original USD amount
         plan,
         billing_cycle: billingCycle,
         payment_method: "mpesa",
         status: "pending",
-        metadata: { phone: phoneNumber },
+        metadata: {
+          phone: phoneNumber,
+          is_lifetime: plan.startsWith("early_"),
+        },
       })
       .select()
       .single();
 
-    if (!payment) {
+    if (!payment || paymentError) {
+      console.log("Error occured updating business payment", paymentError);
       return NextResponse.json(
         { error: "Failed to create payment record" },
         { status: 500 },
@@ -145,13 +151,11 @@ export async function POST(req: NextRequest) {
 
     const token = await generateToken();
 
-    const { response: stkResponse, formattedPhone } = await mpesaSTKPush(
-      amountKes,
-      phoneNumber,
-      payment!.id,
-      plan,
-      token,
-    );
+    const {
+      response: stkResponse,
+      formattedPhone,
+      amountKES,
+    } = await mpesaSTKPush(amountUSD, phoneNumber, payment.id, plan, token);
 
     if (stkResponse.CheckoutRequestID) {
       await supabaseAdmin
@@ -159,12 +163,15 @@ export async function POST(req: NextRequest) {
         .update({
           transaction_id: stkResponse.CheckoutRequestID,
           metadata: {
-            ...stkResponse,
+            ...payment.metadata,
+            mpesa_request: stkResponse,
             phone: formattedPhone,
-            payment_id: payment!.id,
+            amount_kes: amountKES,
+            amount_usd: amountUSD,
+            payment_id: payment.id,
           },
         })
-        .eq("id", payment!.id);
+        .eq("id", payment.id);
 
       await supabaseAdmin
         .from("businesses")

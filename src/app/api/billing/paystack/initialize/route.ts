@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireBusinessAdmin } from "@/lib/auth/server";
 import {
-  getSubscriptionAmountKes,
+  getSubscriptionAmount,
   paystackCreateCustomer,
   paystackCreateSubscription,
   paystackInitializeTransaction,
@@ -53,19 +53,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: 403 });
     }
 
-    const amountKes = getSubscriptionAmountKes(plan, billingCycle);
+    const amount = getSubscriptionAmount(plan, billingCycle);
     console.log(
       "Creating payment record for business:",
       businessId,
-      "Amount KES:",
-      amountKes,
+      "Amount USD:",
+      amount,
       "Plan:",
       plan,
       "Billing Cycle:",
       billingCycle,
     );
-
-    if (amountKes === 0) return;
 
     const planCode = resolvePaystackPlanCode(plan, billingCycle);
 
@@ -77,15 +75,15 @@ export async function POST(req: NextRequest) {
       "billingCycle:",
       billingCycle,
       "amountKes:",
-      amountKes,
+      amount,
     );
 
     const { data: payment, error: bsError } = await supabaseAdmin
       .from("business_payments")
       .insert({
         business_id: businessId,
-        amount: amountKes,
-        currency: "KES",
+        amount: amount,
+        currency: "USD",
         plan,
         billing_cycle: billingCycle,
         payment_method: "paystack",
@@ -114,7 +112,7 @@ export async function POST(req: NextRequest) {
     if (!authorizationUrl) {
       const initRes = await paystackInitializeTransaction({
         email,
-        amountKes,
+        amount,
         plan,
         billingCycle,
         businessId,

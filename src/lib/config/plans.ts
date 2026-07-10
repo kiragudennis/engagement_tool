@@ -1,3 +1,4 @@
+// src/lib/config/plans.ts
 import { Sparkles, Crown, Zap, type LucideIcon } from "lucide-react";
 
 export const KES_TO_USD_RATE = 129;
@@ -35,7 +36,7 @@ export interface PlanFeature {
 export interface PlanDefinition {
   id: PlanId;
   name: string;
-  priceKes: number;
+  price: number;
   icon: LucideIcon;
   color: string;
   borderColor: string;
@@ -54,7 +55,7 @@ export interface PlanDefinition {
 export interface EarlyAccessPlanDefinition {
   id: PlanId;
   name: string;
-  priceKes: number;
+  price: number;
 }
 
 const UNLIMITED = 999;
@@ -168,7 +169,7 @@ export const PLANS: PlanDefinition[] = [
   {
     id: "starter",
     name: "Starter",
-    priceKes: 3999,
+    price: 29,
     icon: Sparkles,
     color: "from-blue-500 to-cyan-500",
     borderColor: "border-blue-500/30",
@@ -177,8 +178,8 @@ export const PLANS: PlanDefinition[] = [
     desc: "For small businesses getting started",
     limits: PLAN_LIMITS.starter,
     paystackPlanCodes: {
-      monthly: "PLN_ydgtlvrtrjpbtz8",
-      annual: "PLN_l2nu74bpwgmfckg",
+      monthly: "PLN_tnycmek89nlf8o4",
+      annual: "PLN_cvdw8uhpsxy6749",
     },
     features: [
       { text: "1 spin game", included: true },
@@ -200,7 +201,7 @@ export const PLANS: PlanDefinition[] = [
   {
     id: "pro",
     name: "Pro",
-    priceKes: 9999,
+    price: 79,
     icon: Crown,
     color: "from-purple-500 to-pink-500",
     borderColor: "border-purple-500/30",
@@ -209,8 +210,8 @@ export const PLANS: PlanDefinition[] = [
     desc: "For growing businesses running regular campaigns",
     limits: PLAN_LIMITS.pro,
     paystackPlanCodes: {
-      monthly: "PLN_1y7cuxm6auf2cxq",
-      annual: "PLN_f8njityjpmp6eal",
+      monthly: "PLN_b8q1ptwh4tyemyd",
+      annual: "PLN_kp2bk8mq4wdx6nc",
     },
     features: [
       { text: "3 spin games", included: true },
@@ -232,7 +233,7 @@ export const PLANS: PlanDefinition[] = [
   {
     id: "enterprise",
     name: "Enterprise",
-    priceKes: 24999,
+    price: 194,
     icon: Zap,
     color: "from-amber-500 to-orange-500",
     borderColor: "border-amber-500/30",
@@ -241,8 +242,8 @@ export const PLANS: PlanDefinition[] = [
     desc: "For chains and high-volume venues",
     limits: PLAN_LIMITS.enterprise,
     paystackPlanCodes: {
-      monthly: "PLN_99uja3f924723eg",
-      annual: "PLN_dquz9sky664pvk5",
+      monthly: "PLN_z5ur4kh042dd30y",
+      annual: "PLN_bqgtnx8m6mbay27",
     },
     features: [
       { text: "Unlimited spin games", included: true },
@@ -267,17 +268,17 @@ export const EARLY_ACCESS_PLANS: EarlyAccessPlanDefinition[] = [
   {
     id: "early_bronze",
     name: "Early Bronze",
-    priceKes: 2999,
+    price: 997,
   },
   {
     id: "early_silver",
     name: "Early Silver",
-    priceKes: 6999,
+    price: 2497,
   },
   {
     id: "early_gold",
     name: "Early Gold",
-    priceKes: 14999,
+    price: 4997,
   },
 ];
 
@@ -290,31 +291,20 @@ export function getPaystackPlanCode(
   cycle: BillingCycle,
 ): string | undefined {
   let def: any = PLANS.find((p) => p.id === plan);
-
-  if (!def) {
-    def = EARLY_ACCESS_PLANS.find((p) => p.id === plan);
-  }
-
   return def?.paystackPlanCodes[cycle];
 }
 
-export function getPriceKes(plan: PlanDefinition, cycle: BillingCycle): number {
-  return cycle === "annual"
-    ? Math.round((plan.priceKes * 10) / 12)
-    : plan.priceKes;
+export function getPrice(plan: PlanDefinition, cycle: BillingCycle): number {
+  return cycle === "annual" ? plan.price * 10 : plan.price;
 }
 
-export function formatKES(amount: number): string {
-  return new Intl.NumberFormat("en-KE", {
+export function formatPrice(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "KES",
+    currency: "USD",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);
-}
-
-export function kesToUsd(kes: number): number {
-  return Math.round(kes / KES_TO_USD_RATE);
 }
 
 export function isUnlimited(value: number): boolean {

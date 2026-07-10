@@ -9,14 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Check, RotateCcw, Brain, Gift, ArrowRight, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  PLANS,
-  PRICING_FAQS,
-  KES_TO_USD_RATE,
-  getPriceKes,
-  formatKES,
-  kesToUsd,
-} from "@/lib/config/plans";
+import { PLANS, PRICING_FAQS, formatPrice } from "@/lib/config/plans";
 
 export default function PricingPage() {
   const router = useRouter();
@@ -99,10 +92,9 @@ export default function PricingPage() {
       <div className="container mx-auto px-4 pb-20">
         <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {PLANS.map((plan, i) => {
-            const price = getPriceKes(plan, billingCycle);
-            const usdPrice = kesToUsd(price);
-            const annualSavings = plan.priceKes * 12 - plan.priceKes * 10;
-
+            const monthlyPrice = plan.price; // $29, $79, or $194
+            const annualTotal = plan.price * 10; // 10 months paid, 2 free
+            const annualSavings = plan.price * 2; // 2 months free
             return (
               <motion.div
                 key={plan.name}
@@ -128,20 +120,6 @@ export default function PricingPage() {
                   )}
                 >
                   <CardContent className="p-6 flex flex-col h-full">
-                    {/* Plan Header */}
-                    {/* <div
-                      className={cn(
-                        "w-12 h-12 rounded-xl flex items-center justify-center mb-4",
-                        plan.bgGlow,
-                      )}
-                    >
-                      <Icon
-                        className={cn(
-                          "h-6 w-6",
-                          plan.color.split(" ")[0].replace("from-", "text-"),
-                        )}
-                      />
-                    </div> */}
                     <h3 className="text-xl font-bold text-white">
                       {plan.name}
                     </h3>
@@ -149,22 +127,52 @@ export default function PricingPage() {
 
                     {/* Price */}
                     <div className="mt-4 mb-6">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-bold text-white">
-                          {formatKES(price)}
-                        </span>
-                        <span className="text-white/40">/mo</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <p className="text-sm text-white/30 mt-1">
-                          ≈ ${usdPrice} USD
-                        </p>
-                        {billingCycle === "annual" && (
-                          <p className="text-xs text-green-400 mt-2">
-                            Save {formatKES(annualSavings)}/year
+                      {billingCycle === "annual" ? (
+                        <>
+                          {/* Annual total prominently displayed */}
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-4xl font-bold text-white">
+                              {formatPrice(annualTotal)}
+                            </span>
+                            <span className="text-white/40">/year</span>
+                          </div>
+
+                          {/* Monthly equivalent in smaller text */}
+                          <p className="text-sm text-white/40 mt-1">
+                            {formatPrice(monthlyPrice)}/mo • 10 months billed
+                            annually
                           </p>
-                        )}
-                      </div>
+
+                          {/* Savings highlight */}
+                          <div className="mt-3 bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2">
+                            <p className="text-sm text-green-400 font-medium">
+                              🎉 Save {formatPrice(annualSavings)} • 2 months
+                              free
+                            </p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {/* Monthly price */}
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-4xl font-bold text-white">
+                              {formatPrice(monthlyPrice)}
+                            </span>
+                            <span className="text-white/40">/mo</span>
+                          </div>
+
+                          {/* Upsell to annual */}
+                          <p className="text-sm text-white/30 mt-3">
+                            Save {formatPrice(annualSavings)} with{" "}
+                            <button
+                              onClick={() => setBillingCycle("annual")}
+                              className="text-green-400 hover:text-green-300 underline"
+                            >
+                              annual billing
+                            </button>
+                          </p>
+                        </>
+                      )}
                     </div>
 
                     {/* Features */}
@@ -202,7 +210,9 @@ export default function PricingPage() {
                           : "bg-white/10 hover:bg-white/20 text-white",
                       )}
                       onClick={() =>
-                        router.push(`/business/signup?plan=${plan.id}`)
+                        router.push(
+                          `/business/signup?plan=${plan.id}&billing=${billingCycle}`,
+                        )
                       }
                     >
                       {plan.popular ? (

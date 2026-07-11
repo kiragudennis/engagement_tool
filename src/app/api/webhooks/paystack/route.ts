@@ -21,8 +21,6 @@ export async function POST(req: NextRequest) {
     const eventType = event.event;
     const data = event.data;
 
-    console.log("Paystack webhook:", eventType, data.reference);
-
     // Handle successful charge (both one-time and recurring)
     if (eventType === "charge.success") {
       const metadata = data.metadata || {};

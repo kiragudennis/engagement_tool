@@ -240,7 +240,6 @@ export default function AdminBillingPage() {
           }),
         });
         const data = await res.json();
-        console.log("M-Pesa response:", data);
         if (!res.ok) throw new Error(data.error || "M-Pesa failed");
         toast.success(data.message || "Check your phone for M-Pesa prompt");
         setStep("done");
@@ -298,23 +297,25 @@ export default function AdminBillingPage() {
               ? "Check your phone for the M-Pesa prompt to complete payment."
               : "Your payment is being processed."}
           </p>
-          <Button
-            onClick={() => router.push(`/admin/${business?.slug}`)}
-            className="gap-2"
-            size="lg"
-          >
-            Go to Dashboard <ArrowRight className="h-4 w-4" />
-          </Button>
-          <Button
-            onClick={() =>
-              router.push(`/admin/${business?.slug}/billing/manage`)
-            }
-            className="gap-2"
-            size="lg"
-            variant={"secondary"}
-          >
-            Manage bills <ArrowRight className="h-4 w-4" />
-          </Button>
+          <div className="flex flex-col items-center gap-4">
+            <Button
+              onClick={() => router.push(`/admin/${business?.slug}`)}
+              className="gap-2 w-full"
+              size="lg"
+            >
+              Go to Dashboard <ArrowRight className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={() =>
+                router.push(`/admin/${business?.slug}/billing/manage`)
+              }
+              className="gap-2 w-full"
+              size="lg"
+              variant={"secondary"}
+            >
+              Manage bills <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
         </motion.div>
       </div>
     );

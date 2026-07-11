@@ -19,14 +19,6 @@ async function mpesaSTKPush(
   // Convert USD to KES for M-Pesa
   let amountKES: number;
 
-  // Reduce the amount for testing
-  if (amountUSD > 1) {
-    console.log("Amount awaiting conversion:", amountUSD);
-
-    amountUSD = 1;
-  }
-
-  console.log("Testing amount:", amountUSD);
   try {
     const access_key = process.env.EXCHANGE_API_KEY;
     const endpoint = process.env.ENDPOINT;
@@ -44,8 +36,6 @@ async function mpesaSTKPush(
     console.error("Exchange rate fetch failed, using fallback rate", err);
     amountKES = Math.round(amountUSD * 131); // fallback rate
   }
-
-  console.log(`M-Pesa STK Push: USD ${amountUSD} → KES ${amountKES}`);
 
   const timestamp = new Date()
     .toISOString()
@@ -70,12 +60,12 @@ async function mpesaSTKPush(
       BusinessShortCode: process.env.MPESA_SHORTCODE,
       Password: password,
       Timestamp: timestamp,
-      TransactionType: "CustomerPayBillOnline",
+      TransactionType: "CustomerBuyGoodsOnline",
       Amount: Math.ceil(amountKES),
       PartyA: formattedPhone,
-      PartyB: process.env.MPESA_SHORTCODE,
+      PartyB: process.env.MPESA_TILL!,
       PhoneNumber: formattedPhone,
-      CallBackURL: `${process.env.NEXT_PUBLIC_SITE_LIVE_URL}/api/webhooks/mpesa/subscription?callback-secret=${process.env.MPESA_CALLBACK_SECRET}`,
+      CallBackURL: `${process.env.NEXT_PUBLIC_SITE_URL}/api/webhooks/mpesa/subscription?callback-secret=${process.env.MPESA_CALLBACK_SECRET}`,
       AccountReference: `ENGAGE-${plan}`,
       TransactionDesc: `Engage ${plan} subscription`,
     }),

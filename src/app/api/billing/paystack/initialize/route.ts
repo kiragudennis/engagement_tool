@@ -54,29 +54,7 @@ export async function POST(req: NextRequest) {
     }
 
     const amount = getSubscriptionAmount(plan, billingCycle);
-    console.log(
-      "Creating payment record for business:",
-      businessId,
-      "Amount USD:",
-      amount,
-      "Plan:",
-      plan,
-      "Billing Cycle:",
-      billingCycle,
-    );
-
     const planCode = resolvePaystackPlanCode(plan, billingCycle);
-
-    console.log(
-      "Creating payment record for business:",
-      businessId,
-      "plan:",
-      plan,
-      "billingCycle:",
-      billingCycle,
-      "amountKes:",
-      amount,
-    );
 
     const { data: payment, error: bsError } = await supabaseAdmin
       .from("business_payments")
@@ -91,8 +69,6 @@ export async function POST(req: NextRequest) {
       })
       .select()
       .single();
-
-    console.log("Payment record created:", payment, "Error:", bsError);
 
     const customerRes = await paystackCreateCustomer(email, fullName);
     const customerCode =
@@ -117,7 +93,7 @@ export async function POST(req: NextRequest) {
         billingCycle,
         businessId,
         paymentId: payment!.id,
-        callbackUrl: `${process.env.NEXT_PUBLIC_SITE_LIVE_URL}/admin/${business.slug}/billing/success`,
+        callbackUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/admin/${business.slug}/billing/success`,
       });
       if (!initRes.status) {
         return NextResponse.json(
@@ -128,17 +104,13 @@ export async function POST(req: NextRequest) {
       authorizationUrl = initRes.data.authorization_url;
     }
 
-    if (customerCode) {
+    if (customerCode || subscriptionCode) {
       await supabaseAdmin
         .from("businesses")
-        .update({ paystack_customer_code: customerCode })
-        .eq("id", businessId);
-    }
-
-    if (subscriptionCode) {
-      await supabaseAdmin
-        .from("businesses")
-        .update({ paystack_subscription_code: subscriptionCode })
+        .update({
+          paystack_customer_code: customerCode,
+          paystack_subscription_code: subscriptionCode,
+        })
         .eq("id", businessId);
     }
 

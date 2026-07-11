@@ -65,57 +65,69 @@ export default function SubscriptionManagement() {
         .eq("slug", slug)
         .single();
 
-      if (!biz) {
+      if (!profile?.business_slug) {
         router.push("/business/signup");
         return;
       }
+
       setBusiness(biz);
 
       const res = await fetch(
-        `/api/billing/paystack/manage?businessId=${biz.id}`,
+        `/api/billing/paystack/manage?businessId=${biz.id}&businessSlug=${profile.business_slug}`,
       );
       const subscriptionData = await res.json();
       setData(subscriptionData);
 
-      // Auto-check pending M-Pesa payments older than 2 minutes
-      const pendingPayments = subscriptionData.payments?.filter(
-        (p: any) =>
-          p.payment_method === "mpesa" &&
-          p.status === "pending" &&
-          p.transaction_id &&
-          new Date(p.created_at) < new Date(Date.now() - 2 * 60 * 1000), // Older than 2 minutes
-      );
+      // Auto-check only the LATEST pending M-Pesa payment older than 2 minutes
+      const latestPendingPayment = subscriptionData.payments
+        ?.filter(
+          (p: any) =>
+            p.payment_method === "mpesa" &&
+            p.status === "pending" &&
+            p.transaction_id &&
+            new Date(p.created_at) < new Date(Date.now() - 2 * 60 * 1000), // Older than 2 minutes
+        )
+        .sort(
+          (a: any, b: any) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        )[0]; // Get only the most recent one
 
-      if (pendingPayments?.length > 0) {
-        for (const payment of pendingPayments) {
-          try {
-            const queryRes = await fetch("/api/billing/paystack/manage", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                action: "query_mpesa",
-                businessId: biz.id,
-                paymentId: payment.id,
-              }),
-            });
+      if (latestPendingPayment) {
+        try {
+          const action =
+            latestPendingPayment.payment_method === "paystack"
+              ? "query_paystack"
+              : "query_mpesa";
 
-            const queryData = await queryRes.json();
+          const queryRes = await fetch("/api/billing/paystack/manage", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action,
+              businessId: biz.id,
+              paymentId: latestPendingPayment.id,
+            }),
+          });
 
-            if (queryData.paymentStatus === "completed") {
-              toast.success(
-                "Found a completed M-Pesa payment! Your subscription has been updated.",
-              );
-              // Reload to get fresh data
-              const updatedRes = await fetch(
-                `/api/billing/paystack/manage?businessId=${biz.id}`,
-              );
-              const updatedData = await updatedRes.json();
-              setData(updatedData);
-              break;
-            }
-          } catch (err) {
-            console.error("Auto-query failed for payment:", payment.id, err);
+          const queryData = await queryRes.json();
+
+          if (queryData.paymentStatus === "completed") {
+            toast.success(
+              "We found your completed M-Pesa payment! Your subscription has been updated.",
+            );
+            // Reload to get fresh data
+            const updatedRes = await fetch(
+              `/api/billing/paystack/manage?businessId=${biz.id}`,
+            );
+            const updatedData = await updatedRes.json();
+            setData(updatedData);
           }
+        } catch (err) {
+          console.error(
+            "Auto-query failed for payment:",
+            latestPendingPayment.id,
+            err,
+          );
         }
       }
     } catch (error) {
@@ -195,6 +207,43 @@ export default function SubscriptionManagement() {
       loadData(); // Refresh data
     } catch (error) {
       toast.error("Failed to query payment status");
+    } finally {
+      setQueryingPayment(null);
+    }
+  };
+
+  const handleQueryPaystackPayment = async (paymentId: string) => {
+    if (!business) return;
+    setQueryingPayment(paymentId);
+
+    try {
+      const res = await fetch("/api/billing/paystack/manage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "query_paystack",
+          businessId: business.id,
+          paymentId,
+        }),
+      });
+
+      const result = await res.json();
+
+      if (result.success) {
+        if (result.paymentStatus === "completed") {
+          toast.success(result.message || "Payment verified successfully!");
+        } else if (result.paymentStatus === "failed") {
+          toast.error(result.message || "Payment failed");
+        } else {
+          toast.info(result.message || "Payment still pending");
+        }
+      } else {
+        toast.error(result.error || "Verification failed");
+      }
+
+      loadData(); // Refresh data
+    } catch (error) {
+      toast.error("Failed to verify payment");
     } finally {
       setQueryingPayment(null);
     }
@@ -486,7 +535,6 @@ export default function SubscriptionManagement() {
         </div>
 
         {/* Payment History */}
-        {/* Payment History */}
         <Card className="bg-white/5 border-white/10">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
@@ -507,7 +555,7 @@ export default function SubscriptionManagement() {
             {data.payments.length === 0 ? (
               <p className="text-white/40 text-sm">No payment history</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-96 overflow-auto no-scrollbar">
                 {data.payments.map((payment: any) => (
                   <div
                     key={payment.id}
@@ -521,6 +569,9 @@ export default function SubscriptionManagement() {
                         {payment.payment_method === "mpesa" && (
                           <Smartphone className="h-3 w-3 text-green-400" />
                         )}
+                        {payment.payment_method === "paystack" && (
+                          <CreditCard className="h-3 w-3 text-purple-400" />
+                        )}
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         <p className="text-white/40 text-xs">
@@ -532,6 +583,17 @@ export default function SubscriptionManagement() {
                         {payment.metadata?.mpesa_receipt && (
                           <Badge className="bg-green-500/10 text-green-400 text-xs">
                             Receipt: {payment.metadata.mpesa_receipt}
+                          </Badge>
+                        )}
+                        {payment.transaction_id &&
+                          payment.payment_method === "paystack" && (
+                            <Badge className="bg-purple-500/10 text-purple-400 text-xs">
+                              Ref: {payment.transaction_id.slice(0, 12)}...
+                            </Badge>
+                          )}
+                        {payment.metadata?.verified_manually && (
+                          <Badge className="bg-blue-500/10 text-blue-400 text-xs">
+                            Verified
                           </Badge>
                         )}
                       </div>
@@ -556,22 +618,32 @@ export default function SubscriptionManagement() {
                         </p>
                       </div>
 
-                      {/* Query button for pending M-Pesa payments */}
-                      {payment.payment_method === "mpesa" &&
-                        payment.status === "pending" &&
+                      {/* Query button for pending/failed payments */}
+                      {payment.status !== "completed" &&
                         payment.transaction_id && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleQueryMpesaPayment(payment.id)}
+                            onClick={() =>
+                              payment.payment_method === "paystack"
+                                ? handleQueryPaystackPayment(payment.id)
+                                : handleQueryMpesaPayment(payment.id)
+                            }
                             disabled={queryingPayment === payment.id}
-                            className="text-green-400 hover:text-green-300 hover:bg-green-500/10"
-                            title="Check payment status"
+                            className={
+                              payment.payment_method === "paystack"
+                                ? "text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                                : "text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                            }
+                            title={`Check ${payment.payment_method} payment status`}
                           >
                             {queryingPayment === payment.id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <Search className="h-4 w-4" />
+                              <>
+                                <RefreshCw className="h-4 w-4 mr-1" />
+                                <span className="text-xs">Verify</span>
+                              </>
                             )}
                           </Button>
                         )}

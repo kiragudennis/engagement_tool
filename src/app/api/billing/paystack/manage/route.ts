@@ -7,6 +7,7 @@ import {
   paystackEnableSubscription,
   paystackDisableSubscription,
   paystackGetCustomer,
+  activateBusinessSubscription,
 } from "@/lib/services/paystack";
 import { EARLY_ACCESS_PLANS, PLANS } from "@/lib/config/plans";
 import { headers } from "next/headers";
@@ -99,12 +100,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { action, businessId } = body;
+    const { action, businessSlug, businessId } = body;
 
     const { data: business } = await supabaseAdmin
       .from("businesses")
       .select("*")
-      .eq("id", businessId)
+      .eq("slug", businessSlug)
       .single();
 
     if (!business) {
@@ -276,6 +277,130 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      case "query_paystack": {
+        const { paymentId } = body;
+
+        if (!paymentId) {
+          return NextResponse.json(
+            { error: "Payment ID required" },
+            { status: 400 },
+          );
+        }
+
+        // Get the payment record
+        const { data: payment } = await supabaseAdmin
+          .from("business_payments")
+          .select("*")
+          .eq("id", paymentId)
+          .single();
+
+        if (!payment) {
+          return NextResponse.json(
+            { error: "Payment not found" },
+            { status: 404 },
+          );
+        }
+
+        if (!payment.transaction_id) {
+          return NextResponse.json(
+            {
+              error: "No transaction reference found",
+            },
+            { status: 400 },
+          );
+        }
+
+        try {
+          const { paystackVerifyTransaction } =
+            await import("@/lib/services/paystack");
+          const verifyResult = await paystackVerifyTransaction(
+            payment.payment_reference,
+          );
+
+          if (verifyResult.status && verifyResult.data?.status === "success") {
+            // Payment was successful - update record
+            const { error: updateError } = await supabaseAdmin
+              .from("business_payments")
+              .update({
+                status: "completed",
+                paid_at: new Date().toISOString(),
+                metadata: {
+                  ...payment.metadata,
+                  paystack_verification: verifyResult.data,
+                  verified_manually: true,
+                  verified_at: new Date().toISOString(),
+                },
+              })
+              .eq("id", payment.id);
+
+            if (updateError) {
+              console.error("Failed to update payment:", updateError);
+            }
+
+            // Activate subscription if needed
+            const isLifetime =
+              payment.plan?.startsWith("early_") ||
+              payment.metadata?.is_lifetime;
+
+            await activateBusinessSubscription({
+              businessId: payment.business_id,
+              plan: payment.plan,
+              billingCycle: isLifetime
+                ? "lifetime"
+                : payment.billing_cycle || "monthly",
+              paymentMethod: "paystack",
+              paystackCustomerCode:
+                verifyResult.data.customer?.customer_code ||
+                business.paystack_customer_code,
+            });
+
+            return NextResponse.json({
+              success: true,
+              paymentStatus: "completed",
+              message: "Payment verified and subscription activated!",
+              amount: verifyResult.data.amount / 100,
+              reference: payment.transaction_id,
+            });
+          } else if (
+            verifyResult.data?.status === "failed" ||
+            verifyResult.data?.status === "abandoned"
+          ) {
+            // Payment failed
+            await supabaseAdmin
+              .from("business_payments")
+              .update({
+                status: "failed",
+                metadata: {
+                  ...payment.metadata,
+                  paystack_verification: verifyResult.data,
+                },
+              })
+              .eq("id", payment.id);
+
+            return NextResponse.json({
+              success: false,
+              paymentStatus: "failed",
+              message: "Payment was not successful",
+              gatewayResponse: verifyResult.data.gateway_response,
+            });
+          } else {
+            // Still pending
+            return NextResponse.json({
+              success: true,
+              paymentStatus: "pending",
+              message: "Payment is still pending. Please check again later.",
+              status: verifyResult.data?.status,
+            });
+          }
+        } catch (error) {
+          console.error("Paystack verification error:", error);
+          return NextResponse.json(
+            { error: "Failed to verify Paystack transaction" },
+            { status: 500 },
+          );
+        }
+      }
+
       case "query_mpesa": {
         const { paymentId } = body;
 
@@ -290,7 +415,7 @@ export async function POST(req: NextRequest) {
 
         // Forward to the M-Pesa query endpoint
         const queryRes = await fetch(
-          `${process.env.NEXT_PUBLIC_SITE_LIVE_URL}/api/billing/mpesa/query`,
+          `${process.env.NEXT_PUBLIC_SITE_URL}/api/billing/mpesa/query`,
           {
             method: "POST",
             headers: {

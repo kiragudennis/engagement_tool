@@ -252,3 +252,22 @@ export async function paystackGeneratePaymentLink(params: {
   });
   return res.json();
 }
+
+// Verify a transaction by reference
+export async function paystackVerifyTransaction(reference: string) {
+  const res = await fetch(`${PAYSTACK_API}/transaction/verify/${reference}`, {
+    headers: paystackHeaders(),
+  });
+  return res.json();
+}
+
+// Get all transactions for a customer (recent)
+export async function paystackGetCustomerTransactions(customerCode: string) {
+  const res = await fetch(
+    `${PAYSTACK_API}/transaction?customer=${customerCode}&perPage=10`,
+    {
+      headers: paystackHeaders(),
+    },
+  );
+  return res.json();
+}

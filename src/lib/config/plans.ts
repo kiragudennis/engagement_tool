@@ -1,5 +1,5 @@
 // src/lib/config/plans.ts
-import { Sparkles, Crown, Zap, type LucideIcon } from "lucide-react";
+import { Sparkles, Crown, Zap, type LucideIcon, Rocket } from "lucide-react";
 
 export const KES_TO_USD_RATE = 129;
 
@@ -264,16 +264,119 @@ export const PLANS: PlanDefinition[] = [
   },
 ];
 
+// ─── Early Bird Packages (USD) ──────────────────────────
+export const EARLY_BIRD_PACKAGES = [
+  {
+    id: "bronze",
+    name: "Bronze",
+    priceUsd: 697, // Break-even at 24 months, saves $173 over 3 years
+    color: "from-amber-500 to-orange-500",
+    borderColor: "border-amber-500/30",
+    bgGlow: "bg-amber-500/10",
+    popular: false,
+    desc: "For small businesses ready to grow with gamification",
+    features: [
+      {
+        text: "Lifetime access — never pay again",
+        included: true,
+        highlight: true,
+      },
+      { text: "3 spin games", included: true },
+      { text: "3 trivia challenges", included: true },
+      { text: "3 active draws", included: true },
+      { text: "5,000 engagements/month", included: true },
+      { text: "12 prize slots on wheel", included: true },
+      { text: "Full branding customization", included: true },
+      { text: "Customer CSV + webhook export", included: true },
+      { text: "Live broadcast (OBS)", included: true },
+      { text: "Bulk code generation", included: true },
+      { text: "Analytics dashboard", included: true },
+      { text: "3 admin users", included: true },
+      { text: "Priority email support", included: true },
+      { text: "API access", included: false },
+      { text: "Dedicated support", included: false },
+      { text: "Custom integrations", included: false },
+    ],
+    bestFor: "Coffee shops, salons, small retailers",
+  },
+  {
+    id: "silver",
+    name: "Silver",
+    priceUsd: 1797, // Break-even at 23 months, saves $573 over 3 years
+    color: "from-gray-400 to-gray-500",
+    borderColor: "border-gray-400/30",
+    bgGlow: "bg-gray-400/10",
+    popular: true,
+    desc: "For growing businesses running regular campaigns",
+    features: [
+      {
+        text: "Lifetime access — never pay again",
+        included: true,
+        highlight: true,
+      },
+      { text: "10 spin games", included: true },
+      { text: "10 trivia challenges", included: true },
+      { text: "10 active draws", included: true },
+      { text: "25,000 engagements/month", included: true },
+      { text: "24 prize slots on wheel", included: true },
+      { text: "Full branding customization", included: true },
+      { text: "Customer CSV + API + Webhooks", included: true },
+      { text: "Live broadcast (OBS)", included: true },
+      { text: "Bulk code generation", included: true },
+      { text: "Advanced analytics", included: true },
+      { text: "10 admin users", included: true },
+      { text: "Priority support (email + chat)", included: true },
+      { text: "API access", included: true },
+      { text: "Dedicated support", included: false },
+      { text: "Custom integrations", included: false },
+    ],
+    bestFor: "Restaurants, event venues, mid-size retailers",
+  },
+  {
+    id: "gold",
+    name: "Gold",
+    priceUsd: 4997, // Break-even at 26 months, saves $823 over 3 years
+    color: "from-yellow-400 to-yellow-600",
+    borderColor: "border-yellow-500/30",
+    bgGlow: "bg-yellow-500/10",
+    popular: false,
+    desc: "For chains and high-volume venues with multiple locations",
+    features: [
+      {
+        text: "Lifetime access — never pay again",
+        included: true,
+        highlight: true,
+      },
+      { text: "Unlimited spin games", included: true },
+      { text: "Unlimited trivia challenges", included: true },
+      { text: "Unlimited active draws", included: true },
+      { text: "100,000 engagements/month", included: true },
+      { text: "24 prize slots on wheel", included: true },
+      { text: "Full white-label branding", included: true },
+      { text: "Customer CSV + API + Webhooks", included: true },
+      { text: "Live broadcast (OBS)", included: true },
+      { text: "Bulk code generation", included: true },
+      { text: "Advanced analytics + custom reports", included: true },
+      { text: "Unlimited admin users", included: true },
+      { text: "Dedicated account manager", included: true },
+      { text: "API access", included: true },
+      { text: "Custom integrations", included: true },
+      { text: "Multiple location support", included: true },
+    ],
+    bestFor: "Chains, franchises, agencies managing multiple clients",
+  },
+];
+
 export const EARLY_ACCESS_PLANS: EarlyAccessPlanDefinition[] = [
   {
     id: "early_bronze",
     name: "Early Bronze",
-    price: 997,
+    price: 697,
   },
   {
     id: "early_silver",
     name: "Early Silver",
-    price: 2497,
+    price: 1797,
   },
   {
     id: "early_gold",

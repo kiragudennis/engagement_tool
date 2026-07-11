@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
       .update({
         status: "completed",
         paid_at: new Date().toISOString(),
-        transaction_id: mpesaReceipt || checkoutRequestId,
+        payment_reference: mpesaReceipt,
         metadata: {
           ...payment.metadata,
           mpesa_receipt: mpesaReceipt,

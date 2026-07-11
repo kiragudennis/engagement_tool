@@ -19,6 +19,14 @@ async function mpesaSTKPush(
   // Convert USD to KES for M-Pesa
   let amountKES: number;
 
+  // Reduce the amount for testing
+  if (amountUSD > 1) {
+    console.log("Amount awaiting conversion:", amountUSD);
+
+    amountUSD = 1;
+  }
+
+  console.log("Testing amount:", amountUSD);
   try {
     const access_key = process.env.EXCHANGE_API_KEY;
     const endpoint = process.env.ENDPOINT;
@@ -172,11 +180,6 @@ export async function POST(req: NextRequest) {
           },
         })
         .eq("id", payment.id);
-
-      await supabaseAdmin
-        .from("businesses")
-        .update({ mpesa_phone: formattedPhone })
-        .eq("id", businessId);
     }
 
     return NextResponse.json({

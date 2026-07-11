@@ -164,3 +164,91 @@ export async function activateBusinessSubscription(params: {
 
   return { data, error };
 }
+
+// Get subscription details from Paystack
+export async function paystackGetSubscription(subscriptionCode: string) {
+  const res = await fetch(`${PAYSTACK_API}/subscription/${subscriptionCode}`, {
+    headers: paystackHeaders(),
+  });
+  return res.json();
+}
+
+// Enable/Reactivate a subscription
+export async function paystackEnableSubscription(subscriptionCode: string) {
+  const res = await fetch(`${PAYSTACK_API}/subscription/enable`, {
+    method: "POST",
+    headers: paystackHeaders(),
+    body: JSON.stringify({ code: subscriptionCode, token: "reactivate_token" }),
+  });
+  return res.json();
+}
+
+// Disable/Cancel a subscription
+export async function paystackDisableSubscription(subscriptionCode: string) {
+  const res = await fetch(`${PAYSTACK_API}/subscription/disable`, {
+    method: "POST",
+    headers: paystackHeaders(),
+    body: JSON.stringify({ code: subscriptionCode, token: "cancel_token" }),
+  });
+  return res.json();
+}
+
+// Get customer details
+export async function paystackGetCustomer(customerCode: string) {
+  const res = await fetch(`${PAYSTACK_API}/customer/${customerCode}`, {
+    headers: paystackHeaders(),
+  });
+  return res.json();
+}
+
+// Get all subscriptions for a customer
+export async function paystackGetCustomerSubscriptions(customerCode: string) {
+  const res = await fetch(
+    `${PAYSTACK_API}/customer/${customerCode}/subscriptions`,
+    {
+      headers: paystackHeaders(),
+    },
+  );
+  return res.json();
+}
+
+// Update customer (e.g., change email)
+export async function paystackUpdateCustomer(
+  customerCode: string,
+  data: { email?: string; first_name?: string },
+) {
+  const res = await fetch(`${PAYSTACK_API}/customer/${customerCode}`, {
+    method: "PUT",
+    headers: paystackHeaders(),
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+// Generate a payment link for customer to retry failed payment
+export async function paystackGeneratePaymentLink(params: {
+  email: string;
+  amount: number;
+  plan: string;
+  businessId: string;
+  paymentId: string;
+  callbackUrl: string;
+}) {
+  const res = await fetch(`${PAYSTACK_API}/transaction/initialize`, {
+    method: "POST",
+    headers: paystackHeaders(),
+    body: JSON.stringify({
+      email: params.email,
+      amount: params.amount * 100,
+      currency: "USD",
+      callback_url: params.callbackUrl,
+      metadata: {
+        business_id: params.businessId,
+        plan: params.plan,
+        payment_id: params.paymentId,
+        type: "retry_payment",
+      },
+    }),
+  });
+  return res.json();
+}

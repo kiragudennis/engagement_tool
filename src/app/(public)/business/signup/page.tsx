@@ -1,7 +1,7 @@
 // app/(public)/business/signup/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,10 +43,25 @@ export default function BusinessSignupPage() {
   const [businessSlug, setBusinessSlug] = useState("");
   const searchParams = useSearchParams();
   const planParam = searchParams.get("plan") || "";
-  const isEarlyBird = planParam.startsWith("early-");
+  const isEarlyBird = planParam.startsWith("early_");
   const router = useRouter();
   const [businessId, setBusinessId] = useState<string | null>(null);
-  const { profile } = useAuth();
+  const { profile, loading } = useAuth();
+
+  // Redirect logged-in users to dashboard
+  useEffect(() => {
+    if (loading) return; // Wait for auth to load
+
+    if (profile && profile.role === "business" && profile.business_slug) {
+      if (isEarlyBird) {
+        router.push(
+          `/admin/${profile.business_slug}/billing?plan=${planParam}&businessId=${businessId}&slug=${profile.business_slug}`,
+        );
+      } else {
+        router.push(`/admin/${profile.business_slug}`);
+      }
+    }
+  }, [profile, loading, isEarlyBird, planParam, businessId, router]);
 
   const handleSubmit = async () => {
     if (!formData.businessName.trim()) {
@@ -103,9 +118,17 @@ export default function BusinessSignupPage() {
     }
   };
 
-  // redirect logged-in users to dashboard
-  if (profile && profile.role === "business" && profile.business_slug) {
-    router.push(`/admin/${profile.business_slug}`);
+  // Show loading while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
+        <div className="animate-spin h-8 w-8 border-4 border-purple-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  // If user is logged in, show nothing (will redirect in useEffect)
+  if (profile) {
     return null;
   }
 

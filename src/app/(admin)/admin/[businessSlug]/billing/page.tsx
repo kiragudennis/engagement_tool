@@ -16,7 +16,6 @@ import {
   ArrowRight,
   ArrowLeft,
   CheckCircle,
-  Shield,
   CreditCard,
   Smartphone,
   Sparkles,
@@ -32,6 +31,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { UsageMeter } from "@/components/billing/UsageMeter";
+import Link from "next/link";
 
 // ─── Plan definitions (USD only) ───────────────────────
 const EARLY_BIRD_PLANS: Record<
@@ -40,13 +40,13 @@ const EARLY_BIRD_PLANS: Record<
 > = {
   early_bronze: {
     name: "Bronze Lifetime",
-    priceUsd: 997, // ~3.4x annual (was $775)
+    priceUsd: 697, // ~3.4x annual (was $775)
     icon: Sparkles,
     color: "from-amber-500 to-orange-500",
   },
   early_silver: {
     name: "Silver Lifetime",
-    priceUsd: 2497, // ~3.2x annual (was $1,938)
+    priceUsd: 1797, // ~3.2x annual (was $1,938)
     icon: Crown,
     color: "from-gray-400 to-gray-500",
   },
@@ -141,8 +141,8 @@ export default function AdminBillingPage() {
   // ─── Check if user can subscribe ──────────────────────
   const isSubscribed =
     business?.subscription_status === "active" &&
-    !business?.plan?.startsWith("early-"); // Allow upgrading to early bird even if active
-  const hasEarlyBird = business?.plan?.startsWith("early-");
+    !business?.plan?.startsWith("early_"); // Allow upgrading to early bird even if active
+  const hasEarlyBird = business?.plan?.startsWith("early_");
   const canSubscribe = !hasEarlyBird && (!isSubscribed || isSignupFlow); // Can't subscribe if already on early bird
 
   // ─── Load business ────────────────────────────────────
@@ -305,6 +305,16 @@ export default function AdminBillingPage() {
           >
             Go to Dashboard <ArrowRight className="h-4 w-4" />
           </Button>
+          <Button
+            onClick={() =>
+              router.push(`/admin/${business?.slug}/billing/manage`)
+            }
+            className="gap-2"
+            size="lg"
+            variant={"secondary"}
+          >
+            Manage bills <ArrowRight className="h-4 w-4" />
+          </Button>
         </motion.div>
       </div>
     );
@@ -312,8 +322,6 @@ export default function AdminBillingPage() {
 
   // ─── Checkout View ────────────────────────────────────
   if (step === "checkout") {
-    console.log("Is early bird", isEarlyBird);
-
     return (
       <div className="min-h-screen bg-gray-950">
         <div className="border-b border-white/10 bg-black/50 backdrop-blur">
@@ -602,14 +610,14 @@ export default function AdminBillingPage() {
                 {
                   id: "early_bronze",
                   name: "Bronze",
-                  price: 997,
+                  price: 697,
                   desc: "Lifetime",
                   color: "border-amber-500/30 bg-amber-500/5",
                 },
                 {
                   id: "early_silver",
                   name: "Silver",
-                  price: 2497,
+                  price: 1797,
                   desc: "Lifetime",
                   color: "border-gray-400/30 bg-gray-400/5",
                   popular: true,
@@ -746,46 +754,57 @@ export default function AdminBillingPage() {
 
         {/* Current Plan */}
         <Card className="bg-white/5 border-white/10">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <Crown className="h-8 w-8 text-purple-400" />
+          <CardContent>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+              <div className="flex items-start gap-3">
+                <Crown className="h-8 w-8 text-purple-400 flex-shrink-0" />
                 <div>
                   <p className="text-white font-bold text-xl capitalize">
                     {business?.plan}
                   </p>
-                  <Badge
-                    className={cn(
-                      isTrial && "bg-yellow-500/20 text-yellow-400",
-                      isActive && "bg-green-500/20 text-green-400",
-                      hasEarlyBird && "bg-amber-500/20 text-amber-400",
-                    )}
-                  >
-                    {hasEarlyBird ? "lifetime" : business?.subscription_status}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      className={cn(
+                        isTrial && "bg-yellow-500/20 text-yellow-400",
+                        isActive && "bg-green-500/20 text-green-400",
+                        hasEarlyBird && "bg-amber-500/20 text-amber-400",
+                      )}
+                    >
+                      {hasEarlyBird
+                        ? "lifetime"
+                        : business?.subscription_status}
+                    </Badge>
+
+                    <Link href={"billing/manage"} className="text-sm p-2">
+                      Manage
+                    </Link>
+                  </div>
                 </div>
               </div>
-              {isTrial && business?.trial_ends_at && (
-                <p className="text-white/60 text-sm">
-                  Ends{" "}
-                  {formatDistanceToNow(new Date(business.trial_ends_at), {
-                    addSuffix: true,
-                  })}
-                </p>
-              )}
-              {isActive && business?.next_billing_at && (
-                <p className="text-white/60 text-sm">
-                  Next billing{" "}
-                  {formatDistanceToNow(new Date(business.next_billing_at), {
-                    addSuffix: true,
-                  })}
-                </p>
-              )}
-              {hasEarlyBird && (
-                <Badge className="bg-amber-500/20 text-amber-400">
-                  <Infinity className="h-3 w-3 mr-1" /> Lifetime Access
-                </Badge>
-              )}
+
+              <div className="flex items-center gap-3 sm:text-right">
+                {isTrial && business?.trial_ends_at && (
+                  <p className="text-white/60 text-sm">
+                    Ends{" "}
+                    {formatDistanceToNow(new Date(business.trial_ends_at), {
+                      addSuffix: true,
+                    })}
+                  </p>
+                )}
+                {isActive && business?.next_billing_at && (
+                  <p className="text-white/60 text-sm">
+                    Next billing{" "}
+                    {formatDistanceToNow(new Date(business.next_billing_at), {
+                      addSuffix: true,
+                    })}
+                  </p>
+                )}
+                {hasEarlyBird && (
+                  <Badge className="bg-amber-500/20 text-amber-400 whitespace-nowrap">
+                    <Infinity className="h-3 w-3 mr-1" /> Lifetime Access
+                  </Badge>
+                )}
+              </div>
             </div>
             <UsageMeter
               label="Engagements this month"

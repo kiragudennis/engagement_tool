@@ -10,11 +10,6 @@ export async function POST(req: NextRequest) {
     const url = new URL(req.url);
     const callbackSecret = url.searchParams.get("callback-secret");
 
-    console.log("M-Pesa webhook received:", {
-      resultCode: result.ResultCode,
-      checkoutRequestId: result.CheckoutRequestID,
-    });
-
     // Check for callback secret
     if (!callbackSecret) {
       console.log("Missing callback secret in the url", callbackSecret);
@@ -82,15 +77,6 @@ export async function POST(req: NextRequest) {
       (i: { Name: string }) => i.Name === "PhoneNumber",
     )?.Value;
 
-    console.log(
-      "Receipt",
-      mpesaReceipt,
-      "Amount",
-      amountPaid,
-      "Phone number",
-      phoneNumber,
-    );
-
     // Update payment record
     const { error: updateError } = await supabaseAdmin
       .from("business_payments")
@@ -119,8 +105,6 @@ export async function POST(req: NextRequest) {
         paymentMethod: "mpesa",
         mpesaPhone: phoneNumber || payment.metadata?.phone,
       });
-
-    console.log("Activation data received", activation);
 
     if (activationError) {
       console.error("Failed to activate subscription:", activationError);

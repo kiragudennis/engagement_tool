@@ -17,12 +17,23 @@ import {
   XCircle,
   RefreshCw,
   Infinity,
-  Search,
   RefreshCwIcon,
+  HelpCircle,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow, format } from "date-fns";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface SubscriptionData {
   business: {
@@ -50,6 +61,11 @@ export default function SubscriptionManagement() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [business, setBusiness] = useState<any>(null);
   const [queryingPayment, setQueryingPayment] = useState<string | null>(null);
+  const [mpesaDialogOpen, setMpesaDialogOpen] = useState(false);
+  const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(
+    null,
+  );
+  const [mpesaReceiptInput, setMpesaReceiptInput] = useState("");
 
   useEffect(() => {
     loadData();
@@ -99,6 +115,10 @@ export default function SubscriptionManagement() {
               ? "query_paystack"
               : "query_mpesa";
 
+          // If M-Pesa payment has a receipt stored, use it
+          const receiptNumber =
+            latestPendingPayment.payment_reference || undefined;
+
           const queryRes = await fetch("/api/billing/paystack/manage", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -106,6 +126,7 @@ export default function SubscriptionManagement() {
               action,
               businessId: biz.id,
               paymentId: latestPendingPayment.id,
+              receiptNumber, // Will be undefined if no receipt yet
             }),
           });
 
@@ -175,7 +196,10 @@ export default function SubscriptionManagement() {
     }
   };
 
-  const handleQueryMpesaPayment = async (paymentId: string) => {
+  const handleQueryMpesaPayment = async (
+    paymentId: string,
+    receiptNumber?: string,
+  ) => {
     if (!business) return;
     setQueryingPayment(paymentId);
 
@@ -187,6 +211,7 @@ export default function SubscriptionManagement() {
           action: "query_mpesa",
           businessId: business.id,
           paymentId,
+          receiptNumber: receiptNumber || undefined,
         }),
       });
 
@@ -195,6 +220,8 @@ export default function SubscriptionManagement() {
       if (result.success) {
         if (result.paymentStatus === "completed") {
           toast.success(result.message || "Payment verified successfully!");
+          setMpesaDialogOpen(false);
+          setMpesaReceiptInput("");
         } else if (result.paymentStatus === "failed") {
           toast.error(result.message || "Payment failed");
         } else {
@@ -210,6 +237,13 @@ export default function SubscriptionManagement() {
     } finally {
       setQueryingPayment(null);
     }
+  };
+
+  // Open dialog for receipt input
+  const openMpesaReceiptDialog = (paymentId: string) => {
+    setSelectedPaymentId(paymentId);
+    setMpesaReceiptInput("");
+    setMpesaDialogOpen(true);
   };
 
   const handleQueryPaystackPayment = async (paymentId: string) => {
@@ -267,6 +301,11 @@ export default function SubscriptionManagement() {
   const isActive = sub.subscription_status === "active";
   const isPaystack = sub.payment_method === "paystack";
   const isMpesa = sub.payment_method === "mpesa";
+
+  console.log(
+    "Payment and subscription match:",
+    data.payments.some((payment) => payment.paid_at === sub.last_payment_at),
+  );
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -451,12 +490,68 @@ export default function SubscriptionManagement() {
               {/* Paystack Customer Code (if available) */}
               {sub.paystack_customer_code && (
                 <div className="flex items-center justify-between py-2 border-b border-white/5">
-                  <span className="text-white/60">Customer Code</span>
+                  <span className="text-white/60">Paystack Customer Code</span>
                   <span className="text-white/40 text-sm font-mono">
                     {sub.paystack_customer_code}
                   </span>
                 </div>
               )}
+
+              {/* Paystack Subscription Code (if available) */}
+              {sub.paystack_subscription_code && (
+                <div className="flex items-center justify-between py-2 border-b border-white/5">
+                  <span className="text-white/60">
+                    Paystack Subscription Code
+                  </span>
+                  <span className="text-white/40 text-sm font-mono">
+                    {sub.paystack_subscription_code}
+                  </span>
+                </div>
+              )}
+
+              {/* Latest payment reference */}
+              {(() => {
+                const latestCompletedPayment = data.payments
+                  ?.filter(
+                    (payment: any) =>
+                      payment.status === "completed" &&
+                      (payment.payment_reference || payment.transaction_id),
+                  )
+                  .sort(
+                    (a: any, b: any) =>
+                      new Date(b.paid_at || b.created_at).getTime() -
+                      new Date(a.paid_at || a.created_at).getTime(),
+                  )[0];
+
+                if (latestCompletedPayment) {
+                  const isMpesa =
+                    latestCompletedPayment.payment_method === "mpesa";
+                  const reference =
+                    latestCompletedPayment.payment_reference ||
+                    latestCompletedPayment.transaction_id;
+
+                  return (
+                    <div className="flex items-center justify-between py-2 border-b border-white/5">
+                      <span className="text-white/60">
+                        {isMpesa ? "M-Pesa Receipt" : "Paystack Reference"}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {isMpesa ? (
+                          <Smartphone className="h-3 w-3 text-green-400" />
+                        ) : (
+                          <CreditCard className="h-3 w-3 text-purple-400" />
+                        )}
+                        <span className="text-white/40 text-sm font-mono">
+                          {reference.length > 20
+                            ? `${reference.slice(0, 20)}...`
+                            : reference}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
           </CardContent>
         </Card>
@@ -600,6 +695,53 @@ export default function SubscriptionManagement() {
                     </div>
 
                     <div className="flex items-center gap-3">
+                      {/* Query button for pending/failed payments */}
+                      {payment.status !== "completed" &&
+                        payment.transaction_id && (
+                          <div className="flex items-center gap-1">
+                            {/* Quick verify button */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                payment.payment_method === "paystack"
+                                  ? handleQueryPaystackPayment(payment.id)
+                                  : handleQueryMpesaPayment(payment.id)
+                              }
+                              disabled={queryingPayment === payment.id}
+                              className={
+                                payment.payment_method === "paystack"
+                                  ? "text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                                  : "text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                              }
+                              title={`Check ${payment.payment_method} payment status`}
+                            >
+                              {queryingPayment === payment.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <RefreshCw className="h-4 w-4 mr-1" />
+                                  <span className="text-xs">Verify</span>
+                                </>
+                              )}
+                            </Button>
+
+                            {/* Receipt input button (M-Pesa only) */}
+                            {payment.payment_method === "mpesa" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  openMpesaReceiptDialog(payment.id)
+                                }
+                                className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                                title="Verify with M-Pesa receipt number"
+                              >
+                                <Search className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       <div className="text-right">
                         <Badge
                           className={cn(
@@ -617,36 +759,6 @@ export default function SubscriptionManagement() {
                           {payment.payment_method}
                         </p>
                       </div>
-
-                      {/* Query button for pending/failed payments */}
-                      {payment.status !== "completed" &&
-                        payment.transaction_id && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              payment.payment_method === "paystack"
-                                ? handleQueryPaystackPayment(payment.id)
-                                : handleQueryMpesaPayment(payment.id)
-                            }
-                            disabled={queryingPayment === payment.id}
-                            className={
-                              payment.payment_method === "paystack"
-                                ? "text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
-                                : "text-green-400 hover:text-green-300 hover:bg-green-500/10"
-                            }
-                            title={`Check ${payment.payment_method} payment status`}
-                          >
-                            {queryingPayment === payment.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <>
-                                <RefreshCw className="h-4 w-4 mr-1" />
-                                <span className="text-xs">Verify</span>
-                              </>
-                            )}
-                          </Button>
-                        )}
                     </div>
                   </div>
                 ))}
@@ -659,16 +771,110 @@ export default function SubscriptionManagement() {
                 p.payment_method === "mpesa" && p.status === "pending",
             ) && (
               <div className="mt-4 p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/20">
-                <p className="text-yellow-400 text-xs flex items-center gap-2">
-                  <AlertTriangle className="h-3 w-3" />
-                  Have a pending M-Pesa payment? Click the search icon to check
-                  if it was completed. This queries Safaricom directly for the
-                  latest status.
-                </p>
+                <div className="flex items-start gap-2">
+                  <HelpCircle className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-yellow-400 text-xs">
+                      <strong>Auto-verify:</strong> Click the refresh icon to
+                      check payment status automatically.
+                    </p>
+                    <p className="text-yellow-400 text-xs mt-1">
+                      <strong>Manual verify:</strong> Click the search icon to
+                      enter your M-Pesa receipt number (e.g., UGBIJAPGQO) for
+                      manual verification.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
+
+        {/* M-Pesa Receipt Input Dialog */}
+        <Dialog open={mpesaDialogOpen} onOpenChange={setMpesaDialogOpen}>
+          <DialogContent className="bg-gray-900 border-white/10 text-white">
+            <DialogHeader>
+              <DialogTitle className="text-white flex items-center gap-2">
+                <Smartphone className="h-5 w-5 text-green-400" />
+                Verify M-Pesa Payment
+              </DialogTitle>
+              <DialogDescription className="text-white/50">
+                Enter your M-Pesa receipt number to verify this payment. You can
+                find this in your M-Pesa SMS confirmation message.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="receipt" className="text-white">
+                  M-Pesa Receipt Number
+                </Label>
+                <Input
+                  id="receipt"
+                  value={mpesaReceiptInput}
+                  onChange={(e) =>
+                    setMpesaReceiptInput(e.target.value.toUpperCase())
+                  }
+                  placeholder="e.g., UGBIJAPGQO"
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30 font-mono tracking-wider text-lg"
+                  maxLength={15}
+                />
+                <p className="text-white/30 text-xs">
+                  This is the code you received via SMS after paying. It usually
+                  looks like "UGBIJAPGQO".
+                </p>
+              </div>
+
+              {/* Example SMS preview */}
+              <div className="p-3 rounded-lg bg-gray-800 border border-white/10">
+                <p className="text-white/40 text-xs mb-1">
+                  Example M-Pesa SMS:
+                </p>
+                <p className="text-white/60 text-xs font-mono">
+                  UGBIJAPGQO Confirmed. KES 1,797.00 paid to ENGAGE. New M-PESA
+                  balance is...
+                </p>
+                <p className="text-green-400 text-xs mt-1">
+                  ↑ Your receipt number is highlighted
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setMpesaDialogOpen(false);
+                  setMpesaReceiptInput("");
+                }}
+                className="border-white/10"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (selectedPaymentId && mpesaReceiptInput.trim()) {
+                    handleQueryMpesaPayment(
+                      selectedPaymentId,
+                      mpesaReceiptInput.trim(),
+                    );
+                  } else {
+                    toast.error("Please enter a receipt number");
+                  }
+                }}
+                disabled={!mpesaReceiptInput.trim() || !selectedPaymentId}
+                className="bg-green-600 hover:bg-green-500"
+              >
+                {queryingPayment === selectedPaymentId ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Search className="h-4 w-4 mr-2" />
+                )}
+                Verify Payment
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

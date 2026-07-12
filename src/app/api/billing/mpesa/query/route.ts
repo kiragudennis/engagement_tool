@@ -34,10 +34,39 @@ async function querySTKStatus(checkoutRequestId: string, token: string) {
   return res.json();
 }
 
+// Querying by receipt number
+async function queryTransactionStatus(receiptNumber: string, token: string) {
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[-:T.]/g, "")
+    .slice(0, 14);
+
+  const password = Buffer.from(
+    `${process.env.MPESA_SHORTCODE}${process.env.MPESA_PASSKEY}${timestamp}`,
+  ).toString("base64");
+
+  const res = await fetch(`${MPESA_API}/mpesa/transactionstatus/v1/query`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      BusinessShortCode: process.env.MPESA_SHORTCODE,
+      Password: password,
+      Timestamp: timestamp,
+      // Use either TransactionID or OriginalConversationID
+      TransactionID: receiptNumber,
+    }),
+  });
+
+  return res.json();
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { businessId, paymentId } = body;
+    const { businessId, paymentId, receiptNumber } = body;
 
     // Get business and payment details
     const { data: business } = await supabaseAdmin
@@ -80,12 +109,33 @@ export async function POST(req: NextRequest) {
 
     // Query M-Pesa for transaction status
     const token = await generateToken();
-    const queryResult = await querySTKStatus(payment.transaction_id, token);
+    let queryResult;
+
+    // If user provided a receipt number, use transaction status query
+    if (receiptNumber) {
+      console.log("Querying by receipt number:", receiptNumber);
+      queryResult = await queryTransactionStatus(receiptNumber, token);
+    }
+    // Otherwise use CheckoutRequestID (STK query)
+    else if (payment.transaction_id) {
+      console.log("Querying by CheckoutRequestID:", payment.transaction_id);
+      queryResult = await querySTKStatus(payment.transaction_id, token);
+    } else {
+      return NextResponse.json(
+        {
+          error: "No transaction ID or receipt number available",
+        },
+        { status: 400 },
+      );
+    }
 
     console.log("M-Pesa query result:", queryResult);
 
     // Check if payment was successful
-    if (queryResult.ResultCode === "0") {
+    if (
+      queryResult.ResultCode === "0" ||
+      queryResult.Result?.ResultCode === "0"
+    ) {
       // Payment successful - extract receipt details
       const callbackMetadata = queryResult.CallbackMetadata?.Item || [];
       const mpesaReceipt = callbackMetadata.find(

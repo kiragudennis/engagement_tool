@@ -402,7 +402,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "query_mpesa": {
-        const { paymentId } = body;
+        const { paymentId, receiptNumber } = body;
 
         if (!paymentId) {
           return NextResponse.json(
@@ -423,7 +423,11 @@ export async function POST(req: NextRequest) {
               ...Object.fromEntries(incomingHeaders.entries()),
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ businessId, paymentId }),
+            body: JSON.stringify({
+              businessId,
+              paymentId,
+              receiptNumber: receiptNumber || undefined,
+            }),
           },
         );
 

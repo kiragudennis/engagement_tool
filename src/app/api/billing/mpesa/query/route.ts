@@ -2,8 +2,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireBusinessAdmin } from "@/lib/auth/server";
-import { generateToken } from "@/lib/limit";
+import { generateToken, secureRatelimit } from "@/lib/limit";
 import { activateBusinessSubscription } from "@/lib/services/paystack";
+import { checkBotId } from "botid/server";
 
 const MPESA_API = "https://api.safaricom.co.ke";
 
@@ -64,6 +65,16 @@ async function queryTransactionStatus(receiptNumber: string, token: string) {
 }
 
 export async function POST(req: NextRequest) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
+  const { success } = await secureRatelimit(req);
+  if (!success) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+
   try {
     const body = await req.json();
     const { businessId, paymentId, receiptNumber } = body;

@@ -185,10 +185,10 @@ export default function LandingPage() {
         />
 
         {/* Theme-aware overlay - light mode */}
-        <div className="absolute inset-0 bg-white/50 dark:hidden" />
+        <div className="absolute inset-0 bg-white/80 dark:hidden" />
 
         {/* Theme-aware overlay - dark mode */}
-        <div className="absolute inset-0 hidden dark:block bg-black/60" />
+        <div className="absolute inset-0 hidden dark:block bg-black/80" />
 
         {/* Decorative blur effects */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-purple-400/20 rounded-full blur-3xl" />

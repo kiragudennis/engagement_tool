@@ -22,6 +22,8 @@ import { ProfileData } from "@/types/customer";
 interface AuthContextType {
   profile: ProfileData | null;
   setProfile: React.Dispatch<React.SetStateAction<ProfileData | null>>;
+  codeResponse: any;
+  setCodeResponse: React.Dispatch<React.SetStateAction<any | null>>;
   loading: boolean;
   signIn: (
     email: string,
@@ -44,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [supabase] = useState(() => getSupabaseClient());
+  const [codeResponse, setCodeResponse] = useState<any>(null);
 
   const fetchUser = useCallback(
     async (supabaseUser: SupabaseUser) => {
@@ -285,6 +288,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return {
       profile,
       setProfile,
+      codeResponse,
+      setCodeResponse,
       loading,
       signIn,
       signInWithMagicLink,

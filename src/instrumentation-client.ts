@@ -21,35 +21,59 @@ Sentry.init({
 initBotId({
   protect: [
     {
-      path: "/api/products",
+      path: "/api/customer/redeem-code",
+      method: "POST",
+    },
+    {
+      path: "/api/customer/validate-code",
       method: "GET",
+    },
+    {
+      path: "/api/auth/login",
+      method: "POST",
+    },
+    {
+      path: "/api/auth/logout",
+      method: "POST",
     },
     {
       path: "/api/auth/signup",
       method: "POST",
     },
     {
-      path: "/api/products/search",
+      path: "/api/auth/verify-code",
       method: "GET",
     },
     {
-      path: "/api/checkout/mpesa/initial",
+      path: "/api/business/create",
       method: "POST",
     },
     {
-      path: "/api/checkout/mpesa/retrial",
+      path: "/api/cron/subscription-renewal",
+      method: "GET",
+    },
+    {
+      path: "/api/billing/mpesa/query",
       method: "POST",
     },
     {
-      path: "/api/checkout/paypal/initial",
+      path: "/api/billing/mpesa/subcribe",
       method: "POST",
     },
     {
-      path: "/api/checkout/paypal/retrial",
+      path: "/api/billing/paystack/manage",
+      method: "GET",
+    },
+    {
+      path: "/api/billing/paystack/manage",
       method: "POST",
     },
     {
-      path: "/api/coupons/validate",
+      path: "/api/billing/paystack/initialize",
+      method: "POST",
+    },
+    {
+      path: "/api/auth/signup",
       method: "POST",
     },
   ],

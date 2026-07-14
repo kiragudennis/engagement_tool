@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
                   <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 20px 0;">
                     <p style="margin: 0 0 8px; font-size: 14px; color: #6b7280;">Your public page:</p>
                     <p style="margin: 0; font-family: monospace; font-size: 16px; color: #f59e0b;">
-                      engagespin.com/${slug}/spin
+                      engagespin.com/${slug}/code-entry
                     </p>
                   </div>
                   

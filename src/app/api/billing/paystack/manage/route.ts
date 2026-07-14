@@ -11,9 +11,21 @@ import {
 } from "@/lib/services/paystack";
 import { EARLY_ACCESS_PLANS, PLANS } from "@/lib/config/plans";
 import { headers } from "next/headers";
+import { checkBotId } from "botid/server";
+import { secureRatelimit } from "@/lib/limit";
 
 // GET: Fetch subscription status
 export async function GET(req: NextRequest) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
+  const { success } = await secureRatelimit(req);
+  if (!success) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const businessId = searchParams.get("businessId");
@@ -98,6 +110,16 @@ export async function GET(req: NextRequest) {
 
 // POST: Manage subscription (reactivate, cancel, retry payment)
 export async function POST(req: NextRequest) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
+  const { success } = await secureRatelimit(req);
+  if (!success) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+
   try {
     const body = await req.json();
     const { action, businessSlug, businessId } = body;

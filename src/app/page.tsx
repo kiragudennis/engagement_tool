@@ -173,7 +173,7 @@ export default function LandingPage() {
   const heroOpacity = useTransform(scrollYProgress, [0, 1], [1, 0]);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
+    <div className="min-h-screen">
       {/* ─── NAV ─────────────────────────────────────── */}
       <Header />
       {/* ─── HERO ────────────────────────────────────── */}

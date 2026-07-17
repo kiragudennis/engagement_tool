@@ -23,6 +23,8 @@ import {
   Diamond,
   Zap,
   Radio,
+  FunnelPlus,
+  CirclePause,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -34,6 +36,8 @@ const SECTIONS = [
   { id: "codes", label: "How Codes Work", icon: Ticket },
   { id: "stickers", label: "Sticker System", icon: Printer },
   { id: "pos", label: "POS Integration", icon: ShoppingBag },
+  { id: "engagement", label: "Engagement", icon: FunnelPlus },
+  { id: "limits", label: "limits", icon: CirclePause },
   { id: "faq", label: "FAQ", icon: Shield },
 ];
 
@@ -634,7 +638,7 @@ export default function DocsPage() {
               {/* ─── ENGAGEMENT ───────────────────────────────────── */}
               <section id="engagement">
                 <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                  <Radio className="h-6 w-6 text-purple-400" /> The Full
+                  <FunnelPlus className="h-6 w-6 text-purple-400" /> The Full
                   Engagement Flow
                 </h2>
 
@@ -884,6 +888,172 @@ export default function DocsPage() {
                         </ul>
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
+              </section>
+
+              <section id="limits">
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                  <CirclePause className="h-8 w-8 text-purple-400" /> Engagement
+                  Limits & Game Capacity
+                </h2>
+
+                <Card className="bg-white/5 border-white/10 mb-6">
+                  <CardContent className="p-6">
+                    <h3 className="text-white font-semibold mb-4">
+                      How Limits Work
+                    </h3>
+                    <p className="text-white/50 text-sm mb-4">
+                      Each plan has limits on how many games you can run and how
+                      many customer engagements you can process per month. The
+                      system automatically manages capacity.
+                    </p>
+
+                    <div className="overflow-x-auto mb-6">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-white/10">
+                            <th className="text-left p-3 text-white/40 font-medium">
+                              Limit
+                            </th>
+                            <th className="text-center p-3 text-white/40 font-medium">
+                              Starter
+                            </th>
+                            <th className="text-center p-3 text-white/40 font-medium">
+                              Pro
+                            </th>
+                            <th className="text-center p-3 text-white/40 font-medium">
+                              Enterprise
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[
+                            ["Spin Games", "1", "3", "Unlimited"],
+                            ["Trivia Challenges", "1", "3", "Unlimited"],
+                            ["Active Draws", "1", "3", "Unlimited"],
+                            ["Engagements/month", "500", "5,000", "25,000"],
+                            ["Prize Slots", "6", "12", "24"],
+                            ["Trivia Questions", "20", "100", "Unlimited"],
+                            ["Access Codes", "10", "50", "Unlimited"],
+                            ["Admin Users", "1", "3", "10"],
+                            ["API Access", "❌", "✅", "✅"],
+                            ["POS Integration", "❌", "✅", "✅"],
+                          ].map((row, i) => (
+                            <tr key={i} className="border-b border-white/5">
+                              <td className="p-3 text-white/70">{row[0]}</td>
+                              <td className="p-3 text-center text-white/50">
+                                {row[1]}
+                              </td>
+                              <td className="p-3 text-center text-white/50">
+                                {row[2]}
+                              </td>
+                              <td className="p-3 text-center text-white/50">
+                                {row[3]}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white/5 border-white/10 mb-6">
+                  <CardContent className="p-6">
+                    <h3 className="text-white font-semibold mb-4">
+                      Game Capacity & Auto-Selection
+                    </h3>
+
+                    <div className="space-y-4 text-white/50 text-sm leading-relaxed">
+                      <p>
+                        <strong className="text-white">Spin Games:</strong> When
+                        you have multiple spin games active, customers are
+                        directed to the first available game. If a game reaches
+                        its engagement limit, the next game automatically starts
+                        accepting players.
+                      </p>
+
+                      <p>
+                        <strong className="text-white">
+                          Trivia Challenges:
+                        </strong>{" "}
+                        Each trivia challenge can be linked to a specific spin
+                        game for ticket entry. When the linked spin game's slots
+                        fill up, new players are directed to the next available
+                        trivia challenge.
+                      </p>
+
+                      <p>
+                        <strong className="text-white">Draws:</strong> The{" "}
+                        <code className="text-purple-400 text-xs">
+                          redeem_access_code
+                        </code>
+                        function automatically enters customers into the first
+                        open draw for your business. If a draw is full or
+                        closed, it moves to the next one.
+                      </p>
+
+                      <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
+                        <h4 className="text-purple-400 font-medium text-sm mb-2">
+                          💡 Pro Tip: Calendar Planning
+                        </h4>
+                        <p className="text-purple-400/60 text-xs">
+                          Schedule your games like a content calendar. Run a
+                          spin game all week, host trivia on Friday nights, and
+                          run a monthly draw. The system automatically manages
+                          capacity across all active games.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white/5 border-white/10">
+                  <CardContent className="p-6">
+                    <h3 className="text-white font-semibold mb-4">
+                      What Counts as an Engagement?
+                    </h3>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      {[
+                        {
+                          action: "Spin",
+                          count: "1 engagement per spin",
+                          desc: "Free or paid spins count the same",
+                        },
+                        {
+                          action: "Trivia Answer",
+                          count: "1 engagement per answer",
+                          desc: "Whether correct or wrong",
+                        },
+                        {
+                          action: "Draw Entry",
+                          count: "1 engagement per entry",
+                          desc: "Code redemption or manual entry",
+                        },
+                      ].map((item, i) => (
+                        <div
+                          key={i}
+                          className="p-4 rounded-lg bg-white/5 text-center"
+                        >
+                          <p className="text-white font-medium text-sm mb-1">
+                            {item.action}
+                          </p>
+                          <p className="text-purple-400 text-xs mb-1">
+                            {item.count}
+                          </p>
+                          <p className="text-white/30 text-xs">{item.desc}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <p className="text-white/40 text-xs mt-4">
+                      Engagement counters reset on the 1st of each month. You'll
+                      receive a notification when you reach 80% of your monthly
+                      limit. Upgrade anytime to increase your limits
+                      immediately.
+                    </p>
                   </CardContent>
                 </Card>
               </section>

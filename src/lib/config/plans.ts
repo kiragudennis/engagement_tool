@@ -401,10 +401,10 @@ export function getPrice(plan: PlanDefinition, cycle: BillingCycle): number {
   return cycle === "annual" ? plan.price * 10 : plan.price;
 }
 
-export function formatPrice(amount: number): string {
+export function formatPrice(amount: number, currency: string = "USD"): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency: currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);

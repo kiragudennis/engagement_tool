@@ -215,13 +215,23 @@ export default function BusinessSettingsPage() {
       // Check if user exists
       const { data: users } = await supabase
         .from("users")
-        .select("id, email")
+        .select("id, email, business_name, business_slug, business_type")
         .eq("email", inviteEmail.toLowerCase())
         .single();
 
       if (!users) {
         toast.error(
           "No account found with this email. They need to sign up first.",
+        );
+        setInviting(false);
+        return;
+      }
+
+      // 🚫 BLOCK: User already has a different business
+      if (users.business_name && users.business_slug !== businessSlug) {
+        toast.error(
+          `${users.full_name || users.email} is already associated with "${users.business_name}". They must leave that business first.`,
+          { duration: 6000 },
         );
         setInviting(false);
         return;
@@ -249,6 +259,18 @@ export default function BusinessSettingsPage() {
         accepted_at: new Date().toISOString(),
       });
 
+      // ✅ Update user profile with business details
+      await supabase
+        .from("users")
+        .update({
+          role: inviteRole === "host" ? "business_host" : "business_admin",
+          business_name: business.name,
+          business_type: business.type,
+          business_slug: business.slug,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", users.id);
+
       toast.success(`${users.email} added as ${inviteRole}!`);
       setInviteEmail("");
       setShowInviteDialog(false);
@@ -268,7 +290,23 @@ export default function BusinessSettingsPage() {
     }
     if (!confirm("Remove this admin?")) return;
     await supabase.from("business_admins").delete().eq("id", adminId);
-    toast.success("Admin removed");
+
+    // ✅ Clear business fields from user profile
+    await supabase
+      .from("users")
+      .update({
+        role: "customer",
+        business_name: null,
+        business_type: null,
+        business_slug: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+
+    toast.success(
+      "Team member removed. Their account is now a customer account.",
+    );
+
     loadData();
   };
 

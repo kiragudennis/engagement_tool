@@ -8,6 +8,8 @@ export const businessSignupSchema = z.object({
     .max(100, "Business name must be under 100 characters")
     .transform((val) => val.trim()),
 
+  type: z.enum(['retail', 'restaurant', 'service', 'event', 'other']),
+
   fullName: z
     .string()
     .min(1, "Your name is required")

@@ -23,6 +23,15 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 function generateSlug(name: string): string {
   return name
@@ -39,6 +48,7 @@ export default function BusinessSignupPage() {
     fullName: "",
     email: "",
     password: "",
+    type: "retail",
   });
   const [businessSlug, setBusinessSlug] = useState("");
   const searchParams = useSearchParams();
@@ -92,6 +102,7 @@ export default function BusinessSignupPage() {
           fullName: formData.fullName,
           email: formData.email,
           password: formData.password,
+          type: formData.type,
         }),
       });
 
@@ -117,6 +128,15 @@ export default function BusinessSignupPage() {
       setStep("form");
     }
   };
+
+  const items = [
+    { label: "Select a business type", value: "" },
+    { label: "Retail", value: "retail" },
+    { label: "Restaurant", value: "restaurant" },
+    { label: "Service", value: "service" },
+    { label: "Event", value: "event" },
+    { label: "Other", value: "other" },
+  ];
 
   // Show loading while checking auth
   if (loading) {
@@ -216,7 +236,7 @@ export default function BusinessSignupPage() {
         </div>
 
         <Card className="bg-black/50 backdrop-blur border-white/10">
-          <CardContent className="p-6 space-y-4">
+          <CardContent className="space-y-4">
             <div>
               <Label className="text-white">Business Name *</Label>
               <Input
@@ -234,6 +254,28 @@ export default function BusinessSignupPage() {
                   {generateSlug(formData.businessName)}/code-entry
                 </p>
               )}
+            </div>
+
+            <div>
+              <Label className="text-white">Business Type *</Label>
+              <Select
+                value={formData.type}
+                onValueChange={(e) => setFormData((p) => ({ ...p, type: e }))}
+              >
+                <SelectTrigger className="w-full max-w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Fruits</SelectLabel>
+                    {items.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>

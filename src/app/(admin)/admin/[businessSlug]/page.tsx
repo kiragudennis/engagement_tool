@@ -162,22 +162,20 @@ export default function BusinessAdminDashboard() {
   if (!business) return null;
 
   return (
-    <div className="min-h-screen bg-gray-950">
+    <div className="min-h-screen">
       {/* Header */}
-      <div className="border-b border-white/10 bg-black/50 backdrop-blur">
+      <div className="border-b border-white/10 backdrop-blur">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold"
+                className="w-10 h-10 rounded-xl flex items-center justify-center font-bold"
                 style={{ backgroundColor: business.brand_color }}
               >
                 {business.name[0]}
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">
-                  {business.name}
-                </h1>
+                <h1 className="text-xl font-bold">{business.name}</h1>
                 <div className="flex items-center gap-2">
                   <Badge
                     className={cn(
@@ -193,7 +191,7 @@ export default function BusinessAdminDashboard() {
                       : business.plan}
                   </Badge>
                   {business.subscription_status === "trial" && (
-                    <span className="text-xs text-white/40">
+                    <span className="text-xs">
                       {formatDistanceToNow(new Date(business.trial_ends_at), {
                         addSuffix: true,
                       })}{" "}
@@ -207,7 +205,7 @@ export default function BusinessAdminDashboard() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1 border-white/10 text-white/70"
+                className="gap-1 border-white/10"
                 asChild
               >
                 <Link href={`/${businessSlug}/code-entry`} target="_blank">
@@ -272,15 +270,15 @@ export default function BusinessAdminDashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
             >
-              <Card className="bg-white/5 border-white/10">
+              <Card className="border-white/10">
                 <CardContent className="p-4 text-center">
                   <stat.icon
                     className={cn("h-5 w-5 mx-auto mb-2", stat.color)}
                   />
-                  <p className="text-2xl font-bold text-white">
+                  <p className="text-2xl font-bold">
                     {stat.value.toLocaleString()}
                   </p>
-                  <p className="text-xs text-white/40">{stat.label}</p>
+                  <p className="text-xs">{stat.label}</p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -289,7 +287,7 @@ export default function BusinessAdminDashboard() {
 
         {/* Main Tabs */}
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="flex bg-white/5 border border-white/10 overflow-x-auto">
+          <TabsList className="flex border border-white/10 overflow-x-auto">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="spin">Spin Game</TabsTrigger>
             <TabsTrigger value="codes">Access Codes</TabsTrigger>
@@ -301,7 +299,7 @@ export default function BusinessAdminDashboard() {
             {/* Public URL Card */}
             <Card className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 border-purple-500/30">
               <CardContent className="p-6">
-                <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+                <h3 className="font-semibold mb-2 flex items-center gap-2">
                   <QrCode className="h-5 w-5" /> Your Public Page
                 </h3>
                 <div className="flex flex-wrap items-center gap-2">
@@ -320,7 +318,7 @@ export default function BusinessAdminDashboard() {
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
-                <p className="text-white/50 text-xs mt-2">
+                <p className="text-xs mt-2">
                   Share this link with customers, print it as a QR code, or
                   embed it on your website
                 </p>
@@ -357,15 +355,13 @@ export default function BusinessAdminDashboard() {
             </div>
 
             {/* Recent Spins */}
-            <Card className="bg-white/5 border-white/10">
+            <Card className="border-white/10">
               <CardHeader>
-                <CardTitle className="text-white text-lg">
-                  Recent Spins
-                </CardTitle>
+                <CardTitle className="text-lg">Recent Spins</CardTitle>
               </CardHeader>
               <CardContent>
                 {recentSpins.length === 0 ? (
-                  <p className="text-white/40 text-center py-8">
+                  <p className="text-center py-8">
                     No spins yet. Share your page to get started!
                   </p>
                 ) : (
@@ -373,17 +369,17 @@ export default function BusinessAdminDashboard() {
                     {recentSpins.slice(0, 8).map((spin, i) => (
                       <div
                         key={i}
-                        className="flex items-center justify-between p-3 rounded-lg bg-white/5"
+                        className="flex items-center justify-between p-3 rounded-lg"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-white text-xs font-bold">
+                          <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-xs font-bold">
                             {spin.users?.full_name?.[0] || "?"}
                           </div>
                           <div>
-                            <p className="text-white text-sm">
+                            <p className="text-sm">
                               {spin.users?.full_name || "Anonymous"}
                             </p>
-                            <p className="text-white/40 text-xs">
+                            <p className="text-xs">
                               {spin.prize_type === "points" &&
                               spin.points_awarded > 0
                                 ? `Won ${spin.points_awarded} Points`
@@ -391,7 +387,7 @@ export default function BusinessAdminDashboard() {
                             </p>
                           </div>
                         </div>
-                        <span className="text-white/30 text-xs">
+                        <span className="text-xs">
                           {formatDistanceToNow(new Date(spin.created_at), {
                             addSuffix: true,
                           })}
@@ -406,13 +402,11 @@ export default function BusinessAdminDashboard() {
 
           {/* Other tabs placeholder */}
           <TabsContent value="spin">
-            <Card className="bg-white/5 border-white/10">
+            <Card className="border-white/10">
               <CardContent className="p-12 text-center">
-                <RotateCcw className="h-12 w-12 text-white/20 mx-auto mb-4" />
-                <h3 className="text-white font-semibold mb-2">
-                  Spin Game Management
-                </h3>
-                <p className="text-white/40 mb-4">
+                <RotateCcw className="h-12 w-12 mx-auto mb-4" />
+                <h3 className="font-semibold mb-2">Spin Game Management</h3>
+                <p className="mb-4">
                   Configure your wheel, prizes, and probabilities
                 </p>
                 <Button
@@ -428,13 +422,11 @@ export default function BusinessAdminDashboard() {
           </TabsContent>
 
           <TabsContent value="codes">
-            <Card className="bg-white/5 border-white/10">
+            <Card className="border-white/10">
               <CardContent className="p-12 text-center">
-                <Ticket className="h-12 w-12 text-white/20 mx-auto mb-4" />
-                <h3 className="text-white font-semibold mb-2">
-                  Access Code Management
-                </h3>
-                <p className="text-white/40 mb-4">
+                <Ticket className="h-12 w-12 mx-auto mb-4" />
+                <h3 className="font-semibold mb-2">Access Code Management</h3>
+                <p className="mb-4">
                   Create and manage codes that customers use to access your
                   spins
                 </p>
@@ -451,11 +443,11 @@ export default function BusinessAdminDashboard() {
           </TabsContent>
 
           <TabsContent value="customers">
-            <Card className="bg-white/5 border-white/10">
+            <Card className="border-white/10">
               <CardContent className="p-12 text-center">
-                <Users className="h-12 w-12 text-white/20 mx-auto mb-4" />
-                <h3 className="text-white font-semibold mb-2">Customer List</h3>
-                <p className="text-white/40 mb-4">
+                <Users className="h-12 w-12 mx-auto mb-4" />
+                <h3 className="font-semibold mb-2">Customer List</h3>
+                <p className="mb-4">
                   {stats.totalCustomers} total customers •{" "}
                   {stats.activeCustomers} active
                 </p>
@@ -492,7 +484,7 @@ function QuickActionCard({
 }) {
   return (
     <Link href={href}>
-      <Card className="bg-white/5 border-white/10 hover:bg-white/10 transition-colors cursor-pointer group h-full">
+      <Card className="border-white/10 hover:bg-white/10 transition-colors cursor-pointer group h-full">
         <CardContent className="p-6">
           <div
             className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"
@@ -500,9 +492,9 @@ function QuickActionCard({
           >
             <Icon className="h-6 w-6" style={{ color }} />
           </div>
-          <h3 className="text-white font-semibold mb-1">{title}</h3>
-          <p className="text-white/40 text-sm">{description}</p>
-          <ChevronRight className="h-4 w-4 text-white/20 mt-3 group-hover:translate-x-1 transition-transform" />
+          <h3 className="font-semibold mb-1">{title}</h3>
+          <p className="text-sm">{description}</p>
+          <ChevronRight className="h-4 w-4 mt-3 group-hover:translate-x-1 transition-transform" />
         </CardContent>
       </Card>
     </Link>

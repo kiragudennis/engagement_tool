@@ -53,8 +53,8 @@ export default function DocsPage() {
           </h1>
           <p className="text-lg text-white/50 max-w-2xl mx-auto">
             Everything you need to know about turning your business into a
-            gamified experience — from printing sticker codes to integrating
-            with your POS system.
+            gamified experience. From printing sticker codes to integrating with
+            your POS system.
           </p>
         </div>
       </div>

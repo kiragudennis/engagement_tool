@@ -5,7 +5,7 @@ import {
   generateSlug,
 } from "@/lib/schemas/business-schema";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { createSessionForUser, findUserIdByEmail } from "@/lib/auth/server";
+import { findUserIdByEmail } from "@/lib/auth/server";
 import { resend, secureRatelimit } from "@/lib/limit";
 import { checkBotId } from "botid/server";
 

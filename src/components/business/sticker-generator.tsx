@@ -107,7 +107,9 @@ export function StickerBatchGenerator({
     try {
       const res = await fetch("/api/business/receipt/sticker-batch", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           slug: businessSlug,
           totalStickers,
@@ -123,88 +125,113 @@ export function StickerBatchGenerator({
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to generate codes");
+      }
+
+      if (!data.stickers || data.stickers.length === 0) {
+        throw new Error("No codes were generated. Please try again.");
+      }
 
       setBatchResult(data);
-      toast.success(`${totalStickers} sticker codes generated!`);
+      toast.success(`${data.total_count} sticker codes generated!`);
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.message || "Failed to generate codes");
     } finally {
       setGenerating(false);
     }
   };
 
+  console.log("Batch result:", batchResult);
+
   const printStickers = () => {
-    if (!batchResult) return;
+    if (
+      !batchResult ||
+      !batchResult.stickers ||
+      batchResult.stickers.length === 0
+    ) {
+      toast.error("No stickers to print. Generate codes first.");
+      return;
+    }
 
     const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
+    if (!printWindow) {
+      toast.error("Please allow popups for printing");
+      return;
+    }
 
-    const stickerWidth = "63mm"; // Standard thermal label width
-    const stickerHeight = "38mm"; // Standard thermal label height
+    const stickerWidth = "63mm";
+    const stickerHeight = "38mm";
 
     const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Stickers - ${businessSlug}</title>
-        <style>
-          @page { size: ${stickerWidth} ${stickerHeight}; margin: 0; }
-          body { margin: 0; font-family: Arial, sans-serif; }
-          .sticker {
-            width: ${stickerWidth};
-            height: ${stickerHeight};
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            page-break-after: always;
-            padding: 2mm;
-            box-sizing: border-box;
-          }
-          .sticker.bronze { border-top: 3px solid #CD7F32; }
-          .sticker.silver { border-top: 3px solid #C0C0C0; }
-          .sticker.gold { border-top: 3px solid #FFD700; }
-          .sticker.diamond { border-top: 3px solid #B9F2FF; }
-          .business-name { font-size: 8px; font-weight: bold; color: #333; margin-bottom: 1mm; }
-          .rarity-badge { font-size: 7px; padding: 0.5mm 2mm; border-radius: 10px; margin-bottom: 1mm; }
-          .qr-code { width: 18mm; height: 18mm; margin: 1mm 0; }
-          .code { font-family: monospace; font-size: 7px; font-weight: bold; margin-bottom: 0.5mm; }
-          .cta { font-size: 6px; color: #666; }
-          @media print {
-            .no-print { display: none; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="no-print" style="text-align:center; padding:10px;">
-          <h3>Printing ${batchResult.total_count} stickers</h3>
-          <p>Make sure your thermal printer is set to ${stickerWidth} × ${stickerHeight} labels</p>
-          <button onclick="window.print()" style="padding:10px 20px; font-size:16px;">
-            🖨️ Print All Stickers
-          </button>
-        </div>
-        ${batchResult.stickers
-          .map(
-            (s: any) => `
-          <div class="sticker ${s.rarity}">
-            <div class="business-name">${batchResult.business_name}</div>
-            <div class="rarity-badge" style="background:${s.color}20; color:${s.color}">
-              ${s.rarity.toUpperCase()} • ${s.points} PTS
-            </div>
-            <img class="qr-code" 
-                 src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`engagespin.com/spin?code=${s.code}`)}" 
-                 alt="QR" />
-            <div class="code">${s.code}</div>
-            <div class="cta">Scan to spin & win!</div>
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Stickers - ${businessSlug}</title>
+      <style>
+        @page { size: ${stickerWidth} ${stickerHeight}; margin: 0; }
+        body { margin: 0; font-family: Arial, sans-serif; }
+        .sticker {
+          width: ${stickerWidth};
+          height: ${stickerHeight};
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          page-break-after: always;
+          padding: 2mm;
+          box-sizing: border-box;
+        }
+        .sticker.bronze { border-top: 3px solid #CD7F32; }
+        .sticker.silver { border-top: 3px solid #C0C0C0; }
+        .sticker.gold { border-top: 3px solid #FFD700; }
+        .sticker.diamond { border-top: 3px solid #B9F2FF; }
+        .business-name { font-size: 8px; font-weight: bold; color: #333; margin-bottom: 1mm; }
+        .rarity-badge { font-size: 7px; padding: 0.5mm 2mm; border-radius: 10px; margin-bottom: 1mm; display: inline-block; }
+        .qr-code { width: 18mm; height: 18mm; margin: 1mm 0; }
+        .code { font-family: monospace; font-size: 7px; font-weight: bold; margin-bottom: 0.5mm; }
+        .cta { font-size: 6px; color: #666; }
+        @media print {
+          .no-print { display: none; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="no-print" style="text-align:center; padding:10px; background:#f0f0f0;">
+        <h3>📦 ${batchResult.business_name} - Sticker Batch</h3>
+        <p>${batchResult.total_count} stickers across ${batchResult.tiers.length} tiers</p>
+        <p style="font-size:12px; color:#666;">
+          ${batchResult.tiers.map((t: any) => `${t.rarity}: ${t.count}×${t.points}pts`).join(" · ")}
+        </p>
+        <p style="font-size:11px;">Printer: ${stickerWidth} × ${stickerHeight} thermal labels</p>
+        <button onclick="window.print()" style="padding:12px 24px; font-size:16px; cursor:pointer; background:#8B5CF6; color:white; border:none; border-radius:8px; margin:10px;">
+          🖨️ Print All ${batchResult.total_count} Stickers
+        </button>
+        <p style="font-size:10px; color:#999;">Set your printer to the correct label size before printing</p>
+      </div>
+      ${batchResult.stickers
+        .map(
+          (s: any) => `
+        <div class="sticker ${s.rarity}">
+          <div class="business-name">${batchResult.business_name}</div>
+          <div class="rarity-badge" style="background:${s.color}20; color:${s.color}">
+            ${s.rarity.toUpperCase()} · ${s.points} PTS
           </div>
-        `,
-          )
-          .join("")}
-      </body>
-      </html>
-    `;
+          <img class="qr-code" 
+               src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`engagespin.com/spin?code=${s.code}`)}" 
+               alt="QR" 
+               onerror="this.style.display='none'" />
+          <div class="code">${s.code}</div>
+          <div class="cta">Scan to spin & win!</div>
+        </div>
+      `,
+        )
+        .join("")}
+    </body>
+    </html>
+  `;
 
     printWindow.document.write(html);
     printWindow.document.close();

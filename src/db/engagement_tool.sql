@@ -107,7 +107,7 @@ CREATE TABLE access_codes (
     business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
     
     code TEXT NOT NULL UNIQUE,
-    type TEXT NOT NULL CHECK (type IN ('public', 'single_use', 'time_limited', 'bulk', 'qr')),
+    type TEXT NOT NULL CHECK (type IN ('public', 'single_use', 'stickers', 'time_limited', 'bulk', 'qr')),
     label TEXT, -- "Friday Night Event", "Receipt Codes Week 24"
     description TEXT,
     
@@ -142,9 +142,13 @@ ALTER TABLE access_codes add column point_value INTEGER DEFAULT NULL;
 -- Batch tracking (for sticker/receipt batches)
 ALTER TABLE access_codess add column batch_id UUID;
 ALTER TABLE access_codes add column batch_label TEXT;
+ALTER TABLE access_codes add column code_prefix TEXT;
+ALTER TABLE access_codes add column code_type TEXT;
+ALTER TABLE access_codes add column code_sequence TEXT;
+ALTER TABLE access_codes add column metadata JSONB DEFAULT '{}'::jsonb;
 
 -- Loyalty Tier
-ALTER TABLE access_codes ADD COLUMN tier TEXT DEFAULT 'standard' CHECK (tier IN ('standard', 'bronze', 'silver', 'gold', 'platinum'));
+ALTER TABLE access_codes ADD COLUMN tier TEXT DEFAULT 'standard' CHECK (tier IN ('standard', 'bronze', 'silver', 'gold', 'diamond'));
 
 -- 4. Code usage tracking
 CREATE TABLE access_code_usage (
@@ -965,17 +969,22 @@ END;
 $$;
 
 -- ============================================
--- 9. Generate Receipt Code - FIXED
+-- 9. UNIFIED: Generate Business Code (receipts + stickers) - FIXED
 -- ============================================
-CREATE OR REPLACE FUNCTION generate_receipt_code(
+CREATE OR REPLACE FUNCTION generate_business_code(
     p_business_id UUID,
-    p_amount NUMERIC,
+    p_code_type CHAR(1) DEFAULT 'S',  -- S=Starter, P=Pro, E=Enterprise
+    p_code_subtype TEXT DEFAULT 'S',   -- S=Sticker, R=Receipt, P=Public, Q=QR
+    p_tier TEXT DEFAULT 'standard',
     p_points_earned INTEGER DEFAULT NULL,
+    p_amount NUMERIC DEFAULT NULL,
     p_items JSONB DEFAULT '[]'::jsonb,
     p_cashier_name TEXT DEFAULT NULL,
     p_source TEXT DEFAULT 'dashboard',
     p_created_by UUID DEFAULT NULL,
     p_unlocks TEXT DEFAULT 'spin',
+    p_batch_id UUID DEFAULT NULL,
+    p_batch_label TEXT DEFAULT NULL,
     p_metadata JSONB DEFAULT '{}'::jsonb
 )
 RETURNS JSON
@@ -990,77 +999,100 @@ DECLARE
     v_code_id UUID;
     v_receipt_id UUID;
     v_sequence INTEGER;
-    v_plan_code_type CHAR(1);
     v_prefix TEXT;
+    v_label TEXT;
+    v_description TEXT;
+    v_max_uses INTEGER;
 BEGIN
     SELECT * INTO v_business FROM businesses WHERE id = p_business_id;
     
-    -- Determine code type from plan
-    v_plan_code_type := CASE 
-        WHEN v_business.plan = 'enterprise' THEN 'E'
-        WHEN v_business.plan = 'pro' THEN 'P'
-        ELSE 'S'
-    END;
-    
-    -- Get business prefix and next sequence
+    -- Get prefix and sequence
     v_prefix := UPPER(SUBSTRING(REGEXP_REPLACE(v_business.slug, '[^a-zA-Z0-9]', '', 'g'), 1, 4));
     v_sequence := next_code_sequence(p_business_id);
     
-    -- Generate receipt number from sequence
-    v_receipt_number := 'RCPT-' || LPAD(v_sequence::TEXT, 5, '0');
+    -- Generate code: PREFIX-PLANTYPE-SUBTYPE-SEQUENCE-RANDOM
+    v_code := v_prefix 
+              || '-' || p_code_type || p_code_subtype
+              || '-' || LPAD(v_sequence::TEXT, 5, '0')
+              || '-' || UPPER(SUBSTRING(MD5(gen_random_uuid()::TEXT), 1, 4));
     
-    -- Determine points
+    -- Calculate points
     IF p_points_earned IS NOT NULL THEN
         v_points := p_points_earned;
     ELSE
         v_points := COALESCE(v_business.points_per_redemption, 10);
     END IF;
     
-    -- Generate unique code: PREFIX-TYPE-SEQUENCE-RANDOM
-    -- Uses the same sequence for consistency
-    v_code := v_prefix 
-              || '-' || v_plan_code_type || 'R'
-              || '-' || LPAD(v_sequence::TEXT, 5, '0')
-              || '-' || UPPER(SUBSTRING(MD5(gen_random_uuid()::TEXT), 1, 4));
+    -- Configure based on subtype
+    IF p_code_subtype = 'R' THEN
+        -- Receipt code
+        v_receipt_number := 'RCPT-' || LPAD(v_sequence::TEXT, 5, '0');
+        v_label := 'Receipt #' || v_receipt_number;
+        v_description := 'Receipt: KES ' || COALESCE(p_amount, 0) || ' = ' || v_points || ' pts';
+        v_max_uses := 1;
+    ELSIF p_code_subtype = 'S' THEN
+        -- Sticker code
+        v_label := COALESCE(p_tier, 'standard') || ' Sticker - ' || v_points || 'pts';
+        v_description := COALESCE(p_tier, 'standard') || ' tier sticker code worth ' || v_points || ' points';
+        v_max_uses := 1;
+    ELSE
+        -- Public/QR code
+        v_label := 'Code #' || LPAD(v_sequence::TEXT, 5, '0');
+        v_description := 'Standard access code';
+        v_max_uses := NULL; -- Unlimited by default for public codes
+    END IF;
     
     -- Create the access code
     INSERT INTO access_codes (
         business_id, code, code_prefix, code_type, code_sequence,
-        type, label, unlocks, max_uses, max_uses_per_user, 
-        point_value, is_active, description, metadata
+        type, label, tier, unlocks, 
+        max_uses, max_uses_per_user, 
+        point_value, is_active, description,
+        batch_id, batch_label, metadata
     ) VALUES (
-        p_business_id, v_code, v_prefix, v_plan_code_type, v_sequence,
-        'receipt', 'Receipt #' || v_receipt_number, p_unlocks,
-        1, 1, v_points, TRUE,
-        'Receipt: KES ' || p_amount || ' = ' || v_points || ' pts',
+        p_business_id, v_code, v_prefix, p_code_type, v_sequence,
+        CASE p_code_subtype 
+            WHEN 'R' THEN 'receipt'
+            WHEN 'S' THEN 'sticker'
+            ELSE 'public'
+        END,
+        v_label, p_tier, p_unlocks,
+        v_max_uses, 1, 
+        v_points, TRUE, v_description,
+        p_batch_id, p_batch_label,
         jsonb_build_object(
             'amount', p_amount,
             'items', p_items,
             'cashier', p_cashier_name,
-            'source', p_source
+            'source', p_source,
+            'tier', p_tier
         ) || p_metadata
     )
     RETURNING id INTO v_code_id;
     
-    -- Create receipt record
-    INSERT INTO business_receipts (
-        business_id, receipt_number, amount, items,
-        access_code_id, code, points_earned,
-        source, cashier_name, created_by
-    ) VALUES (
-        p_business_id, v_receipt_number, p_amount, p_items,
-        v_code_id, v_code, v_points,
-        p_source, p_cashier_name, p_created_by
-    )
-    RETURNING id INTO v_receipt_id;
+    -- Create receipt record (only for receipt type)
+    IF p_code_subtype = 'R' THEN
+        INSERT INTO business_receipts (
+            business_id, receipt_number, amount, items,
+            access_code_id, code, points_earned,
+            source, cashier_name, created_by
+        ) VALUES (
+            p_business_id, v_receipt_number, COALESCE(p_amount, 0), p_items,
+            v_code_id, v_code, v_points,
+            p_source, p_cashier_name, p_created_by
+        )
+        RETURNING id INTO v_receipt_id;
+    END IF;
     
     RETURN json_build_object(
         'success', true,
+        'code_id', v_code_id,
         'receipt_id', v_receipt_id,
         'receipt_number', v_receipt_number,
         'code', v_code,
         'points_earned', v_points,
         'amount', p_amount,
+        'tier', p_tier,
         'business_name', v_business.name,
         'business_slug', v_business.slug,
         'business_logo', v_business.logo_url,

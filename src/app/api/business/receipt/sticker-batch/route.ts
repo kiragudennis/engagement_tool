@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { z } from "zod";
+import { createClient } from "@/lib/supabase/server";
 
 const stickerBatchSchema = z.object({
   slug: z.string(),
@@ -16,23 +17,55 @@ const stickerBatchSchema = z.object({
   ),
 });
 
+const TIER_COLORS: Record<string, string> = {
+  bronze: "#CD7F32",
+  silver: "#C0C0C0",
+  gold: "#FFD700",
+  diamond: "#B9F2FF",
+};
+
 export async function POST(req: NextRequest) {
   try {
+    // ─── AUTHENTICATION ──────────────────────────────────
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (!user || userError) {
+      NextResponse.json(
+        { error: "Not Authorized" },
+        {
+          status: 403,
+        },
+      );
+    }
+
+    const userId = user?.id;
+
     const body = await req.json();
     const parsed = stickerBatchSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: "Invalid request",
+          errors: parsed.error.flatten().fieldErrors,
+        },
+        { status: 400 },
+      );
     }
 
     const { slug, totalStickers, tiers } = parsed.data;
 
     // Get business
-    const { data: business } = await supabaseAdmin
+    const { data: business, error: businessError } = await supabaseAdmin
       .from("businesses")
       .select("id, name, slug, plan, brand_color")
       .eq("slug", slug)
       .single();
-    if (!business) {
+
+    if (businessError || !business) {
       return NextResponse.json(
         { error: "Business not found" },
         { status: 404 },
@@ -47,79 +80,77 @@ export async function POST(req: NextRequest) {
           ? "P"
           : "S";
 
-    // Generate batch ID
+    // Generate batch ID and label
     const batchId = crypto.randomUUID();
     const batchLabel = `${business.slug}-stickers-${new Date().toISOString().split("T")[0]}`;
 
     // Generate codes for each tier
     const allStickers: any[] = [];
+    let totalGenerated = 0;
 
     for (const tier of tiers) {
-      const batchCodes = [];
-
       for (let i = 0; i < tier.count; i++) {
-        const code = await supabaseAdmin
-          .rpc("generate_business_code", {
+        const { data: result, error: codeError } = await supabaseAdmin.rpc(
+          "generate_business_code",
+          {
             p_business_id: business.id,
             p_code_type: codeType,
+            p_code_subtype: "S",
             p_tier: tier.rarity,
-          })
-          .then(({ data }) => data);
+            p_points_earned: tier.points,
+            p_unlocks: "spin",
+            p_batch_id: batchId,
+            p_batch_label: batchLabel,
+            p_source: "sticker_batch",
+            p_created_by: userId,
+          },
+        );
 
-        batchCodes.push({
-          business_id: business.id,
-          code,
-          code_prefix: business.slug.substring(0, 4).toUpperCase(),
-          code_type: codeType,
-          code_sequence: 0, // Will be set by the function
-          type: "sticker",
-          label: `${tier.rarity} Sticker - ${tier.points}pts`,
-          tier: tier.rarity,
-          unlocks: "spin",
-          max_uses: 1,
-          max_uses_per_user: 1,
-          point_value: tier.points,
-          batch_id: batchId,
-          batch_label: batchLabel,
-          is_active: true,
-          description: `${tier.rarity} tier sticker code worth ${tier.points} points`,
-        });
-      }
-
-      // Insert in batches of 50
-      for (let j = 0; j < batchCodes.length; j += 50) {
-        const chunk = batchCodes.slice(j, j + 50);
-        const { data: inserted } = await supabaseAdmin
-          .from("access_codes")
-          .insert(chunk)
-          .select("code, tier, point_value");
-        if (inserted) {
-          type Tier = "bronze" | "silver" | "gold" | "diamond";
-          const colorMap: Record<Tier, string> = {
-            bronze: "#CD7F32",
-            silver: "#C0C0C0",
-            gold: "#FFD700",
-            diamond: "#B9F2FF",
-          };
-
-          inserted.forEach(
-            (c: { code: string; tier: Tier; point_value: number }) =>
-              allStickers.push({
-                code: c.code,
-                rarity: c.tier,
-                points: c.point_value,
-                color: colorMap[c.tier],
-              }),
+        if (codeError) {
+          console.error(
+            `Code generation error for ${tier.rarity} #${i}:`,
+            codeError,
           );
+          continue;
+        }
+
+        if (result && (result as any).code) {
+          allStickers.push({
+            code: (result as any).code,
+            rarity: tier.rarity,
+            points: tier.points,
+            color: TIER_COLORS[tier.rarity] || "#8B5CF6",
+          });
+          totalGenerated++;
         }
       }
+    }
+
+    // Record the batch in sticker_batches table
+    const { error: batchError } = await supabaseAdmin
+      .from("sticker_batches")
+      .insert({
+        business_id: business.id,
+        batch_label: batchLabel,
+        total_count: totalGenerated,
+        distribution: tiers.map((t) => ({
+          rarity: t.rarity,
+          count: t.count,
+          points: t.points,
+        })),
+        created_by: userId,
+      });
+
+    if (batchError) {
+      console.error("Batch record error:", batchError);
+      // Don't fail - codes were already generated
     }
 
     return NextResponse.json({
       success: true,
       batch_id: batchId,
       business_name: business.name,
-      total_count: allStickers.length,
+      total_count: totalGenerated,
       tiers: tiers.map((t) => ({
         rarity: t.rarity,
         points: t.points,
@@ -130,7 +161,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error("Sticker batch error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: error.message || "Internal server error" },
       { status: 500 },
     );
   }

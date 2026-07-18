@@ -6,33 +6,101 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { motion } from "framer-motion";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Ticket,
+  Plus,
   Copy,
   Trash2,
+  QrCode,
+  Download,
   Loader2,
-  ArrowLeft,
+  Clock,
+  Users,
+  Zap,
   Pause,
   Play,
-  Eye,
-  Search,
-  QrCode,
-  ExternalLink,
+  ArrowLeft,
   Sparkles,
+  Filter,
+  Search,
+  Eye,
+  Printer,
+  RotateCcw,
+  Brain,
+  Trophy,
   Gift,
   Star,
   Crown,
   Diamond,
-  Printer,
-  ShoppingBag,
   Globe,
+  ShoppingBag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import Link from "next/link";
+
+// ─── Config ─────────────────────────────────────────────
+const CODE_TYPE_CONFIG: Record<
+  string,
+  { label: string; icon: any; color: string; description: string }
+> = {
+  public: {
+    label: "Public",
+    icon: Globe,
+    color: "bg-blue-500/20 text-blue-400",
+    description: "Share publicly, unlimited uses",
+  },
+  single_use: {
+    label: "Single Use",
+    icon: Ticket,
+    color: "bg-green-500/20 text-green-400",
+    description: "One code = one activation",
+  },
+  time_limited: {
+    label: "Timed",
+    icon: Clock,
+    color: "bg-yellow-500/20 text-yellow-400",
+    description: "Valid during specific hours",
+  },
+  qr: {
+    label: "QR Code",
+    icon: QrCode,
+    color: "bg-pink-500/20 text-pink-400",
+    description: "In-store QR code",
+  },
+  sticker: {
+    label: "Sticker",
+    icon: Printer,
+    color: "bg-amber-500/20 text-amber-400",
+    description: "Product-printed codes",
+  },
+  receipt: {
+    label: "Receipt",
+    icon: ShoppingBag,
+    color: "bg-purple-500/20 text-purple-400",
+    description: "POS-generated codes",
+  },
+};
 
 const TIER_COLORS: Record<string, string> = {
   bronze: "bg-amber-700/20 text-amber-400",
@@ -42,15 +110,23 @@ const TIER_COLORS: Record<string, string> = {
   standard: "bg-white/10 text-white/60",
 };
 
-const TYPE_ICONS: Record<string, any> = {
-  sticker: Printer,
-  receipt: ShoppingBag,
-  public: Globe,
-  qr: QrCode,
-  single_use: Ticket,
-  bulk: Sparkles,
+const TIER_ICONS: Record<string, any> = {
+  bronze: Star,
+  silver: Sparkles,
+  gold: Crown,
+  diamond: Diamond,
 };
 
+const UNLOCKS_OPTIONS = [
+  { value: "spin", label: "Spin Only", icon: RotateCcw },
+  { value: "trivia", label: "Trivia Only", icon: Brain },
+  { value: "draw", label: "Draw Only", icon: Trophy },
+  { value: "spin_draw", label: "Spin + Draw", icon: Gift },
+  { value: "trivia_draw", label: "Trivia + Draw", icon: Sparkles },
+  { value: "all", label: "All (Spin + Trivia + Draw)", icon: Sparkles },
+];
+
+// ─── Main Component ─────────────────────────────────────
 export default function CodeManagementPage() {
   const { businessSlug } = useParams<{ businessSlug: string }>();
   const { supabase } = useAuth();
@@ -61,39 +137,142 @@ export default function CodeManagementPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
 
+  // Dialog state
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showBulkDialog, setShowBulkDialog] = useState(false);
+  const [showQRDialog, setShowQRDialog] = useState(false);
+  const [selectedQRCode, setSelectedQRCode] = useState<any>(null);
+  const [creating, setCreating] = useState(false);
+  const [bulkCodes, setBulkCodes] = useState<string[]>([]);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    type: "public",
+    label: "",
+    unlocks: "spin",
+    max_uses: "" as string,
+    max_uses_per_user: "1",
+    valid_from: "",
+    valid_until: "",
+    tier: "standard",
+    point_value: "" as string,
+  });
+  const [bulkCount, setBulkCount] = useState(50);
+
+  // ─── Load Data ────────────────────────────────────────
   const loadData = useCallback(async () => {
     if (!businessSlug) return;
-    const { data: biz } = await supabase
-      .from("businesses")
-      .select("id, name, slug, brand_color, plan")
-      .eq("slug", businessSlug)
-      .single();
-    if (!biz) {
-      router.push("/business/signup");
-      return;
+    try {
+      const { data: biz } = await supabase
+        .from("businesses")
+        .select("id, name, slug, brand_color, plan")
+        .eq("slug", businessSlug)
+        .single();
+      if (!biz) {
+        router.push("/business/signup");
+        return;
+      }
+      setBusiness(biz);
+
+      let query = supabase
+        .from("access_codes")
+        .select("*")
+        .eq("business_id", biz.id)
+        .order("created_at", { ascending: false })
+        .limit(200);
+
+      if (filterType !== "all") query = query.eq("type", filterType);
+      if (filterStatus === "active") query = query.eq("is_active", true);
+      if (filterStatus === "inactive") query = query.eq("is_active", false);
+
+      const { data: codeData } = await query;
+      setCodes(codeData || []);
+    } catch (err) {
+      console.error("Error loading codes:", err);
+    } finally {
+      setLoading(false);
     }
-    setBusiness(biz);
-
-    let query = supabase
-      .from("access_codes")
-      .select("*")
-      .eq("business_id", biz.id)
-      .order("created_at", { ascending: false })
-      .limit(200);
-
-    if (filterType !== "all") query = query.eq("type", filterType);
-
-    const { data } = await query;
-    setCodes(data || []);
-    setLoading(false);
-  }, [businessSlug, supabase, filterType, router]);
+  }, [businessSlug, supabase, filterType, filterStatus, router]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const toggleStatus = async (code: any) => {
+  // ─── Create Single Code ────────────────────────────────
+  const handleCreateCode = async () => {
+    if (!business) return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/business/codes/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          slug: businessSlug,
+          type: formData.type,
+          label: formData.label || undefined,
+          unlocks: formData.unlocks,
+          tier: formData.tier !== "standard" ? formData.tier : undefined,
+          point_value: formData.point_value
+            ? parseInt(formData.point_value)
+            : undefined,
+          max_uses: formData.max_uses ? parseInt(formData.max_uses) : undefined,
+          max_uses_per_user: parseInt(formData.max_uses_per_user) || 1,
+          valid_from: formData.valid_from || undefined,
+          valid_until: formData.valid_until || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create code");
+
+      toast.success(`Code ${data.code} created!`);
+      setShowCreateDialog(false);
+      resetForm();
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create code");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // ─── Create Bulk Codes ────────────────────────────────
+  const handleCreateBulkCodes = async () => {
+    if (!business) return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/business/codes/bulk-create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          slug: businessSlug,
+          count: bulkCount,
+          unlocks: formData.unlocks,
+          label: formData.label || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate codes");
+
+      setBulkCodes(data.codes || []);
+      toast.success(`${data.count || bulkCount} codes generated!`);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to generate codes");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // ─── Toggle / Delete ──────────────────────────────────
+  const toggleCodeStatus = async (code: any) => {
     await supabase
       .from("access_codes")
       .update({ is_active: !code.is_active })
@@ -114,10 +293,36 @@ export default function CodeManagementPage() {
     toast.success("Copied!");
   };
 
+  const exportCodes = (codes: string[]) => {
+    const csv = "code\n" + codes.join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${businessSlug}-codes-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Codes exported to CSV");
+  };
+
+  const resetForm = () => {
+    setFormData({
+      type: "public",
+      label: "",
+      unlocks: "spin",
+      max_uses: "",
+      max_uses_per_user: "1",
+      valid_from: "",
+      valid_until: "",
+      tier: "standard",
+      point_value: "",
+    });
+  };
+
   const filteredCodes = codes.filter(
     (c) =>
       !search ||
-      c.code.toLowerCase().includes(search.toLowerCase()) ||
+      c.code?.toLowerCase().includes(search.toLowerCase()) ||
       c.label?.toLowerCase().includes(search.toLowerCase()),
   );
 
@@ -133,6 +338,7 @@ export default function CodeManagementPage() {
 
   return (
     <div className="min-h-screen bg-gray-950">
+      {/* Header */}
       <div className="border-b border-white/10 bg-black/50 backdrop-blur">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -151,14 +357,36 @@ export default function CodeManagementPage() {
             </div>
             <div className="flex items-center gap-2">
               <Button
+                variant="outline"
                 size="sm"
-                className="gap-1"
-                style={{ backgroundColor: brandColor }}
+                className="gap-1 border-white/10"
                 asChild
               >
                 <Link href={`/admin/${businessSlug}/stickers`}>
                   <Printer className="h-4 w-4" /> Sticker Generator
                 </Link>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 border-white/10"
+                onClick={() => {
+                  resetForm();
+                  setShowBulkDialog(true);
+                }}
+              >
+                <Zap className="h-4 w-4" /> Bulk
+              </Button>
+              <Button
+                size="sm"
+                className="gap-1"
+                style={{ backgroundColor: brandColor }}
+                onClick={() => {
+                  resetForm();
+                  setShowCreateDialog(true);
+                }}
+              >
+                <Plus className="h-4 w-4" /> New Code
               </Button>
             </div>
           </div>
@@ -196,111 +424,171 @@ export default function CodeManagementPage() {
             </Card>
           ))}
         </div>
-
-        {/* Quick Links */}
-        <div className="flex gap-2 mb-6">
-          {["all", "sticker", "receipt", "public", "qr"].map((type) => (
-            <button
-              key={type}
-              onClick={() => setFilterType(type)}
-              className={cn(
-                "px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
-                filterType === type
-                  ? "bg-purple-500/20 text-purple-400"
-                  : "bg-white/5 text-white/40 hover:text-white/60",
-              )}
-            >
-              {type === "all"
-                ? "All"
-                : type.charAt(0).toUpperCase() + type.slice(1)}
-              <span className="ml-1 text-white/20">
-                {type === "all"
-                  ? codes.length
-                  : codes.filter((c) => c.type === type).length}
-              </span>
-            </button>
-          ))}
-        </div>
+        {/* Filters */}
+        <Card className="bg-white/5 border-white/10 mb-6">
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                <Input
+                  placeholder="Search codes..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 bg-white/5 border-white/10 text-white"
+                />
+              </div>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-36 bg-white/5 border-white/10 text-white">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="sticker">Stickers</SelectItem>
+                  <SelectItem value="receipt">Receipts</SelectItem>
+                  <SelectItem value="public">Public</SelectItem>
+                  <SelectItem value="single_use">Single Use</SelectItem>
+                  <SelectItem value="qr">QR Code</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-36 bg-white/5 border-white/10 text-white">
+                  <Eye className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Code List */}
-        {filteredCodes.length === 0 ? (
-          <Card className="bg-white/5 border-white/10">
-            <CardContent className="p-12 text-center">
-              <Ticket className="h-12 w-12 text-white/10 mx-auto mb-4" />
-              <h3 className="text-white font-semibold mb-2">No Codes Found</h3>
+        <AnimatePresence>
+          {filteredCodes.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center py-16"
+            >
+              <Ticket className="h-16 w-16 text-white/10 mx-auto mb-4" />
+              <h3 className="text-white font-semibold text-lg mb-2">
+                No Codes Yet
+              </h3>
               <p className="text-white/40 mb-4">
-                {filterType !== "all"
-                  ? `No ${filterType} codes yet.`
-                  : "Generate sticker codes or create public marketing codes."}
+                Create codes or generate sticker batches to get started.
               </p>
-              <Button asChild style={{ backgroundColor: brandColor }}>
-                <Link href={`/admin/${businessSlug}/stickers`}>
-                  Generate Stickers
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {filteredCodes.map((code, i) => {
-              const TypeIcon = TYPE_ICONS[code.type] || Ticket;
-              const tierColor = TIER_COLORS[code.tier] || TIER_COLORS.standard;
-
-              return (
-                <motion.div
-                  key={code.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.02 }}
+              <div className="flex gap-3 justify-center">
+                <Button
+                  onClick={() => {
+                    resetForm();
+                    setShowCreateDialog(true);
+                  }}
+                  style={{ backgroundColor: brandColor }}
                 >
-                  <Card
-                    className={cn(
-                      "bg-white/5 border-white/10 hover:bg-white/10 transition-colors",
-                      !code.is_active && "opacity-50",
-                    )}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3 min-w-0">
-                          {/* Tier indicator */}
-                          {code.tier && code.tier !== "standard" && (
-                            <div className="flex-shrink-0">
-                              {code.tier === "bronze" && (
-                                <Star className="h-4 w-4 text-amber-400" />
-                              )}
-                              {code.tier === "silver" && (
-                                <Sparkles className="h-4 w-4 text-gray-300" />
-                              )}
-                              {code.tier === "gold" && (
-                                <Crown className="h-4 w-4 text-yellow-400" />
-                              )}
-                              {code.tier === "diamond" && (
-                                <Diamond className="h-4 w-4 text-cyan-300" />
-                              )}
-                            </div>
-                          )}
+                  <Plus className="h-4 w-4 mr-2" /> Create Code
+                </Button>
+                <Button variant="outline" className="border-white/10" asChild>
+                  <Link href={`/admin/${businessSlug}/stickers`}>
+                    <Printer className="h-4 w-4 mr-2" /> Sticker Generator
+                  </Link>
+                </Button>
+              </div>
+            </motion.div>
+          ) : (
+            <div className="space-y-2">
+              {filteredCodes.map((code, i) => {
+                const config =
+                  CODE_TYPE_CONFIG[code.type] || CODE_TYPE_CONFIG.public;
+                const TypeIcon = config.icon;
+                const TierIcon =
+                  code.tier && code.tier !== "standard"
+                    ? TIER_ICONS[code.tier]
+                    : null;
+                const usagePercent = code.max_uses
+                  ? Math.min(100, (code.current_uses / code.max_uses) * 100)
+                  : 0;
 
-                          <div className="min-w-0">
+                return (
+                  <motion.div
+                    key={code.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.02 }}
+                  >
+                    <Card
+                      className={cn(
+                        "bg-white/5 border-white/10 hover:bg-white/10 transition-colors",
+                        !code.is_active && "opacity-50",
+                      )}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+                          <div className="flex-1 min-w-0 space-y-1.5">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <code className="text-sm font-mono font-bold text-yellow-400 truncate">
-                                {code.code}
-                              </code>
-                              <Badge className={cn("text-xs", tierColor)}>
-                                {code.tier || code.type}
+                              <Badge className={cn("text-xs", config.color)}>
+                                <TypeIcon className="h-3 w-3 mr-1" />
+                                {config.label}
                               </Badge>
+                              {code.tier && code.tier !== "standard" && (
+                                <Badge
+                                  className={cn(
+                                    "text-xs",
+                                    TIER_COLORS[code.tier],
+                                  )}
+                                >
+                                  {TierIcon && (
+                                    <TierIcon className="h-3 w-3 mr-1" />
+                                  )}
+                                  {code.tier}
+                                </Badge>
+                              )}
                               {code.point_value && (
                                 <Badge className="bg-green-500/10 text-green-400 text-xs">
                                   {code.point_value} pts
                                 </Badge>
                               )}
+                              <Badge className="text-xs bg-white/10 text-white/60">
+                                {code.unlocks === "all"
+                                  ? "All"
+                                  : code.unlocks === "spin_draw"
+                                    ? "Spin+Draw"
+                                    : code.unlocks === "trivia_draw"
+                                      ? "Trivia+Draw"
+                                      : code.unlocks}
+                              </Badge>
+                              {!code.is_active && (
+                                <Badge className="text-xs bg-red-500/20 text-red-400">
+                                  Paused
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <code className="text-sm font-mono font-bold text-yellow-400 truncate">
+                                {code.code}
+                              </code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => copyCode(code.code)}
+                              >
+                                <Copy className="h-3 w-3 text-white/30" />
+                              </Button>
                             </div>
                             {code.label && (
-                              <p className="text-white/40 text-xs truncate mt-0.5">
+                              <p className="text-white/50 text-xs truncate">
                                 {code.label}
                               </p>
                             )}
-                            <div className="flex items-center gap-3 text-xs text-white/30 mt-1">
-                              <span>{code.current_uses || 0} used</span>
+                            <div className="flex items-center gap-3 text-xs text-white/30">
+                              <span>
+                                {code.current_uses || 0} /{" "}
+                                {code.max_uses || "∞"} uses
+                              </span>
                               <span>
                                 {formatDistanceToNow(
                                   new Date(code.created_at),
@@ -308,45 +596,353 @@ export default function CodeManagementPage() {
                                 )}
                               </span>
                             </div>
+                            {code.max_uses && (
+                              <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
+                                <div
+                                  className="h-full rounded-full transition-all"
+                                  style={{
+                                    width: `${usagePercent}%`,
+                                    backgroundColor:
+                                      usagePercent > 80
+                                        ? "#ef4444"
+                                        : usagePercent > 50
+                                          ? "#f59e0b"
+                                          : "#10b981",
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleCodeStatus(code)}
+                            >
+                              {code.is_active ? (
+                                <Pause className="h-3 w-3 text-yellow-400" />
+                              ) : (
+                                <Play className="h-3 w-3 text-green-400" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedQRCode(code);
+                                setShowQRDialog(true);
+                              }}
+                            >
+                              <QrCode className="h-3 w-3 text-white/40" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteCode(code)}
+                            >
+                              <Trash2 className="h-3 w-3 text-red-400" />
+                            </Button>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => copyCode(code.code)}
-                          >
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleStatus(code)}
-                          >
-                            {code.is_active ? (
-                              <Pause className="h-3 w-3 text-yellow-400" />
-                            ) : (
-                              <Play className="h-3 w-3 text-green-400" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteCode(code)}
-                          >
-                            <Trash2 className="h-3 w-3 text-red-400" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              );
-            })}
-          </div>
-        )}
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+        </AnimatePresence>
       </div>
+
+      {/* Create Code Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogHeader>
+          <DialogTitle className="text-white">Create Access Code</DialogTitle>
+          <DialogDescription className="text-white/50">
+            Codes let customers access your games
+          </DialogDescription>
+        </DialogHeader>
+        <DialogContent className="max-w-md bg-gray-900 border-white/10">
+          <div className="space-y-4 py-4">
+            <div>
+              <Label className="text-white">Code Type</Label>
+              <Select
+                value={formData.type}
+                onValueChange={(v) => setFormData((p) => ({ ...p, type: v }))}
+              >
+                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(CODE_TYPE_CONFIG).map(([value, config]) => (
+                    <SelectItem key={value} value={value}>
+                      <div className="flex items-center gap-2">
+                        <config.icon className="h-4 w-4" />
+                        {config.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-white">Label (Optional)</Label>
+              <Input
+                value={formData.label}
+                onChange={(e) =>
+                  setFormData((p) => ({ ...p, label: e.target.value }))
+                }
+                placeholder="Friday Night Event..."
+                className="bg-white/5 border-white/10 text-white"
+              />
+            </div>
+            <div>
+              <Label className="text-white">Unlocks</Label>
+              <Select
+                value={formData.unlocks}
+                onValueChange={(v) =>
+                  setFormData((p) => ({ ...p, unlocks: v }))
+                }
+              >
+                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {UNLOCKS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <div className="flex items-center gap-2">
+                        <opt.icon className="h-4 w-4" />
+                        {opt.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-white">Tier</Label>
+                <Select
+                  value={formData.tier}
+                  onValueChange={(v) => setFormData((p) => ({ ...p, tier: v }))}
+                >
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard">Standard</SelectItem>
+                    <SelectItem value="bronze">Bronze</SelectItem>
+                    <SelectItem value="silver">Silver</SelectItem>
+                    <SelectItem value="gold">Gold</SelectItem>
+                    <SelectItem value="diamond">Diamond</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-white">Points (optional)</Label>
+                <Input
+                  type="number"
+                  value={formData.point_value}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, point_value: e.target.value }))
+                  }
+                  placeholder="Default"
+                  className="bg-white/5 border-white/10 text-white"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-white">Max Uses Per Person</Label>
+                <Input
+                  type="number"
+                  value={formData.max_uses_per_user}
+                  onChange={(e) =>
+                    setFormData((p) => ({
+                      ...p,
+                      max_uses_per_user: e.target.value,
+                    }))
+                  }
+                  className="bg-white/5 border-white/10 text-white"
+                  min="1"
+                />
+              </div>
+              <div>
+                <Label className="text-white">Max Total Uses</Label>
+                <Input
+                  type="number"
+                  value={formData.max_uses}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, max_uses: e.target.value }))
+                  }
+                  placeholder="Unlimited"
+                  className="bg-white/5 border-white/10 text-white"
+                />
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setShowCreateDialog(false)}
+            className="border-white/10"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleCreateCode}
+            disabled={creating}
+            style={{ backgroundColor: brandColor }}
+          >
+            {creating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              "Create Code"
+            )}
+          </Button>
+        </DialogFooter>
+      </Dialog>
+
+      {/* Bulk Generate Dialog */}
+      <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
+        <DialogHeader>
+          <DialogTitle className="text-white">Generate Bulk Codes</DialogTitle>
+          <DialogDescription className="text-white/50">
+            Create multiple codes at once
+          </DialogDescription>
+        </DialogHeader>
+        <DialogContent className="max-w-md bg-gray-900 border-white/10">
+          <div className="space-y-4 py-4">
+            <div>
+              <Label className="text-white">Number of Codes</Label>
+              <Input
+                type="number"
+                value={bulkCount}
+                onChange={(e) => setBulkCount(parseInt(e.target.value) || 10)}
+                className="bg-white/5 border-white/10 text-white"
+                min={1}
+                max={500}
+              />
+            </div>
+            <div>
+              <Label className="text-white">Unlocks</Label>
+              <Select
+                value={formData.unlocks}
+                onValueChange={(v) =>
+                  setFormData((p) => ({ ...p, unlocks: v }))
+                }
+              >
+                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {UNLOCKS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <div className="flex items-center gap-2">
+                        <opt.icon className="h-4 w-4" />
+                        {opt.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {bulkCodes.length > 0 && (
+              <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 max-h-40 overflow-y-auto">
+                <p className="text-green-400 text-sm font-medium mb-2">
+                  {bulkCodes.length} codes generated
+                </p>
+                {bulkCodes.slice(0, 10).map((c, i) => (
+                  <code
+                    key={i}
+                    className="block text-xs text-green-300 font-mono"
+                  >
+                    {c}
+                  </code>
+                ))}
+                {bulkCodes.length > 10 && (
+                  <p className="text-xs text-green-400/50 mt-1">
+                    ...and {bulkCodes.length - 10} more
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+        <DialogFooter className="flex flex-col gap-2">
+          {bulkCodes.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => exportCodes(bulkCodes)}
+              className="border-white/10 w-full"
+            >
+              <Download className="h-4 w-4 mr-2" /> Export CSV
+            </Button>
+          )}
+          <div className="flex gap-2 w-full">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowBulkDialog(false);
+                setBulkCodes([]);
+              }}
+              className="border-white/10 flex-1"
+            >
+              Close
+            </Button>
+            <Button
+              onClick={handleCreateBulkCodes}
+              disabled={creating}
+              className="flex-1"
+              style={{ backgroundColor: brandColor }}
+            >
+              {creating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Generate"
+              )}
+            </Button>
+          </div>
+        </DialogFooter>
+      </Dialog>
+
+      {/* QR Dialog */}
+      <Dialog open={showQRDialog} onOpenChange={setShowQRDialog}>
+        <DialogHeader>
+          <DialogTitle className="text-white">QR Code</DialogTitle>
+          <DialogDescription>Scan</DialogDescription>
+        </DialogHeader>
+        <DialogContent className="max-w-sm bg-gray-900 border-white/10 text-center">
+          {selectedQRCode && (
+            <div className="space-y-4 py-4">
+              <div className="bg-white p-4 rounded-xl inline-block mx-auto">
+                <div className="w-48 h-48 bg-gray-200 rounded-lg flex items-center justify-center">
+                  <QrCode className="h-24 w-24 text-gray-400" />
+                </div>
+              </div>
+              <p className="text-white font-mono font-bold text-lg">
+                {selectedQRCode.code}
+              </p>
+              <p className="text-white/50 text-sm">
+                Customers scan to go directly to your page
+              </p>
+              <Button
+                onClick={() => {
+                  navigator.clipboard.writeText(
+                    `engagespin.com/spin?code=${selectedQRCode.code}`,
+                  );
+                  toast.success("URL copied!");
+                }}
+                variant="outline"
+                className="border-white/10 w-full"
+              >
+                <Copy className="h-4 w-4 mr-2" /> Copy URL
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

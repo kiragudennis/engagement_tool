@@ -18,14 +18,44 @@ import { Slider } from "@/components/ui/slider";
 import {
   Loader2,
   Printer,
-  Download,
   Sparkles,
   Crown,
   Star,
   Diamond,
+  RotateCcw,
+  Gift,
+  Trophy,
+  Coins,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
+const UNLOCKS_OPTIONS = [
+  {
+    value: "points",
+    label: "Points Only",
+    description: "Just award points",
+    icon: Coins,
+  },
+  {
+    value: "spin",
+    label: "Spin & Win",
+    description: "Access to spin the wheel",
+    icon: RotateCcw,
+  },
+  {
+    value: "spin_draw",
+    label: "Spin + Draws",
+    description: "Spin + auto-enter draws",
+    icon: Gift,
+  },
+  {
+    value: "draw",
+    label: "Draws Only",
+    description: "Only enter prize draws",
+    icon: Trophy,
+  },
+];
 
 const RARITY_TIERS = [
   {
@@ -33,36 +63,40 @@ const RARITY_TIERS = [
     label: "Bronze",
     icon: Star,
     color: "#CD7F32",
-    bg: "bg-amber-700",
     defaultPct: 70,
     defaultPts: 5,
+    defaultUnlocks: "points",
+    description: "Most common — points only",
   },
   {
     id: "silver",
     label: "Silver",
     icon: Sparkles,
     color: "#C0C0C0",
-    bg: "bg-gray-400",
     defaultPct: 20,
     defaultPts: 25,
+    defaultUnlocks: "spin",
+    description: "Uncommon — unlocks the wheel",
   },
   {
     id: "gold",
     label: "Gold",
     icon: Crown,
     color: "#FFD700",
-    bg: "bg-yellow-500",
     defaultPct: 8,
     defaultPts: 100,
+    defaultUnlocks: "spin_draw",
+    description: "Rare — spin + draw entry",
   },
   {
     id: "diamond",
     label: "Diamond",
     icon: Diamond,
     color: "#B9F2FF",
-    bg: "bg-cyan-400",
     defaultPct: 2,
     defaultPts: 500,
+    defaultUnlocks: "spin_draw",
+    description: "Ultra rare — spin + draw entry",
   },
 ];
 
@@ -79,19 +113,19 @@ export function StickerBatchGenerator({
       ...t,
       percentage: t.defaultPct,
       points: t.defaultPts,
+      unlocks: t.defaultUnlocks,
       enabled: true,
     })),
   );
   const [generating, setGenerating] = useState(false);
   const [batchResult, setBatchResult] = useState<any>(null);
 
-  // Ensure percentages add up to 100
   const totalPct = tiers.reduce(
     (sum, t) => sum + (t.enabled ? t.percentage : 0),
     0,
   );
 
-  const updateTier = (id: string, field: string, value: number) => {
+  const updateTier = (id: string, field: string, value: any) => {
     setTiers((prev) =>
       prev.map((t) => (t.id === id ? { ...t, [field]: value } : t)),
     );
@@ -119,17 +153,14 @@ export function StickerBatchGenerator({
               rarity: t.id,
               percentage: t.percentage,
               points: t.points,
+              unlocks: t.unlocks,
               count: Math.round((t.percentage / 100) * totalStickers),
             })),
         }),
       });
 
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to generate codes");
-      }
-
+      if (!res.ok) throw new Error(data.error || "Failed to generate codes");
       if (!data.stickers || data.stickers.length === 0) {
         throw new Error("No codes were generated. Please try again.");
       }
@@ -143,95 +174,68 @@ export function StickerBatchGenerator({
     }
   };
 
-  console.log("Batch result:", batchResult);
+  const getUnlocksLabel = (unlocksValue: string) => {
+    return (
+      UNLOCKS_OPTIONS.find((o) => o.value === unlocksValue)?.label ||
+      unlocksValue
+    );
+  };
 
   const printStickers = () => {
-    if (
-      !batchResult ||
-      !batchResult.stickers ||
-      batchResult.stickers.length === 0
-    ) {
-      toast.error("No stickers to print. Generate codes first.");
+    if (!batchResult?.stickers?.length) {
+      toast.error("No stickers to print.");
       return;
     }
 
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
-      toast.error("Please allow popups for printing");
+      toast.error("Please allow popups");
       return;
     }
 
     const stickerWidth = "63mm";
     const stickerHeight = "38mm";
 
-    const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Stickers - ${businessSlug}</title>
+    const html = `<!DOCTYPE html><html><head><title>Stickers - ${businessSlug}</title>
       <style>
         @page { size: ${stickerWidth} ${stickerHeight}; margin: 0; }
         body { margin: 0; font-family: Arial, sans-serif; }
-        .sticker {
-          width: ${stickerWidth};
-          height: ${stickerHeight};
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          page-break-after: always;
-          padding: 2mm;
-          box-sizing: border-box;
-        }
+        .sticker { width: ${stickerWidth}; height: ${stickerHeight}; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; page-break-after: always; padding: 2mm; box-sizing: border-box; }
         .sticker.bronze { border-top: 3px solid #CD7F32; }
         .sticker.silver { border-top: 3px solid #C0C0C0; }
         .sticker.gold { border-top: 3px solid #FFD700; }
         .sticker.diamond { border-top: 3px solid #B9F2FF; }
         .business-name { font-size: 8px; font-weight: bold; color: #333; margin-bottom: 1mm; }
-        .rarity-badge { font-size: 7px; padding: 0.5mm 2mm; border-radius: 10px; margin-bottom: 1mm; display: inline-block; }
+        .rarity-badge { font-size: 7px; padding: 0.5mm 2mm; border-radius: 10px; margin-bottom: 0.5mm; display: inline-block; }
+        .unlocks-badge { font-size: 6px; color: #555; margin-bottom: 0.5mm; font-weight: bold; }
         .qr-code { width: 18mm; height: 18mm; margin: 1mm 0; }
         .code { font-family: monospace; font-size: 7px; font-weight: bold; margin-bottom: 0.5mm; }
         .cta { font-size: 6px; color: #666; }
-        @media print {
-          .no-print { display: none; }
-        }
-      </style>
-    </head>
-    <body>
+        @media print { .no-print { display: none; } }
+      </style></head><body>
       <div class="no-print" style="text-align:center; padding:10px; background:#f0f0f0;">
         <h3>📦 ${batchResult.business_name} - Sticker Batch</h3>
         <p>${batchResult.total_count} stickers across ${batchResult.tiers.length} tiers</p>
-        <p style="font-size:12px; color:#666;">
-          ${batchResult.tiers.map((t: any) => `${t.rarity}: ${t.count}×${t.points}pts`).join(" · ")}
+        <p style="font-size:11px; color:#666;">
+          ${batchResult.tiers.map((t: any) => `${t.rarity}: ${t.count}×${t.points}pts (${getUnlocksLabel(t.unlocks)})`).join(" · ")}
         </p>
-        <p style="font-size:11px;">Printer: ${stickerWidth} × ${stickerHeight} thermal labels</p>
-        <button onclick="window.print()" style="padding:12px 24px; font-size:16px; cursor:pointer; background:#8B5CF6; color:white; border:none; border-radius:8px; margin:10px;">
-          🖨️ Print All ${batchResult.total_count} Stickers
-        </button>
-        <p style="font-size:10px; color:#999;">Set your printer to the correct label size before printing</p>
+        <button onclick="window.print()" style="padding:12px 24px; font-size:16px; cursor:pointer; background:#8B5CF6; color:white; border:none; border-radius:8px; margin:10px;">🖨️ Print All</button>
       </div>
       ${batchResult.stickers
         .map(
           (s: any) => `
         <div class="sticker ${s.rarity}">
           <div class="business-name">${batchResult.business_name}</div>
-          <div class="rarity-badge" style="background:${s.color}20; color:${s.color}">
-            ${s.rarity.toUpperCase()} · ${s.points} PTS
-          </div>
-          <img class="qr-code" 
-               src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`engagespin.com/spin?code=${s.code}`)}" 
-               alt="QR" 
-               onerror="this.style.display='none'" />
+          <div class="rarity-badge" style="background:${s.color}20; color:${s.color}">${s.rarity.toUpperCase()} · ${s.points} PTS</div>
+          <div class="unlocks-badge">${getUnlocksLabel(s.unlocks)}</div>
+          <img class="qr-code" src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`engagespin.com/spin?code=${s.code}`)}" alt="QR" onerror="this.style.display='none'" />
           <div class="code">${s.code}</div>
-          <div class="cta">Scan to spin & win!</div>
+          <div class="cta">Scan to ${s.unlocks === "draw" ? "enter draw" : s.unlocks === "points" ? "earn points" : "spin & win"}!</div>
         </div>
       `,
         )
         .join("")}
-    </body>
-    </html>
-  `;
+    </body></html>`;
 
     printWindow.document.write(html);
     printWindow.document.close();
@@ -252,8 +256,8 @@ export function StickerBatchGenerator({
           </div>
 
           <p className="text-white/50 text-sm">
-            Generate rarity-tiered codes to print on products. Customers
-            discover codes after purchase — no staff involvement needed.
+            Generate rarity-tiered codes. Each tier can unlock different
+            experiences — higher tiers unlock more features.
           </p>
 
           {/* Total stickers */}
@@ -271,10 +275,10 @@ export function StickerBatchGenerator({
             />
           </div>
 
-          {/* Rarity tiers */}
+          {/* Rarity tiers with per-tier unlocks */}
           <div>
             <Label className="text-white/60 text-xs mb-3 block">
-              Rarity Distribution
+              Rarity Distribution & Unlocks
             </Label>
             <div className="space-y-3">
               {tiers.map((tier) => {
@@ -282,11 +286,10 @@ export function StickerBatchGenerator({
                 const count = Math.round(
                   (tier.percentage / 100) * totalStickers,
                 );
-
                 return (
                   <div
                     key={tier.id}
-                    className="p-3 rounded-lg bg-white/5 space-y-2"
+                    className="p-3 rounded-lg bg-white/5 space-y-3"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -307,7 +310,13 @@ export function StickerBatchGenerator({
                           {count} stickers
                         </Badge>
                       </div>
-                      <div className="flex items-center gap-2">
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-white/40 text-[10px]">
+                          Points
+                        </Label>
                         <Input
                           type="number"
                           value={tier.points}
@@ -318,11 +327,36 @@ export function StickerBatchGenerator({
                               parseInt(e.target.value) || 0,
                             )
                           }
-                          className="w-16 h-7 text-xs bg-white/5 border-white/10 text-white text-center"
+                          className="h-7 text-xs bg-white/5 border-white/10 text-white"
                         />
-                        <span className="text-white/40 text-xs">pts</span>
+                      </div>
+                      <div>
+                        <Label className="text-white/40 text-[10px]">
+                          Unlocks
+                        </Label>
+                        <Select
+                          value={tier.unlocks}
+                          onValueChange={(v) =>
+                            updateTier(tier.id, "unlocks", v)
+                          }
+                        >
+                          <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {UNLOCKS_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                <div className="flex items-center gap-1.5 text-xs">
+                                  <opt.icon className="h-3 w-3" />
+                                  {opt.label}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
+
                     <div className="flex items-center gap-3">
                       <span className="text-white/40 text-xs w-8">
                         {tier.percentage}%
@@ -337,6 +371,10 @@ export function StickerBatchGenerator({
                         className="flex-1"
                       />
                     </div>
+
+                    <p className="text-white/20 text-[10px]">
+                      {tier.description}
+                    </p>
                   </div>
                 );
               })}
@@ -393,7 +431,7 @@ export function StickerBatchGenerator({
                 >
                   <p className="text-white font-bold">{t.count}</p>
                   <p className="text-white/40 text-xs capitalize">
-                    {t.rarity} ({t.points}pts)
+                    {t.rarity} — {t.points}pts ({getUnlocksLabel(t.unlocks)})
                   </p>
                 </div>
               ))}

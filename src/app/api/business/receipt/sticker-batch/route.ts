@@ -12,6 +12,9 @@ const stickerBatchSchema = z.object({
       rarity: z.enum(["bronze", "silver", "gold", "diamond"]),
       percentage: z.number(),
       points: z.number().positive(),
+      unlocks: z
+        .enum(["points", "spin", "spin_draw", "draw"])
+        .default("points"),
       count: z.number(),
     }),
   ),
@@ -98,7 +101,7 @@ export async function POST(req: NextRequest) {
             p_code_subtype: "S",
             p_tier: tier.rarity,
             p_points_earned: tier.points,
-            p_unlocks: "spin",
+            p_unlocks: tier.unlocks,
             p_batch_id: batchId,
             p_batch_label: batchLabel,
             p_source: "sticker_batch",
@@ -119,6 +122,7 @@ export async function POST(req: NextRequest) {
             code: (result as any).code,
             rarity: tier.rarity,
             points: tier.points,
+            unlocks: tier.unlocks,
             color: TIER_COLORS[tier.rarity] || "#8B5CF6",
           });
           totalGenerated++;
@@ -136,6 +140,7 @@ export async function POST(req: NextRequest) {
         distribution: tiers.map((t) => ({
           rarity: t.rarity,
           count: t.count,
+          unlocks: t.unlocks,
           points: t.points,
         })),
         created_by: userId,
@@ -154,6 +159,7 @@ export async function POST(req: NextRequest) {
       tiers: tiers.map((t) => ({
         rarity: t.rarity,
         points: t.points,
+        unlocks: t.unlocks,
         count: t.count,
       })),
       stickers: allStickers,

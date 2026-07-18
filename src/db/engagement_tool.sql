@@ -112,7 +112,7 @@ CREATE TABLE access_codes (
     description TEXT,
     
     -- What this code unlocks
-    unlocks TEXT NOT NULL DEFAULT 'spin' CHECK (unlocks IN ('spin', 'trivia', 'draw', 'both', 'spin_draw', 'trivia_draw', 'all')),
+    unlocks TEXT NOT NULL DEFAULT 'points' CHECK (unlocks IN ('points', 'spin', 'spin_draw', 'draw')),
     
     -- Limits
     max_uses INTEGER, -- NULL = unlimited
@@ -455,8 +455,7 @@ END;
 $$;
 
 
--- Validate and redeem a code
--- Fixed and enhanced redeem_access_code function with loyalty points
+-- Cleaned redeem_access_code with simplified unlocks
 CREATE OR REPLACE FUNCTION redeem_access_code(
     p_code TEXT,
     p_user_id UUID
@@ -518,9 +517,7 @@ BEGIN
     v_activation_days := COALESCE(v_business.activation_duration_days, 30);
     
     -- ─── CHECK ACTIVATION REQUIREMENT ───────────────────
-    -- Does this code require the user to already be activated?
     IF v_code.require_activation THEN
-        -- Check if user is currently active with this business
         SELECT * INTO v_activation
         FROM customer_business_activations
         WHERE user_id = p_user_id 
@@ -531,7 +528,7 @@ BEGIN
         IF NOT FOUND THEN
             RETURN json_build_object(
                 'success', false, 
-                'error', 'You need to be an active customer of ' || v_business.name || ' to use this code. Ask them for an activation code first!',
+                'error', 'You need to be an active customer of ' || v_business.name || ' to use this code.',
                 'requires_activation', true,
                 'business_name', v_business.name,
                 'business_slug', v_business.slug
@@ -541,18 +538,13 @@ BEGIN
         v_is_activated := TRUE;
     END IF;
     
-    -- ─── UPSERT/EXTEND ACTIVATION ───────────────────────
-    -- If this code activates (is an activation code itself), extend the activation
-    -- Activation codes are typically: QR codes at counter, receipt codes, sticker codes
-    -- Public marketing codes (require_activation=FALSE) don't extend activation
-    
+    -- ─── ACTIVATE/EXTEND (for activation codes) ─────────
     IF v_code.type IN ('qr', 'single_use', 'sticker', 'receipt') THEN
         SELECT * INTO v_activation
         FROM customer_business_activations
         WHERE user_id = p_user_id AND business_id = v_code.business_id;
         
         IF FOUND THEN
-            -- Extend or reactivate
             UPDATE customer_business_activations
             SET is_active = TRUE,
                 expires_at = GREATEST(expires_at, NOW() + (v_activation_days || ' days')::INTERVAL),
@@ -561,7 +553,6 @@ BEGIN
                 last_activity_at = NOW()
             WHERE id = v_activation.id;
         ELSE
-            -- New activation
             INSERT INTO customer_business_activations (
                 user_id, business_id, activated_by_code_id,
                 activation_source, expires_at, is_active
@@ -578,14 +569,15 @@ BEGIN
     INSERT INTO access_code_usage (code_id, user_id) VALUES (v_code.id, p_user_id);
     UPDATE access_codes SET current_uses = current_uses + 1 WHERE id = v_code.id;
     
-    -- Update user home business
     UPDATE users
     SET home_business_id = COALESCE(home_business_id, v_code.business_id),
         created_via_code_id = COALESCE(created_via_code_id, v_code.id),
         onboarding_completed = TRUE
     WHERE id = p_user_id;
     
-    -- ─── CALCULATE POINTS ───────────────────────────────
+    -- ─── AWARD POINTS ───────────────────────────────────
+    -- Always award points on redemption. If code has point_value, use it.
+    -- Otherwise use business default. Codes that unlock 'points' still award.
     IF v_code.point_value IS NOT NULL THEN
         v_points_awarded := v_code.point_value;
     ELSE
@@ -599,26 +591,32 @@ BEGIN
             'Code ' || v_code.code || ' redeemed at ' || v_business.name,
             jsonb_build_object(
                 'code_id', v_code.id, 'code_type', v_code.type,
-                'code_tier', v_code.tier, 'unlocks', v_code.unlocks,
-                'is_activation', v_code.type IN ('qr', 'single_use', 'sticker', 'receipt')
+                'code_tier', v_code.tier, 'unlocks', v_code.unlocks
             )
         );
     END IF;
     
     -- ─── AUTO-ENTER DRAWS ───────────────────────────────
-    IF v_code.unlocks IN ('draw', 'spin_draw', 'trivia_draw', 'all') THEN
+    -- Only if code unlocks draws
+    IF v_code.unlocks IN ('draw', 'spin_draw') THEN
+        -- Try linked draw first, then any open draw
         SELECT d.id, d.name, d.prize_name, d.entry_ends_at INTO v_draw
         FROM draws d
-        WHERE d.access_code_id = v_code.id AND d.status = 'open'
-          AND d.entry_starts_at <= NOW() AND d.entry_ends_at >= NOW()
+        WHERE d.access_code_id = v_code.id 
+          AND d.status = 'open'
+          AND d.entry_starts_at <= NOW() 
+          AND d.entry_ends_at >= NOW()
         LIMIT 1;
         
         IF NOT FOUND THEN
             SELECT d.id, d.name, d.prize_name, d.entry_ends_at INTO v_draw
             FROM draws d
-            WHERE d.business_id = v_code.business_id AND d.status = 'open'
-              AND d.entry_starts_at <= NOW() AND d.entry_ends_at >= NOW()
-            ORDER BY d.entry_ends_at ASC LIMIT 1;
+            WHERE d.business_id = v_code.business_id 
+              AND d.status = 'open'
+              AND d.entry_starts_at <= NOW() 
+              AND d.entry_ends_at >= NOW()
+            ORDER BY d.entry_ends_at ASC 
+            LIMIT 1;
         END IF;
         
         IF FOUND AND NOT EXISTS (
@@ -644,13 +642,11 @@ BEGIN
     END IF;
     
     -- ─── REDIRECT ───────────────────────────────────────
-    IF v_code.unlocks IN ('draw', 'spin_draw') THEN
-        v_redirect_url := '/' || v_business.slug || '/spin';
-    ELSIF v_code.unlocks IN ('trivia', 'trivia_draw') THEN
-        v_redirect_url := '/' || v_business.slug || '/trivia';
-    ELSE
-        v_redirect_url := '/' || v_business.slug || '/spin';
-    END IF;
+    -- points → spin page (they can use points to spin)
+    -- spin → spin page
+    -- spin_draw → spin page (draw entry already handled above)
+    -- draw → spin page (or could go to draw page)
+    v_redirect_url := '/' || v_business.slug || '/spin';
     
     RETURN json_build_object(
         'success', true,
@@ -982,7 +978,7 @@ CREATE OR REPLACE FUNCTION generate_business_code(
     p_cashier_name TEXT DEFAULT NULL,
     p_source TEXT DEFAULT 'dashboard',
     p_created_by UUID DEFAULT NULL,
-    p_unlocks TEXT DEFAULT 'spin',
+    p_unlocks TEXT DEFAULT 'points',
     p_batch_id UUID DEFAULT NULL,
     p_batch_label TEXT DEFAULT NULL,
     p_metadata JSONB DEFAULT '{}'::jsonb

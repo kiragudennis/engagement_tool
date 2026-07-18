@@ -53,6 +53,7 @@ import {
   Diamond,
   Globe,
   ShoppingBag,
+  Coins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -118,12 +119,30 @@ const TIER_ICONS: Record<string, any> = {
 };
 
 const UNLOCKS_OPTIONS = [
-  { value: "spin", label: "Spin Only", icon: RotateCcw },
-  { value: "trivia", label: "Trivia Only", icon: Brain },
-  { value: "draw", label: "Draw Only", icon: Trophy },
-  { value: "spin_draw", label: "Spin + Draw", icon: Gift },
-  { value: "trivia_draw", label: "Trivia + Draw", icon: Sparkles },
-  { value: "all", label: "All (Spin + Trivia + Draw)", icon: Sparkles },
+  {
+    value: "points",
+    label: "Points Only",
+    description: "Access to spin the wheel",
+    icon: Coins,
+  },
+  {
+    value: "spin",
+    label: "Spin Only",
+    description: "Access to spin the wheel",
+    icon: RotateCcw,
+  },
+  {
+    value: "spin_draw",
+    label: "Spin + Draws",
+    description: "Spin + auto-enter draws",
+    icon: Gift,
+  },
+  {
+    value: "draw",
+    label: "Draws Only",
+    description: "Only enter prize draws",
+    icon: Trophy,
+  },
 ];
 
 // ─── Main Component ─────────────────────────────────────
@@ -656,13 +675,13 @@ export default function CodeManagementPage() {
 
       {/* Create Code Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogHeader>
-          <DialogTitle className="text-white">Create Access Code</DialogTitle>
-          <DialogDescription className="text-white/50">
-            Codes let customers access your games
-          </DialogDescription>
-        </DialogHeader>
         <DialogContent className="max-w-md bg-gray-900 border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-white">Create Access Code</DialogTitle>
+            <DialogDescription className="text-white/50">
+              Codes let customers access your games
+            </DialogDescription>
+          </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
               <Label className="text-white">Code Type</Label>
@@ -781,38 +800,40 @@ export default function CodeManagementPage() {
               </div>
             </div>
           </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateDialog(false)}
+              className="border-white/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateCode}
+              disabled={creating}
+              style={{ backgroundColor: brandColor }}
+            >
+              {creating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Create Code"
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => setShowCreateDialog(false)}
-            className="border-white/10"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleCreateCode}
-            disabled={creating}
-            style={{ backgroundColor: brandColor }}
-          >
-            {creating ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              "Create Code"
-            )}
-          </Button>
-        </DialogFooter>
       </Dialog>
 
       {/* Bulk Generate Dialog */}
       <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
-        <DialogHeader>
-          <DialogTitle className="text-white">Generate Bulk Codes</DialogTitle>
-          <DialogDescription className="text-white/50">
-            Create multiple codes at once
-          </DialogDescription>
-        </DialogHeader>
         <DialogContent className="max-w-md bg-gray-900 border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-white">
+              Generate Bulk Codes
+            </DialogTitle>
+            <DialogDescription className="text-white/50">
+              Create multiple codes at once
+            </DialogDescription>
+          </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
               <Label className="text-white">Number of Codes</Label>
@@ -869,42 +890,42 @@ export default function CodeManagementPage() {
               </div>
             )}
           </div>
+          <DialogFooter className="flex flex-col gap-2">
+            {bulkCodes.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => exportCodes(bulkCodes)}
+                className="border-white/10 w-full"
+              >
+                <Download className="h-4 w-4 mr-2" /> Export CSV
+              </Button>
+            )}
+            <div className="flex gap-2 w-full">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowBulkDialog(false);
+                  setBulkCodes([]);
+                }}
+                className="border-white/10 flex-1"
+              >
+                Close
+              </Button>
+              <Button
+                onClick={handleCreateBulkCodes}
+                disabled={creating}
+                className="flex-1"
+                style={{ backgroundColor: brandColor }}
+              >
+                {creating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Generate"
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
         </DialogContent>
-        <DialogFooter className="flex flex-col gap-2">
-          {bulkCodes.length > 0 && (
-            <Button
-              variant="outline"
-              onClick={() => exportCodes(bulkCodes)}
-              className="border-white/10 w-full"
-            >
-              <Download className="h-4 w-4 mr-2" /> Export CSV
-            </Button>
-          )}
-          <div className="flex gap-2 w-full">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowBulkDialog(false);
-                setBulkCodes([]);
-              }}
-              className="border-white/10 flex-1"
-            >
-              Close
-            </Button>
-            <Button
-              onClick={handleCreateBulkCodes}
-              disabled={creating}
-              className="flex-1"
-              style={{ backgroundColor: brandColor }}
-            >
-              {creating ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                "Generate"
-              )}
-            </Button>
-          </div>
-        </DialogFooter>
       </Dialog>
 
       {/* QR Dialog */}

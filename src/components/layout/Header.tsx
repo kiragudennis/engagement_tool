@@ -1,9 +1,18 @@
+// components/layout/Header.tsx
 "use client";
 
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ShoppingCart, Menu, User, Sun, Moon, Sparkles } from "lucide-react";
+import {
+  ShoppingCart,
+  Menu,
+  User,
+  Sun,
+  Moon,
+  Sparkles,
+  Store,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +24,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useAuth } from "@/lib/context/AuthContext";
 
 const navigation = [
   { name: "Account", href: "/account" },
@@ -24,23 +34,30 @@ const navigation = [
   { name: "Contact", href: "/contact" },
 ];
 
-const adminNavigation = [
-  { name: "Dashboard", href: "/admin" },
-  { name: "Products", href: "/admin/products" },
-  { name: "Orders", href: "/admin/orders" },
-  { name: "Coupons", href: "/admin/coupons" },
-  { name: "Tracking", href: "/admin/tracking" },
-  { name: "Customers", href: "/admin/customers" },
-  { name: "Marketing", href: "/admin/marketing" },
-  { name: "Analytics", href: "/admin/analytics" },
-];
-
 export default function Header() {
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  // Make use of profile.business_slug or profile.role is 'business_owner' / 'business_admin' / 'business_host
+  // OR profile.role !== 'customer' which is the default value
+  const { profile } = useAuth();
+  const hasBusiness = !!profile?.business_slug;
+  const businessSlug = profile?.business_slug;
+  const businessRole = profile?.role; // 'business_owner', 'business_admin', 'business_host'
 
-  const isAdmin = pathname.startsWith("/admin");
+  const adminNavigation = [
+    { name: "Dashboard", href: `/admin/${businessSlug}` },
+    { name: "Codes", href: `/admin/${businessSlug}/codes` },
+    { name: "Stickers", href: `/admin/${businessSlug}/stickers` },
+    { name: "Spin", href: `/admin/${businessSlug}/spin` },
+    { name: "Trivia", href: `/admin/${businessSlug}/trivia` },
+    { name: "Draw", href: `/admin/${businessSlug}/draws` },
+    { name: "Customers", href: `/admin/${businessSlug}/customers` },
+    { name: "Billing", href: `/admin/${businessSlug}/billing` },
+    { name: "Settings", href: `/admin/${businessSlug}/settings` },
+  ];
+
+  const isAdmin = hasBusiness && businessRole !== "customer";
   const navItems = isAdmin ? adminNavigation : navigation;
 
   return (
@@ -93,7 +110,7 @@ export default function Header() {
           </Button>
 
           {/* User Account Link */}
-          <Link href={isAdmin ? "/" : "/admin"}>
+          <Link href={isAdmin ? "/" : `/admin/${businessSlug}`}>
             <Button variant="ghost" size="icon" aria-label="User Account">
               <User className="h-5 w-5" />
             </Button>
@@ -108,13 +125,28 @@ export default function Header() {
           </Link>
 
           {/* CTA Button */}
-          <Button
-            asChild
-            size="sm"
-            className="bg-gradient-to-r from-purple-600 to-pink-600"
-          >
-            <Link href="/business/signup">Start Free Trial</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            {hasBusiness && (
+              <Link href={`/admin/${businessSlug}`}>
+                <Button variant="ghost" size="sm" className="gap-1">
+                  <Store className="h-4 w-4" />
+                  <span className="hidden sm:inline text-sm">
+                    {profile?.business_name}
+                  </span>
+                </Button>
+              </Link>
+            )}
+
+            {!hasBusiness && (
+              <Button
+                asChild
+                size="sm"
+                className="bg-gradient-to-r from-purple-600 to-pink-600"
+              >
+                <Link href="/business/signup">Start Free Trial</Link>
+              </Button>
+            )}
+          </div>
 
           {/* Mobile Menu Button */}
           <Sheet open={isOpen} onOpenChange={setIsOpen}>

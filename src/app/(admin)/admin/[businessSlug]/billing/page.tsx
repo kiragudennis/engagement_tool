@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
-import { getPlanLimits } from "@/lib/config/plans";
+import { formatPrice, getPlanLimits } from "@/lib/config/plans";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,6 @@ import {
   ArrowRight,
   ArrowLeft,
   CheckCircle,
-  Shield,
   CreditCard,
   Smartphone,
   Sparkles,
@@ -32,27 +31,28 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { UsageMeter } from "@/components/billing/UsageMeter";
+import Link from "next/link";
 
-// ─── Plan definitions ───────────────────────────────────
+// ─── Plan definitions (USD only) ───────────────────────
 const EARLY_BIRD_PLANS: Record<
   string,
-  { name: string; priceKes: number; icon: any; color: string }
+  { name: string; priceUsd: number; icon: any; color: string }
 > = {
   early_bronze: {
     name: "Bronze Lifetime",
-    priceKes: 100_000,
+    priceUsd: 697, // ~3.4x annual (was $775)
     icon: Sparkles,
     color: "from-amber-500 to-orange-500",
   },
   early_silver: {
     name: "Silver Lifetime",
-    priceKes: 250_000,
+    priceUsd: 1797, // ~3.2x annual (was $1,938)
     icon: Crown,
     color: "from-gray-400 to-gray-500",
   },
   early_gold: {
     name: "Gold Lifetime",
-    priceKes: 500_000,
+    priceUsd: 4997, // ~2.6x annual (was $3,876)
     icon: Rocket,
     color: "from-yellow-400 to-yellow-600",
   },
@@ -60,11 +60,31 @@ const EARLY_BIRD_PLANS: Record<
 
 const MONTHLY_PLANS: Record<
   string,
-  { name: string; monthlyKes: number; annualKes: number }
+  {
+    name: string;
+    monthlyUsd: number;
+    annualTotal: number;
+    annualSavings: number;
+  }
 > = {
-  starter: { name: "Starter", monthlyKes: 2_900, annualKes: 2_420 },
-  pro: { name: "Pro", monthlyKes: 9_900, annualKes: 8_250 },
-  enterprise: { name: "Enterprise", monthlyKes: 25_900, annualKes: 21_580 },
+  starter: {
+    name: "Starter",
+    monthlyUsd: 29,
+    annualTotal: 290,
+    annualSavings: 58,
+  },
+  pro: {
+    name: "Pro",
+    monthlyUsd: 79,
+    annualTotal: 790,
+    annualSavings: 158,
+  },
+  enterprise: {
+    name: "Enterprise",
+    monthlyUsd: 194,
+    annualTotal: 1940,
+    annualSavings: 388,
+  },
 };
 
 const PAYMENT_METHODS = [
@@ -105,30 +125,24 @@ export default function AdminBillingPage() {
   const [codeCount, setCodeCount] = useState(0);
 
   // Determine plan type
-  const isEarlyBird = selectedPlan.startsWith("early-");
+  const isEarlyBird = selectedPlan.startsWith("early_");
   const earlyBirdPlan = isEarlyBird ? EARLY_BIRD_PLANS[selectedPlan] : null;
   const monthlyPlan = !isEarlyBird
     ? MONTHLY_PLANS[selectedPlan] || MONTHLY_PLANS.pro
     : null;
 
+  // Calculate price
   const price = isEarlyBird
-    ? earlyBirdPlan!.priceKes
+    ? earlyBirdPlan!.priceUsd
     : billingCycle === "annual"
-      ? monthlyPlan?.annualKes || 9_900
-      : monthlyPlan?.monthlyKes || 9_900;
-
-  const formatKES = (amount: number) =>
-    new Intl.NumberFormat("en-KE", {
-      style: "currency",
-      currency: "KES",
-      minimumFractionDigits: 0,
-    }).format(amount);
+      ? monthlyPlan?.annualTotal || 790
+      : monthlyPlan?.monthlyUsd || 79;
 
   // ─── Check if user can subscribe ──────────────────────
   const isSubscribed =
     business?.subscription_status === "active" &&
-    !business?.plan?.startsWith("early-"); // Allow upgrading to early bird even if active
-  const hasEarlyBird = business?.plan?.startsWith("early-");
+    !business?.plan?.startsWith("early_"); // Allow upgrading to early bird even if active
+  const hasEarlyBird = business?.plan?.startsWith("early_");
   const canSubscribe = !hasEarlyBird && (!isSubscribed || isSignupFlow); // Can't subscribe if already on early bird
 
   // ─── Load business ────────────────────────────────────
@@ -184,6 +198,7 @@ export default function AdminBillingPage() {
 
     try {
       if (paymentMethod === "paystack") {
+        // Both subscription and one-time go through the same endpoint
         const res = await fetch("/api/billing/paystack/initialize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -225,7 +240,6 @@ export default function AdminBillingPage() {
           }),
         });
         const data = await res.json();
-        console.log("M-Pesa response:", data);
         if (!res.ok) throw new Error(data.error || "M-Pesa failed");
         toast.success(data.message || "Check your phone for M-Pesa prompt");
         setStep("done");
@@ -244,6 +258,8 @@ export default function AdminBillingPage() {
     //   toast.error("You already have an active subscription");
     //   return;
     // }
+    console.log("Plan", planId);
+
     setSelectedPlan(planId);
     setStep("checkout");
   };
@@ -281,13 +297,25 @@ export default function AdminBillingPage() {
               ? "Check your phone for the M-Pesa prompt to complete payment."
               : "Your payment is being processed."}
           </p>
-          <Button
-            onClick={() => router.push(`/admin/${business?.slug}`)}
-            className="gap-2"
-            size="lg"
-          >
-            Go to Dashboard <ArrowRight className="h-4 w-4" />
-          </Button>
+          <div className="flex flex-col items-center gap-4">
+            <Button
+              onClick={() => router.push(`/admin/${business?.slug}`)}
+              className="gap-2 w-full"
+              size="lg"
+            >
+              Go to Dashboard <ArrowRight className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={() =>
+                router.push(`/admin/${business?.slug}/billing/manage`)
+              }
+              className="gap-2 w-full"
+              size="lg"
+              variant={"secondary"}
+            >
+              Manage bills <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
         </motion.div>
       </div>
     );
@@ -365,38 +393,58 @@ export default function AdminBillingPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold text-white">
-                      {formatKES(price)}
+                      {formatPrice(price)}
                     </p>
                     <p className="text-white/40 text-xs">
-                      {isEarlyBird ? "one-time" : "/mo + VAT"}
+                      {isEarlyBird
+                        ? "one-time"
+                        : billingCycle === "annual"
+                          ? "/year"
+                          : "/mo"}
                     </p>
                   </div>
                 </div>
 
                 {/* Billing cycle toggle for monthly plans */}
                 {!isEarlyBird && (
-                  <div className="flex gap-2">
-                    <Button
-                      variant={
-                        billingCycle === "monthly" ? "default" : "outline"
-                      }
-                      size="sm"
-                      onClick={() => setBillingCycle("monthly")}
-                      className="flex-1"
-                    >
-                      Monthly
-                    </Button>
-                    <Button
-                      variant={
-                        billingCycle === "annual" ? "default" : "outline"
-                      }
-                      size="sm"
-                      onClick={() => setBillingCycle("annual")}
-                      className="flex-1"
-                    >
-                      Annual (Save 17%)
-                    </Button>
-                  </div>
+                  <>
+                    <div className="flex gap-2 mb-3">
+                      <Button
+                        variant={
+                          billingCycle === "monthly" ? "default" : "outline"
+                        }
+                        size="sm"
+                        onClick={() => setBillingCycle("monthly")}
+                        className="flex-1"
+                      >
+                        Monthly
+                      </Button>
+                      <Button
+                        variant={
+                          billingCycle === "annual" ? "default" : "outline"
+                        }
+                        size="sm"
+                        onClick={() => setBillingCycle("annual")}
+                        className="flex-1"
+                      >
+                        Annual (Save 17%)
+                      </Button>
+                    </div>
+
+                    {/* Show savings when annual is selected */}
+                    {billingCycle === "annual" && (
+                      <div className="bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2">
+                        <p className="text-sm text-green-400 font-medium">
+                          🎉 Save {formatPrice(monthlyPlan?.annualSavings || 0)}{" "}
+                          • 2 months free
+                        </p>
+                        <p className="text-xs text-green-400/70 mt-1">
+                          {formatPrice(monthlyPlan?.monthlyUsd || 0)}/mo
+                          equivalent • billed annually
+                        </p>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -457,7 +505,7 @@ export default function AdminBillingPage() {
                   </>
                 ) : (
                   <>
-                    Pay {formatKES(price)} <ArrowRight className="h-5 w-5" />
+                    Pay {formatPrice(price)} <ArrowRight className="h-5 w-5" />
                   </>
                 )}
               </Button>
@@ -526,19 +574,24 @@ export default function AdminBillingPage() {
           )}
         >
           <CardContent>
-            <div className="flex items-center gap-2 mb-4">
-              <Flame className="h-5 w-5 text-amber-400" />
-              <h2 className="text-white font-semibold text-lg">
-                Early Bird Lifetime Deals
-              </h2>
-              <Badge className="bg-amber-500/20 text-amber-400 border-0">
-                Limited Time
-              </Badge>
-              {!canSubscribe && (
-                <Badge className="bg-gray-500/20 text-gray-400 border-0 ml-auto">
-                  <Lock className="h-3 w-3 mr-1" /> Already Subscribed
+            <div className="flex flex-col sm:flex-row items-center gap-2 mb-4">
+              <div className="flex items-start gap-2">
+                <Flame className="h-5 w-5 text-amber-400" />
+                <h2 className="text-white font-semibold text-lg">
+                  Early Bird Lifetime Deals
+                </h2>
+              </div>
+
+              <div className="flex justify-end items-center">
+                <Badge className="bg-amber-500/20 text-amber-400 border-0">
+                  Limited Time
                 </Badge>
-              )}
+                {!canSubscribe && (
+                  <Badge className="bg-gray-500/20 text-gray-400 border-0 ml-auto">
+                    <Lock className="h-3 w-3 mr-1" /> Already Subscribed
+                  </Badge>
+                )}
+              </div>
             </div>
             <p className="text-white/50 text-sm mb-4">
               Pay once, use forever. Lock in your price before these deals are
@@ -558,14 +611,14 @@ export default function AdminBillingPage() {
                 {
                   id: "early_bronze",
                   name: "Bronze",
-                  price: "100K",
+                  price: 697,
                   desc: "Lifetime",
                   color: "border-amber-500/30 bg-amber-500/5",
                 },
                 {
                   id: "early_silver",
                   name: "Silver",
-                  price: "250K",
+                  price: 1797,
                   desc: "Lifetime",
                   color: "border-gray-400/30 bg-gray-400/5",
                   popular: true,
@@ -573,7 +626,7 @@ export default function AdminBillingPage() {
                 {
                   id: "early_gold",
                   name: "Gold",
-                  price: "500K",
+                  price: 4997,
                   desc: "Lifetime",
                   color: "border-yellow-500/30 bg-yellow-500/5",
                 },
@@ -605,7 +658,7 @@ export default function AdminBillingPage() {
                     )}
                     <p className="text-white font-bold">{eb.name}</p>
                     <p className="text-2xl font-bold text-white mt-1">
-                      KES {eb.price}
+                      {formatPrice(eb.price)}
                     </p>
                     <p className="text-amber-400 text-xs mt-0.5 flex items-center justify-center gap-1">
                       <Infinity className="h-3 w-3" />
@@ -681,10 +734,10 @@ export default function AdminBillingPage() {
                       )}
                     </div>
                     <p className="text-white/60 text-sm mt-1">
-                      KES {plan.monthlyKes.toLocaleString()}/mo
+                      $ {plan.monthlyUsd.toLocaleString()}/mo
                     </p>
                     <p className="text-white/30 text-xs">
-                      or KES {plan.annualKes.toLocaleString()}/mo billed
+                      or KES {plan.annualTotal.toLocaleString()}/mo billed
                       annually
                     </p>
                   </button>
@@ -702,46 +755,57 @@ export default function AdminBillingPage() {
 
         {/* Current Plan */}
         <Card className="bg-white/5 border-white/10">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <Crown className="h-8 w-8 text-purple-400" />
+          <CardContent>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+              <div className="flex items-start gap-3">
+                <Crown className="h-8 w-8 text-purple-400 flex-shrink-0" />
                 <div>
                   <p className="text-white font-bold text-xl capitalize">
                     {business?.plan}
                   </p>
-                  <Badge
-                    className={cn(
-                      isTrial && "bg-yellow-500/20 text-yellow-400",
-                      isActive && "bg-green-500/20 text-green-400",
-                      hasEarlyBird && "bg-amber-500/20 text-amber-400",
-                    )}
-                  >
-                    {hasEarlyBird ? "lifetime" : business?.subscription_status}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      className={cn(
+                        isTrial && "bg-yellow-500/20 text-yellow-400",
+                        isActive && "bg-green-500/20 text-green-400",
+                        hasEarlyBird && "bg-amber-500/20 text-amber-400",
+                      )}
+                    >
+                      {hasEarlyBird
+                        ? "lifetime"
+                        : business?.subscription_status}
+                    </Badge>
+
+                    <Link href={"billing/manage"} className="text-sm p-2">
+                      Manage
+                    </Link>
+                  </div>
                 </div>
               </div>
-              {isTrial && business?.trial_ends_at && (
-                <p className="text-white/60 text-sm">
-                  Ends{" "}
-                  {formatDistanceToNow(new Date(business.trial_ends_at), {
-                    addSuffix: true,
-                  })}
-                </p>
-              )}
-              {isActive && business?.next_billing_at && (
-                <p className="text-white/60 text-sm">
-                  Next billing{" "}
-                  {formatDistanceToNow(new Date(business.next_billing_at), {
-                    addSuffix: true,
-                  })}
-                </p>
-              )}
-              {hasEarlyBird && (
-                <Badge className="bg-amber-500/20 text-amber-400">
-                  <Infinity className="h-3 w-3 mr-1" /> Lifetime Access
-                </Badge>
-              )}
+
+              <div className="flex items-center gap-3 sm:text-right">
+                {isTrial && business?.trial_ends_at && (
+                  <p className="text-white/60 text-sm">
+                    Ends{" "}
+                    {formatDistanceToNow(new Date(business.trial_ends_at), {
+                      addSuffix: true,
+                    })}
+                  </p>
+                )}
+                {isActive && business?.next_billing_at && (
+                  <p className="text-white/60 text-sm">
+                    Next billing{" "}
+                    {formatDistanceToNow(new Date(business.next_billing_at), {
+                      addSuffix: true,
+                    })}
+                  </p>
+                )}
+                {hasEarlyBird && (
+                  <Badge className="bg-amber-500/20 text-amber-400 whitespace-nowrap">
+                    <Infinity className="h-3 w-3 mr-1" /> Lifetime Access
+                  </Badge>
+                )}
+              </div>
             </div>
             <UsageMeter
               label="Engagements this month"

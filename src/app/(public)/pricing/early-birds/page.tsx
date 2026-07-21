@@ -10,8 +10,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Check,
   ArrowRight,
-  Crown,
-  Sparkles,
   Shield,
   Infinity,
   Zap,
@@ -21,178 +19,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-
-// ─── Early Bird Packages ────────────────────────────────
-const EARLY_BIRD_PACKAGES = [
-  {
-    id: "bronze",
-    name: "Bronze",
-    priceKes: 100_000,
-    icon: Sparkles,
-    color: "from-amber-500 to-orange-500",
-    borderColor: "border-amber-500/30",
-    bgGlow: "bg-amber-500/10",
-    popular: false,
-    desc: "For small businesses ready to grow with gamification",
-    features: [
-      {
-        text: "Lifetime access — never pay again",
-        included: true,
-        highlight: true,
-      },
-      { text: "3 spin games", included: true },
-      { text: "3 trivia challenges", included: true },
-      { text: "3 active draws", included: true },
-      { text: "5,000 engagements/month", included: true },
-      { text: "12 prize slots on wheel", included: true },
-      { text: "Full branding customization", included: true },
-      { text: "Customer CSV + webhook export", included: true },
-      { text: "Live broadcast (OBS)", included: true },
-      { text: "Bulk code generation", included: true },
-      { text: "Analytics dashboard", included: true },
-      { text: "3 admin users", included: true },
-      { text: "Priority email support", included: true },
-      { text: "API access", included: false },
-      { text: "Dedicated support", included: false },
-      { text: "Custom integrations", included: false },
-    ],
-    bestFor: "Coffee shops, salons, small retailers",
-  },
-  {
-    id: "silver",
-    name: "Silver",
-    priceKes: 250_000,
-    icon: Crown,
-    color: "from-gray-400 to-gray-500",
-    borderColor: "border-gray-400/30",
-    bgGlow: "bg-gray-400/10",
-    popular: true,
-    desc: "For growing businesses running regular campaigns",
-    features: [
-      {
-        text: "Lifetime access — never pay again",
-        included: true,
-        highlight: true,
-      },
-      { text: "10 spin games", included: true },
-      { text: "10 trivia challenges", included: true },
-      { text: "10 active draws", included: true },
-      { text: "25,000 engagements/month", included: true },
-      { text: "24 prize slots on wheel", included: true },
-      { text: "Full branding customization", included: true },
-      { text: "Customer CSV + API + Webhooks", included: true },
-      { text: "Live broadcast (OBS)", included: true },
-      { text: "Bulk code generation", included: true },
-      { text: "Advanced analytics", included: true },
-      { text: "10 admin users", included: true },
-      { text: "Priority support (email + chat)", included: true },
-      { text: "API access", included: true },
-      { text: "Dedicated support", included: false },
-      { text: "Custom integrations", included: false },
-    ],
-    bestFor: "Restaurants, event venues, mid-size retailers",
-  },
-  {
-    id: "gold",
-    name: "Gold",
-    priceKes: 500_000,
-    icon: Rocket,
-    color: "from-yellow-400 to-yellow-600",
-    borderColor: "border-yellow-500/30",
-    bgGlow: "bg-yellow-500/10",
-    popular: false,
-    desc: "For chains and high-volume venues with multiple locations",
-    features: [
-      {
-        text: "Lifetime access — never pay again",
-        included: true,
-        highlight: true,
-      },
-      { text: "Unlimited spin games", included: true },
-      { text: "Unlimited trivia challenges", included: true },
-      { text: "Unlimited active draws", included: true },
-      { text: "100,000 engagements/month", included: true },
-      { text: "24 prize slots on wheel", included: true },
-      { text: "Full white-label branding", included: true },
-      { text: "Customer CSV + API + Webhooks", included: true },
-      { text: "Live broadcast (OBS)", included: true },
-      { text: "Bulk code generation", included: true },
-      { text: "Advanced analytics + custom reports", included: true },
-      { text: "Unlimited admin users", included: true },
-      { text: "Dedicated account manager", included: true },
-      { text: "API access", included: true },
-      { text: "Custom integrations", included: true },
-      { text: "Multiple location support", included: true },
-    ],
-    bestFor: "Chains, franchises, agencies managing multiple clients",
-  },
-];
-
-// ─── Comparison with regular pricing ────────────────────
-const COMPARISON = [
-  {
-    label: "Monthly cost",
-    bronze: "KES 9,900/mo",
-    silver: "KES 9,900/mo",
-    gold: "KES 25,900/mo",
-  },
-  {
-    label: "Annual cost",
-    bronze: "KES 118,800/year",
-    silver: "KES 118,800/year",
-    gold: "KES 310,800/year",
-  },
-  {
-    label: "3-year cost",
-    bronze: "KES 356,400",
-    silver: "KES 356,400",
-    gold: "KES 932,400",
-  },
-  {
-    label: "You pay once",
-    bronze: "KES 100,000",
-    silver: "KES 250,000",
-    gold: "KES 500,000",
-  },
-  {
-    label: "You save (3 years)",
-    bronze: "KES 256,400",
-    silver: "KES 106,400",
-    gold: "KES 432,400",
-  },
-];
-
-// ─── FAQ ────────────────────────────────────────────────
-const FAQS = [
-  {
-    q: "What does 'lifetime access' mean?",
-    a: "You pay once and never pay again. Your account stays active for the lifetime of the Engage platform. No monthly bills, no annual renewals, no surprise price increases.",
-  },
-  {
-    q: "Is this a limited-time offer?",
-    a: "Yes. These early bird packages are only available during our launch period. Once we reach our target number of early adopters, these prices will never be offered again.",
-  },
-  {
-    q: "What happens if I outgrow my package?",
-    a: "You can upgrade to a higher tier at any time by paying the difference. Already paid KES 100K for Bronze? Upgrade to Silver by paying the KES 150K difference.",
-  },
-  {
-    q: "Can I get a refund?",
-    a: "We offer a 30-day money-back guarantee. If you're not satisfied within the first 30 days, we'll refund your full payment, no questions asked.",
-  },
-  {
-    q: "How does this compare to the monthly plans?",
-    a: "The Bronze package is equivalent to our Pro plan (KES 9,900/mo). At 3 years, you'd pay KES 356,400 on monthly billing. With Bronze, you pay KES 100,000 once and save KES 256,400.",
-  },
-  {
-    q: "What if Engage shuts down?",
-    a: "We're committed to the long haul. However, in the unlikely event we cease operations, we'll provide at least 12 months notice and help you export all your data. Your customer list always belongs to you.",
-  },
-  {
-    q: "Are there any hidden fees?",
-    a: "No. The price you see is the price you pay. No setup fees, no transaction fees, no hidden costs. You get everything listed in your package for life.",
-  },
-];
+import { EARLY_BIRD_PACKAGES, formatPrice } from "@/lib/config/plans";
+import { COMPARISON, FAQS } from "@/lib/config/info";
 
 // ─── Urgency Banner ─────────────────────────────────────
 function UrgencyBanner() {
@@ -234,22 +62,28 @@ function UrgencyBanner() {
 
 // ─── Savings Calculator ─────────────────────────────────
 function SavingsHighlight({ pkg }: { pkg: (typeof EARLY_BIRD_PACKAGES)[0] }) {
-  const monthlyEquivalent = pkg.id === "gold" ? 25_900 : 9_900; // Pro for bronze/silver, Enterprise for gold
-  const threeYearCost = monthlyEquivalent * 36;
-  const savings = threeYearCost - pkg.priceKes;
-  const monthsToBreakEven = Math.ceil(pkg.priceKes / monthlyEquivalent);
+  // Bronze = Starter ($29/mo), Silver = Pro ($79/mo), Gold = Enterprise ($194/mo)
+  const monthlyEquivalent =
+    pkg.id === "gold" ? 194 : pkg.id === "silver" ? 79 : 29; // Bronze = Starter
+
+  const annualCost = monthlyEquivalent * 10; // 10 months billed annually
+  const threeYearCost = annualCost * 3; // 3 years of annual billing
+  const fiveYearCost = annualCost * 5; // 5 years of annual billing
+  const savings3yr = threeYearCost - pkg.priceUsd;
+  const savings5yr = fiveYearCost - pkg.priceUsd;
+  const monthsToBreakEven = Math.ceil(pkg.priceUsd / monthlyEquivalent);
 
   return (
     <div className="p-4 rounded-xl bg-green-500/5 border border-green-500/20 text-center">
       <p className="text-green-400 font-bold text-lg">
-        Save KES {savings.toLocaleString()}
+        Save ${savings3yr.toLocaleString()}
       </p>
       <p className="text-white/50 text-xs mt-1">
-        Compared to 3 years of monthly billing (KES{" "}
-        {monthlyEquivalent.toLocaleString()}/mo)
+        vs 3 years of ${monthlyEquivalent}/mo annual billing
       </p>
       <p className="text-white/30 text-xs mt-2">
-        Pays for itself in {monthsToBreakEven} months
+        Break-even in {monthsToBreakEven} months • $
+        {savings5yr.toLocaleString()} saved over 5 years
       </p>
     </div>
   );
@@ -259,15 +93,6 @@ function SavingsHighlight({ pkg }: { pkg: (typeof EARLY_BIRD_PACKAGES)[0] }) {
 export default function EarlyBirdsPricingPage() {
   const router = useRouter();
   const [selectedPlan, setSelectedPlan] = useState<string>("silver");
-
-  const formatKES = (amount: number) => {
-    return new Intl.NumberFormat("en-KE", {
-      style: "currency",
-      currency: "KES",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-950 to-slate-950">
@@ -328,19 +153,6 @@ export default function EarlyBirdsPricingPage() {
               >
                 <CardContent className="p-6 flex flex-col h-full">
                   {/* Header */}
-                  <div
-                    className={cn(
-                      "w-12 h-12 rounded-xl flex items-center justify-center mb-4",
-                      pkg.bgGlow,
-                    )}
-                  >
-                    <pkg.icon
-                      className={cn(
-                        "h-6 w-6",
-                        pkg.color.split(" ")[0].replace("from-", "text-"),
-                      )}
-                    />
-                  </div>
                   <h3 className="text-xl font-bold text-white">{pkg.name}</h3>
                   <p className="text-white/40 text-sm mt-1">{pkg.desc}</p>
 
@@ -348,7 +160,7 @@ export default function EarlyBirdsPricingPage() {
                   <div className="mt-4 mb-2">
                     <div className="flex items-baseline gap-2">
                       <span className="text-4xl font-bold text-white">
-                        {formatKES(pkg.priceKes)}
+                        {formatPrice(pkg.priceUsd)}
                       </span>
                       <span className="text-white/40 text-lg sm:text-xs">
                         one-time
@@ -411,7 +223,7 @@ export default function EarlyBirdsPricingPage() {
                           : "bg-white/10 hover:bg-white/20 text-white",
                     )}
                     onClick={() =>
-                      router.push(`/business/signup?plan=early-${pkg.id}`)
+                      router.push(`/business/signup?plan=early_${pkg.id}`)
                     }
                   >
                     {pkg.id === "gold" ? (
@@ -465,8 +277,8 @@ export default function EarlyBirdsPricingPage() {
                     key={i}
                     className={cn(
                       "border-b border-white/5",
+                      i === COMPARISON.length - 3 && "bg-green-500/5",
                       i === COMPARISON.length - 2 && "bg-green-500/5",
-                      i === COMPARISON.length - 1 && "bg-amber-500/5",
                     )}
                   >
                     <td className="p-3 text-white/60">{row.label}</td>
@@ -510,7 +322,7 @@ export default function EarlyBirdsPricingPage() {
               {
                 icon: Zap,
                 title: "Immediate ROI",
-                desc: "Bronze pays for itself in 10 months compared to Pro plan. After that, it's pure savings.",
+                desc: "Silver pays for itself in under 10 months compared to Pro plan. After that, it's pure savings.",
                 color: "text-purple-400",
               },
             ].map((item, i) => (
@@ -583,8 +395,8 @@ export default function EarlyBirdsPricingPage() {
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button
               size="lg"
-              className="bg-gradient-to-r from-amber-500 to-yellow-500 text-black text-lg px-8 hover:from-amber-400 hover:to-yellow-400"
-              onClick={() => router.push("/business/signup?plan=early-silver")}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-lg px-8 hover:from-purple-500 hover:to-pink-500"
+              onClick={() => router.push("/business/signup?plan=early_silver")}
             >
               Claim Your Lifetime Deal <Rocket className="h-5 w-5 ml-2" />
             </Button>

@@ -450,7 +450,7 @@ export default function LoginPage() {
               </div>
 
               <Card className="bg-white dark:bg-gray-900/95 border-gray-200 dark:border-gray-800 backdrop-blur-sm">
-                <CardContent className="p-6">
+                <CardContent>
                   <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <TabsList className="grid w-full grid-cols-2 mb-6 bg-gray-100 dark:bg-gray-800">
                       <TabsTrigger
@@ -518,7 +518,7 @@ export default function LoginPage() {
                     <p className="text-gray-500 dark:text-gray-400 text-sm">
                       Have a code?{" "}
                       <Link
-                        href="/spin"
+                        href="/code-entry"
                         className="text-purple-600 dark:text-purple-400 hover:underline"
                       >
                         Enter it here

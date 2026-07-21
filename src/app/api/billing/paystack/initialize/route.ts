@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireBusinessAdmin } from "@/lib/auth/server";
 import {
-  getSubscriptionAmountKes,
+  getSubscriptionAmount,
   paystackCreateCustomer,
   paystackCreateSubscription,
   paystackInitializeTransaction,
@@ -53,39 +53,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: 403 });
     }
 
-    const amountKes = getSubscriptionAmountKes(plan, billingCycle);
-    console.log(
-      "Creating payment record for business:",
-      businessId,
-      "Amount KES:",
-      amountKes,
-      "Plan:",
-      plan,
-      "Billing Cycle:",
-      billingCycle,
-    );
-
-    if (amountKes === 0) return;
-
+    const amount = getSubscriptionAmount(plan, billingCycle);
     const planCode = resolvePaystackPlanCode(plan, billingCycle);
-
-    console.log(
-      "Creating payment record for business:",
-      businessId,
-      "plan:",
-      plan,
-      "billingCycle:",
-      billingCycle,
-      "amountKes:",
-      amountKes,
-    );
 
     const { data: payment, error: bsError } = await supabaseAdmin
       .from("business_payments")
       .insert({
         business_id: businessId,
-        amount: amountKes,
-        currency: "KES",
+        amount: amount,
+        currency: "USD",
         plan,
         billing_cycle: billingCycle,
         payment_method: "paystack",
@@ -93,8 +69,6 @@ export async function POST(req: NextRequest) {
       })
       .select()
       .single();
-
-    console.log("Payment record created:", payment, "Error:", bsError);
 
     const customerRes = await paystackCreateCustomer(email, fullName);
     const customerCode =
@@ -114,12 +88,12 @@ export async function POST(req: NextRequest) {
     if (!authorizationUrl) {
       const initRes = await paystackInitializeTransaction({
         email,
-        amountKes,
+        amount,
         plan,
         billingCycle,
         businessId,
         paymentId: payment!.id,
-        callbackUrl: `${process.env.NEXT_PUBLIC_SITE_LIVE_URL}/admin/${business.slug}/billing/success`,
+        callbackUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/admin/${business.slug}/billing/success`,
       });
       if (!initRes.status) {
         return NextResponse.json(
@@ -130,17 +104,13 @@ export async function POST(req: NextRequest) {
       authorizationUrl = initRes.data.authorization_url;
     }
 
-    if (customerCode) {
+    if (customerCode || subscriptionCode) {
       await supabaseAdmin
         .from("businesses")
-        .update({ paystack_customer_code: customerCode })
-        .eq("id", businessId);
-    }
-
-    if (subscriptionCode) {
-      await supabaseAdmin
-        .from("businesses")
-        .update({ paystack_subscription_code: subscriptionCode })
+        .update({
+          paystack_customer_code: customerCode,
+          paystack_subscription_code: subscriptionCode,
+        })
         .eq("id", businessId);
     }
 

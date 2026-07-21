@@ -39,31 +39,21 @@ import {
   Loader2,
   Save,
   Store,
-  Settings,
   CreditCard,
   Users,
   Palette,
-  Globe,
-  Link,
-  QrCode,
   Copy,
-  ExternalLink,
-  Check,
-  Shield,
-  Clock,
   Mail,
   Phone,
   User,
-  Building2,
   Image,
-  Upload,
   Trash2,
   Plus,
-  Eye,
-  EyeOff,
   Crown,
-  Zap,
   AlertTriangle,
+  RefreshCw,
+  ShoppingBag,
+  Printer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -95,6 +85,9 @@ export default function BusinessSettingsPage() {
     max_spins_per_activation: 0,
     show_branding_on_live: true,
     require_email_for_prize: true,
+    points_per_redemption: 10,
+    points_multiplier: 0.5,
+    api_key: "",
   });
 
   // Admin users
@@ -125,6 +118,16 @@ export default function BusinessSettingsPage() {
       router.push("/business/signup");
       return;
     }
+    // Load API key
+    const { data: apiKey } = await supabase
+      .from("business_api_keys")
+      .select("api_key")
+      .eq("business_id", biz.id)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
     setBusiness(biz);
     setFormData({
       name: biz.name || "",
@@ -142,6 +145,9 @@ export default function BusinessSettingsPage() {
       max_spins_per_activation: biz.max_spins_per_activation || 0,
       show_branding_on_live: biz.show_branding_on_live ?? true,
       require_email_for_prize: biz.require_email_for_prize ?? true,
+      points_per_redemption: biz.points_per_redemption ?? 10,
+      points_multiplier: biz.points_multiplier ?? 0.5,
+      api_key: apiKey?.api_key || "",
     });
 
     // Load admin users
@@ -209,13 +215,23 @@ export default function BusinessSettingsPage() {
       // Check if user exists
       const { data: users } = await supabase
         .from("users")
-        .select("id, email")
+        .select("id, email, business_name, business_slug, business_type")
         .eq("email", inviteEmail.toLowerCase())
         .single();
 
       if (!users) {
         toast.error(
           "No account found with this email. They need to sign up first.",
+        );
+        setInviting(false);
+        return;
+      }
+
+      // 🚫 BLOCK: User already has a different business
+      if (users.business_name && users.business_slug !== businessSlug) {
+        toast.error(
+          `${users.full_name || users.email} is already associated with "${users.business_name}". They must leave that business first.`,
+          { duration: 6000 },
         );
         setInviting(false);
         return;
@@ -243,6 +259,18 @@ export default function BusinessSettingsPage() {
         accepted_at: new Date().toISOString(),
       });
 
+      // ✅ Update user profile with business details
+      await supabase
+        .from("users")
+        .update({
+          role: inviteRole === "host" ? "business_host" : "business_admin",
+          business_name: business.name,
+          business_type: business.type,
+          business_slug: business.slug,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", users.id);
+
       toast.success(`${users.email} added as ${inviteRole}!`);
       setInviteEmail("");
       setShowInviteDialog(false);
@@ -262,7 +290,23 @@ export default function BusinessSettingsPage() {
     }
     if (!confirm("Remove this admin?")) return;
     await supabase.from("business_admins").delete().eq("id", adminId);
-    toast.success("Admin removed");
+
+    // ✅ Clear business fields from user profile
+    await supabase
+      .from("users")
+      .update({
+        role: "customer",
+        business_name: null,
+        business_type: null,
+        business_slug: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+
+    toast.success(
+      "Team member removed. Their account is now a customer account.",
+    );
+
     loadData();
   };
 
@@ -284,7 +328,36 @@ export default function BusinessSettingsPage() {
     }
   };
 
+  // ─── Regenerate Api Key ──────────────────────────────────
+  const handleRegenerateApiKey = async () => {
+    if (
+      !confirm(
+        "Regenerate your API key? The old key will stop working immediately.",
+      )
+    )
+      return;
+
+    try {
+      const res = await fetch("/api/business/api-key/regenerate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessId: business.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setFormData((p) => ({ ...p, api_key: data.api_key }));
+      toast.success("API key regenerated!");
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
   const publicUrl = `engagespin.com/${businessSlug}/spin`;
+  const isStarterPlan =
+    business?.plan === "starter" || business?.plan === "trial";
+  const isProOrEnterprise =
+    business?.plan === "pro" || business?.plan === "enterprise";
 
   if (loading) {
     return (
@@ -737,6 +810,28 @@ export default function BusinessSettingsPage() {
                   </div>
                   <div>
                     <Label className="text-white">
+                      Points Per Code Redemption
+                    </Label>
+                    <Input
+                      type="number"
+                      value={formData.points_per_redemption}
+                      onChange={(e) =>
+                        setFormData((p) => ({
+                          ...p,
+                          points_per_redemption: parseInt(e.target.value) || 10,
+                        }))
+                      }
+                      className="mt-1 bg-white/5 border-white/10 text-white"
+                      min={0}
+                      max={1000}
+                    />
+                    <p className="text-white/30 text-xs mt-1">
+                      Loyalty points awarded to customers each time they redeem
+                      a code. Set to 0 to disable.
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-white">
                       Max Spins Per Activation
                     </Label>
                     <Input
@@ -824,12 +919,197 @@ export default function BusinessSettingsPage() {
                     </li>
                     <li>
                       •{" "}
+                      <span className="text-green-400">
+                        +{formData.points_per_redemption || 10} loyalty points
+                      </span>{" "}
+                      awarded per code redemption
+                    </li>
+                    <li>
+                      •{" "}
                       {formData.require_email_for_prize
                         ? "Email required to claim prizes"
                         : "No email required"}
                     </li>
                   </ul>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Points Configuration */}
+            <Card className="bg-white/5 border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white">
+                  Points Configuration
+                </CardTitle>
+                <CardDescription className="text-white/50">
+                  How customers earn loyalty points from your codes
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Sticker Codes (All Plans) */}
+                <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Printer className="h-4 w-4 text-purple-400" />
+                    <h4 className="text-white font-medium text-sm">
+                      Sticker Codes
+                    </h4>
+                    <Badge className="bg-white/10 text-white/60 text-xs border-0">
+                      All Plans
+                    </Badge>
+                  </div>
+                  <p className="text-white/40 text-xs">
+                    Sticker codes have fixed point values set during batch
+                    generation. Manage sticker batches from the Sticker
+                    Generator page.
+                  </p>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="border-white/10 text-xs"
+                  >
+                    <a href={`/admin/${businessSlug}/stickers`}>
+                      <Printer className="h-3 w-3 mr-1" /> Go to Sticker
+                      Generator
+                    </a>
+                  </Button>
+                </div>
+
+                {/* Public/Marketing Codes (All Plans) */}
+                <div>
+                  <Label className="text-white">Public Code Points</Label>
+                  <Input
+                    type="number"
+                    value={formData.points_per_redemption || 10}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        points_per_redemption: parseInt(e.target.value) || 10,
+                      }))
+                    }
+                    className="mt-1 bg-white/5 border-white/10 text-white"
+                    min={1}
+                  />
+                  <p className="text-white/30 text-xs mt-1">
+                    Default points for public marketing codes and QR codes.
+                    Sticker codes use their own point values set during
+                    generation.
+                  </p>
+                </div>
+
+                {/* POS Integration (Pro/Enterprise only) */}
+                {isProOrEnterprise ? (
+                  <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/20 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <ShoppingBag className="h-4 w-4 text-purple-400" />
+                      <h4 className="text-white font-medium text-sm">
+                        POS Receipt Codes
+                      </h4>
+                      <Badge className="bg-purple-500/20 text-purple-400 text-xs border-0">
+                        Pro Feature
+                      </Badge>
+                    </div>
+
+                    <p className="text-white/40 text-xs">
+                      When your POS system sends the cart total, points are
+                      calculated as:
+                      <strong className="text-white">
+                        {" "}
+                        Amount × Multiplier
+                      </strong>
+                      . The calculation happens when the code is created, not
+                      when it's redeemed.
+                    </p>
+
+                    <div>
+                      <Label className="text-white">Points Multiplier</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={formData.points_multiplier || 1.0}
+                        onChange={(e) =>
+                          setFormData((p) => ({
+                            ...p,
+                            points_multiplier:
+                              parseFloat(e.target.value) || 1.0,
+                          }))
+                        }
+                        className="mt-1 bg-white/5 border-white/10 text-white"
+                        min={0.1}
+                        max={10}
+                      />
+                      <p className="text-white/30 text-xs mt-1">
+                        Example: Cart KES 250 ×{" "}
+                        {formData.points_multiplier || 1.0} ={" "}
+                        {Math.floor(250 * (formData.points_multiplier || 1.0))}{" "}
+                        points
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label className="text-white">API Key</Label>
+                      <div className="flex gap-2 mt-1">
+                        <Input
+                          value={formData.api_key || "No API key generated"}
+                          readOnly
+                          className="flex-1 bg-white/5 border-white/10 text-white/50 font-mono text-sm"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-white/10"
+                          onClick={() => {
+                            navigator.clipboard.writeText(formData.api_key);
+                            toast.success("API key copied!");
+                          }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-white/10"
+                          onClick={handleRegenerateApiKey}
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-white/30 text-xs mt-1">
+                        Use this key to generate receipt codes from your POS
+                        system.
+                        <a
+                          href="/docs/api"
+                          className="text-purple-400 hover:underline ml-1"
+                        >
+                          View API docs →
+                        </a>
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center">
+                    <p className="text-white/50 text-sm">
+                      <span className="text-purple-400 font-medium">
+                        Pro & Enterprise
+                      </span>{" "}
+                      get access to:
+                    </p>
+                    <ul className="text-white/40 text-xs mt-2 space-y-1">
+                      <li>• Points multiplier for POS receipt codes</li>
+                      <li>• API access for POS integration</li>
+                    </ul>
+                    <Button
+                      asChild
+                      size="sm"
+                      className="mt-3"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      <a href={`/admin/${businessSlug}/billing`}>
+                        Upgrade Plan
+                      </a>
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

@@ -1,13 +1,16 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 import { redeemCodeSchema } from "@/lib/schemas/auth-schema";
-import {
-  createSessionForUser,
-  findUserIdByEmail,
-} from "@/lib/auth/server";
+import { createSessionForUser, findUserIdByEmail } from "@/lib/auth/server";
 import { secureRatelimit } from "@/lib/limit";
+import { checkBotId } from "botid/server";
 
 export async function POST(req: NextRequest) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
   try {
     const { success } = await secureRatelimit(req);
     if (!success) {
@@ -141,6 +144,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Code redemption error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

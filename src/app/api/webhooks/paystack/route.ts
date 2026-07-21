@@ -1,3 +1,4 @@
+// src/app/api/webhooks/paystack/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
@@ -20,59 +21,105 @@ export async function POST(req: NextRequest) {
     const eventType = event.event;
     const data = event.data;
 
-    if (eventType === "charge.success" || eventType === "subscription.create") {
+    // Handle successful charge (both one-time and recurring)
+    if (eventType === "charge.success") {
       const metadata = data.metadata || {};
-      const businessId = metadata.business_id;
-      const plan = metadata.plan || metadata.plan_name;
-      const billingCycle = metadata.billing_cycle || "monthly";
       const paymentId = metadata.payment_id;
+      const businessId = metadata.business_id;
+      const plan = metadata.plan;
+      const billingCycle = metadata.billing_cycle || "monthly";
+      const isEarlyBird =
+        metadata.is_early_bird === "true" || metadata.type === "one_time";
 
+      // Update payment record if we have the payment ID
       if (paymentId) {
-        await supabaseAdmin
+        const { error: updateError } = await supabaseAdmin
           .from("business_payments")
           .update({
             status: "completed",
             paid_at: new Date().toISOString(),
-            transaction_id: data.reference || data.id,
+            payment_reference: data.reference,
+            transaction_id: data.id,
+            metadata: { paystack_response: data },
           })
           .eq("id", paymentId);
+
+        if (updateError) {
+          console.error("Failed to update payment:", updateError);
+        }
       }
 
-      if (businessId && plan) {
-        const { data: activation, error: activationError } =
-          await activateBusinessSubscription({
-            businessId,
-            plan,
-            billingCycle,
-            paymentMethod: "paystack",
-            paystackCustomerCode: data.customer?.customer_code,
-            paystackSubscriptionCode: data.subscription_code,
-          });
-        console.log(
-          "Business subscription activated:",
-          activation,
-          "Error:",
-          activationError,
-        );
+      // Determine business ID from customer code if not in metadata (for recurring charges)
+      let resolvedBusinessId = businessId;
+      if (!resolvedBusinessId && data.customer?.customer_code) {
+        const { data: biz } = await supabaseAdmin
+          .from("businesses")
+          .select("id")
+          .eq("paystack_customer_code", data.customer.customer_code)
+          .single();
+        resolvedBusinessId = biz?.id;
+      }
+
+      // Activate subscription
+      if (resolvedBusinessId && plan) {
+        await activateBusinessSubscription({
+          businessId: resolvedBusinessId,
+          plan,
+          billingCycle: isEarlyBird ? "lifetime" : billingCycle,
+          paymentMethod: "paystack",
+          paystackCustomerCode: data.customer?.customer_code,
+          paystackSubscriptionCode: data.subscription_code,
+        });
       }
     }
 
-    if (eventType === "invoice.payment_failed") {
-      const customerCode = data.customer?.customer_code;
-      if (customerCode) {
+    // Handle subscription creation event
+    if (eventType === "subscription.create") {
+      const metadata = data.metadata || {};
+      const businessId = metadata.business_id;
+
+      if (businessId && data.subscription_code) {
         await supabaseAdmin
           .from("businesses")
-          .update({ subscription_status: "past_due" })
-          .eq("paystack_customer_code", customerCode);
+          .update({
+            paystack_subscription_code: data.subscription_code,
+            paystack_email_token: data.email_token,
+          })
+          .eq("id", businessId);
       }
     }
 
+    // Handle failed payment
+    if (eventType === "invoice.payment_failed") {
+      const customerCode = data.customer?.customer_code;
+      const subscriptionCode = data.subscription?.subscription_code;
+
+      if (customerCode || subscriptionCode) {
+        const query = supabaseAdmin.from("businesses").update({
+          subscription_status: "past_due",
+          past_due_at: new Date().toISOString(),
+        });
+
+        if (customerCode) {
+          query.eq("paystack_customer_code", customerCode);
+        } else if (subscriptionCode) {
+          query.eq("paystack_subscription_code", subscriptionCode);
+        }
+
+        await query;
+      }
+    }
+
+    // Handle subscription cancellation
     if (eventType === "subscription.disable") {
       const subscriptionCode = data.subscription_code;
       if (subscriptionCode) {
         await supabaseAdmin
           .from("businesses")
-          .update({ subscription_status: "cancelled" })
+          .update({
+            subscription_status: "cancelled",
+            cancelled_at: new Date().toISOString(),
+          })
           .eq("paystack_subscription_code", subscriptionCode);
       }
     }

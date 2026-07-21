@@ -1,7 +1,7 @@
 // app/(public)/business/signup/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,15 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 function generateSlug(name: string): string {
   return name
@@ -39,14 +48,30 @@ export default function BusinessSignupPage() {
     fullName: "",
     email: "",
     password: "",
+    type: "retail",
   });
   const [businessSlug, setBusinessSlug] = useState("");
   const searchParams = useSearchParams();
   const planParam = searchParams.get("plan") || "";
-  const isEarlyBird = planParam.startsWith("early-");
+  const isEarlyBird = planParam.startsWith("early_");
   const router = useRouter();
   const [businessId, setBusinessId] = useState<string | null>(null);
-  const { profile } = useAuth();
+  const { profile, loading } = useAuth();
+
+  // Redirect logged-in users to dashboard
+  useEffect(() => {
+    if (loading) return; // Wait for auth to load
+
+    if (profile && profile.role === "business" && profile.business_slug) {
+      if (isEarlyBird) {
+        router.push(
+          `/admin/${profile.business_slug}/billing?plan=${planParam}&businessId=${businessId}&slug=${profile.business_slug}`,
+        );
+      } else {
+        router.push(`/admin/${profile.business_slug}`);
+      }
+    }
+  }, [profile, loading, isEarlyBird, planParam, businessId, router]);
 
   const handleSubmit = async () => {
     if (!formData.businessName.trim()) {
@@ -77,6 +102,7 @@ export default function BusinessSignupPage() {
           fullName: formData.fullName,
           email: formData.email,
           password: formData.password,
+          type: formData.type,
         }),
       });
 
@@ -103,9 +129,26 @@ export default function BusinessSignupPage() {
     }
   };
 
-  // redirect logged-in users to dashboard
-  if (profile && profile.role === "business" && profile.business_slug) {
-    router.push(`/admin/${profile.business_slug}`);
+  const items = [
+    { label: "Select a business type", value: "" },
+    { label: "Retail", value: "retail" },
+    { label: "Restaurant", value: "restaurant" },
+    { label: "Service", value: "service" },
+    { label: "Event", value: "event" },
+    { label: "Other", value: "other" },
+  ];
+
+  // Show loading while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
+        <div className="animate-spin h-8 w-8 border-4 border-purple-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  // If user is logged in, show nothing (will redirect in useEffect)
+  if (profile) {
     return null;
   }
 
@@ -193,7 +236,7 @@ export default function BusinessSignupPage() {
         </div>
 
         <Card className="bg-black/50 backdrop-blur border-white/10">
-          <CardContent className="p-6 space-y-4">
+          <CardContent className="space-y-4">
             <div>
               <Label className="text-white">Business Name *</Label>
               <Input
@@ -211,6 +254,28 @@ export default function BusinessSignupPage() {
                   {generateSlug(formData.businessName)}/code-entry
                 </p>
               )}
+            </div>
+
+            <div>
+              <Label className="text-white">Business Type *</Label>
+              <Select
+                value={formData.type}
+                onValueChange={(e) => setFormData((p) => ({ ...p, type: e }))}
+              >
+                <SelectTrigger className="w-full max-w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Fruits</SelectLabel>
+                    {items.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>

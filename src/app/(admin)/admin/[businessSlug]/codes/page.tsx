@@ -4,13 +4,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -38,71 +36,38 @@ import {
   Clock,
   Users,
   Zap,
-  Calendar,
   Pause,
   Play,
-  RefreshCw,
   ArrowLeft,
-  ExternalLink,
   Sparkles,
-  CheckCircle,
-  XCircle,
   Filter,
   Search,
-  ChevronDown,
-  Gift,
   Eye,
-  EyeOff,
+  Printer,
   RotateCcw,
   Brain,
   Trophy,
+  Gift,
+  Star,
+  Crown,
+  Diamond,
+  Globe,
+  ShoppingBag,
+  Coins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
-import { canCreateCode } from "@/lib/services/plan-limits";
+import Link from "next/link";
 
-// ─── Types ──────────────────────────────────────────────
-interface AccessCode {
-  id: string;
-  code: string;
-  type: "public" | "single_use" | "time_limited" | "bulk" | "qr";
-  label: string;
-  description: string;
-  unlocks: "spin" | "trivia" | "both";
-  max_uses: number | null;
-  current_uses: number;
-  max_uses_per_user: number;
-  valid_from: string | null;
-  valid_until: string | null;
-  is_active: boolean;
-  created_at: string;
-  usage_count?: number;
-}
-
-// ─── Helpers ────────────────────────────────────────────
-function generateCode(businessSlug: string, type: string): string {
-  const prefix = businessSlug.replace(/-/g, "").toUpperCase().slice(0, 6);
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-  const timestamp = Date.now().toString(36).slice(-2).toUpperCase();
-  return type === "bulk"
-    ? `${prefix}-${random}${timestamp}`
-    : `${prefix}-${random}`;
-}
-
-function generateBulkCodes(businessSlug: string, count: number): string[] {
-  return Array.from({ length: count }, () =>
-    generateCode(businessSlug, "bulk"),
-  );
-}
-
+// ─── Config ─────────────────────────────────────────────
 const CODE_TYPE_CONFIG: Record<
   string,
   { label: string; icon: any; color: string; description: string }
 > = {
   public: {
     label: "Public",
-    icon: Users,
+    icon: Globe,
     color: "bg-blue-500/20 text-blue-400",
     description: "Share publicly, unlimited uses",
   },
@@ -118,19 +83,67 @@ const CODE_TYPE_CONFIG: Record<
     color: "bg-yellow-500/20 text-yellow-400",
     description: "Valid during specific hours",
   },
-  bulk: {
-    label: "Bulk",
-    icon: Zap,
-    color: "bg-purple-500/20 text-purple-400",
-    description: "Multiple single-use codes",
-  },
   qr: {
     label: "QR Code",
     icon: QrCode,
     color: "bg-pink-500/20 text-pink-400",
     description: "In-store QR code",
   },
+  sticker: {
+    label: "Sticker",
+    icon: Printer,
+    color: "bg-amber-500/20 text-amber-400",
+    description: "Product-printed codes",
+  },
+  receipt: {
+    label: "Receipt",
+    icon: ShoppingBag,
+    color: "bg-purple-500/20 text-purple-400",
+    description: "POS-generated codes",
+  },
 };
+
+const TIER_COLORS: Record<string, string> = {
+  bronze: "bg-amber-700/20 text-amber-400",
+  silver: "bg-gray-400/20 text-gray-300",
+  gold: "bg-yellow-500/20 text-yellow-400",
+  diamond: "bg-cyan-400/20 text-cyan-300",
+  standard: "bg-white/10 text-white/60",
+};
+
+const TIER_ICONS: Record<string, any> = {
+  bronze: Star,
+  silver: Sparkles,
+  gold: Crown,
+  diamond: Diamond,
+};
+
+const UNLOCKS_OPTIONS = [
+  {
+    value: "points",
+    label: "Points Only",
+    description: "Access to spin the wheel",
+    icon: Coins,
+  },
+  {
+    value: "spin",
+    label: "Spin Only",
+    description: "Access to spin the wheel",
+    icon: RotateCcw,
+  },
+  {
+    value: "spin_draw",
+    label: "Spin + Draws",
+    description: "Spin + auto-enter draws",
+    icon: Gift,
+  },
+  {
+    value: "draw",
+    label: "Draws Only",
+    description: "Only enter prize draws",
+    icon: Trophy,
+  },
+];
 
 // ─── Main Component ─────────────────────────────────────
 export default function CodeManagementPage() {
@@ -139,7 +152,7 @@ export default function CodeManagementPage() {
   const router = useRouter();
 
   const [business, setBusiness] = useState<any>(null);
-  const [codes, setCodes] = useState<AccessCode[]>([]);
+  const [codes, setCodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
@@ -149,20 +162,21 @@ export default function CodeManagementPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
   const [showQRDialog, setShowQRDialog] = useState(false);
-  const [selectedQRCode, setSelectedQRCode] = useState<AccessCode | null>(null);
+  const [selectedQRCode, setSelectedQRCode] = useState<any>(null);
   const [creating, setCreating] = useState(false);
   const [bulkCodes, setBulkCodes] = useState<string[]>([]);
 
   // Form state
   const [formData, setFormData] = useState({
-    type: "public" as AccessCode["type"],
+    type: "public",
     label: "",
-    description: "",
-    unlocks: "spin" as "spin" | "trivia" | "both",
+    unlocks: "spin",
     max_uses: "" as string,
     max_uses_per_user: "1",
     valid_from: "",
     valid_until: "",
+    tier: "standard",
+    point_value: "" as string,
   });
   const [bulkCount, setBulkCount] = useState(50);
 
@@ -172,7 +186,7 @@ export default function CodeManagementPage() {
     try {
       const { data: biz } = await supabase
         .from("businesses")
-        .select("id, name, slug, brand_color")
+        .select("id, name, slug, brand_color, plan")
         .eq("slug", businessSlug)
         .single();
       if (!biz) {
@@ -183,21 +197,17 @@ export default function CodeManagementPage() {
 
       let query = supabase
         .from("access_codes")
-        .select("*, access_code_usage(count)")
+        .select("*")
         .eq("business_id", biz.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(200);
 
       if (filterType !== "all") query = query.eq("type", filterType);
       if (filterStatus === "active") query = query.eq("is_active", true);
       if (filterStatus === "inactive") query = query.eq("is_active", false);
 
       const { data: codeData } = await query;
-      setCodes(
-        (codeData || []).map((c) => ({
-          ...c,
-          usage_count: c.access_code_usage?.[0]?.count || c.current_uses || 0,
-        })),
-      );
+      setCodes(codeData || []);
     } catch (err) {
       console.error("Error loading codes:", err);
     } finally {
@@ -209,46 +219,36 @@ export default function CodeManagementPage() {
     loadData();
   }, [loadData]);
 
-  // ─── Create Code ──────────────────────────────────────
+  // ─── Create Single Code ────────────────────────────────
   const handleCreateCode = async () => {
     if (!business) return;
-
-    const allowed = await canCreateCode(supabase, business.id);
-    if (!allowed) {
-      toast.error("Code limit reached for your plan. Upgrade to add more codes.", {
-        action: {
-          label: "Upgrade",
-          onClick: () => router.push(`/admin/${businessSlug}/billing?upgrade=pro`),
-        },
-      });
-      return;
-    }
-
     setCreating(true);
     try {
-      const code =
-        formData.type === "bulk"
-          ? generateBulkCodes(businessSlug, 1)[0]
-          : generateCode(businessSlug, formData.type);
-
-      const { error } = await supabase.from("access_codes").insert({
-        business_id: business.id,
-        code,
-        type: formData.type,
-        label:
-          formData.label || `${CODE_TYPE_CONFIG[formData.type].label} Code`,
-        description: formData.description,
-        unlocks: formData.unlocks,
-        max_uses: formData.max_uses ? parseInt(formData.max_uses) : null,
-        max_uses_per_user: parseInt(formData.max_uses_per_user) || 1,
-        valid_from: formData.valid_from || null,
-        valid_until: formData.valid_until || null,
-        is_active: true,
+      const res = await fetch("/api/business/codes/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          slug: businessSlug,
+          type: formData.type,
+          label: formData.label || undefined,
+          unlocks: formData.unlocks,
+          tier: formData.tier !== "standard" ? formData.tier : undefined,
+          point_value: formData.point_value
+            ? parseInt(formData.point_value)
+            : undefined,
+          max_uses: formData.max_uses ? parseInt(formData.max_uses) : undefined,
+          max_uses_per_user: parseInt(formData.max_uses_per_user) || 1,
+          valid_from: formData.valid_from || undefined,
+          valid_until: formData.valid_until || undefined,
+        }),
       });
 
-      if (error) throw error;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create code");
 
-      toast.success(`Code ${code} created!`);
+      toast.success(`Code ${data.code} created!`);
       setShowCreateDialog(false);
       resetForm();
       loadData();
@@ -262,34 +262,27 @@ export default function CodeManagementPage() {
   // ─── Create Bulk Codes ────────────────────────────────
   const handleCreateBulkCodes = async () => {
     if (!business) return;
-
-    const allowed = await canCreateCode(supabase, business.id);
-    if (!allowed) {
-      toast.error("Code limit reached for your plan.");
-      return;
-    }
-
     setCreating(true);
     try {
-      const codes = generateBulkCodes(businessSlug, bulkCount);
-      const inserts = codes.map((code) => ({
-        business_id: business.id,
-        code,
-        type: "single_use" as const,
-        label:
-          formData.label || `Bulk Code Batch ${format(new Date(), "MMM dd")}`,
-        description: formData.description,
-        unlocks: formData.unlocks,
-        max_uses: 1,
-        max_uses_per_user: 1,
-        is_active: true,
-      }));
+      const res = await fetch("/api/business/codes/bulk-create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          slug: businessSlug,
+          count: bulkCount,
+          unlocks: formData.unlocks,
+          label: formData.label || undefined,
+        }),
+      });
 
-      const { error } = await supabase.from("access_codes").insert(inserts);
-      if (error) throw error;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate codes");
 
-      setBulkCodes(codes);
-      toast.success(`${bulkCount} codes generated!`);
+      setBulkCodes(data.codes || []);
+      toast.success(`${data.count || bulkCount} codes generated!`);
+      loadData();
     } catch (err: any) {
       toast.error(err.message || "Failed to generate codes");
     } finally {
@@ -297,34 +290,28 @@ export default function CodeManagementPage() {
     }
   };
 
-  // ─── Toggle Code Status ───────────────────────────────
-  const toggleCodeStatus = async (code: AccessCode) => {
-    try {
-      await supabase
-        .from("access_codes")
-        .update({ is_active: !code.is_active })
-        .eq("id", code.id);
-
-      toast.success(`Code ${code.is_active ? "paused" : "activated"}`);
-      loadData();
-    } catch (err: any) {
-      toast.error(err.message);
-    }
+  // ─── Toggle / Delete ──────────────────────────────────
+  const toggleCodeStatus = async (code: any) => {
+    await supabase
+      .from("access_codes")
+      .update({ is_active: !code.is_active })
+      .eq("id", code.id);
+    toast.success(`Code ${code.is_active ? "paused" : "activated"}`);
+    loadData();
   };
 
-  // ─── Delete Code ──────────────────────────────────────
-  const deleteCode = async (code: AccessCode) => {
-    if (!confirm(`Delete code ${code.code}?`)) return;
-    try {
-      await supabase.from("access_codes").delete().eq("id", code.id);
-      toast.success("Code deleted");
-      loadData();
-    } catch (err: any) {
-      toast.error(err.message);
-    }
+  const deleteCode = async (code: any) => {
+    if (!confirm(`Delete ${code.code}?`)) return;
+    await supabase.from("access_codes").delete().eq("id", code.id);
+    toast.success("Code deleted");
+    loadData();
   };
 
-  // ─── Export Codes ─────────────────────────────────────
+  const copyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    toast.success("Copied!");
+  };
+
   const exportCodes = (codes: string[]) => {
     const csv = "code\n" + codes.join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -341,32 +328,25 @@ export default function CodeManagementPage() {
     setFormData({
       type: "public",
       label: "",
-      description: "",
       unlocks: "spin",
       max_uses: "",
       max_uses_per_user: "1",
       valid_from: "",
       valid_until: "",
+      tier: "standard",
+      point_value: "",
     });
   };
 
-  const copyCode = (code: string) => {
-    navigator.clipboard.writeText(code);
-    toast.success("Code copied!");
-  };
+  const filteredCodes = codes.filter(
+    (c) =>
+      !search ||
+      c.code?.toLowerCase().includes(search.toLowerCase()) ||
+      c.label?.toLowerCase().includes(search.toLowerCase()),
+  );
 
-  // ─── Filtered Codes ───────────────────────────────────
-  const filteredCodes = codes.filter((c) => {
-    if (
-      search &&
-      !c.code.toLowerCase().includes(search.toLowerCase()) &&
-      !c.label?.toLowerCase().includes(search.toLowerCase())
-    )
-      return false;
-    return true;
-  });
+  const brandColor = business?.brand_color || "#8B5CF6";
 
-  // ─── Loading ──────────────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-950">
@@ -399,17 +379,27 @@ export default function CodeManagementPage() {
                 variant="outline"
                 size="sm"
                 className="gap-1 border-white/10"
+                asChild
+              >
+                <Link href={`/admin/${businessSlug}/stickers`}>
+                  <Printer className="h-4 w-4" /> Sticker Generator
+                </Link>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 border-white/10"
                 onClick={() => {
                   resetForm();
                   setShowBulkDialog(true);
                 }}
               >
-                <Zap className="h-4 w-4" /> Generate Bulk
+                <Zap className="h-4 w-4" /> Bulk
               </Button>
               <Button
                 size="sm"
                 className="gap-1"
-                style={{ backgroundColor: business?.brand_color }}
+                style={{ backgroundColor: brandColor }}
                 onClick={() => {
                   resetForm();
                   setShowCreateDialog(true);
@@ -423,6 +413,36 @@ export default function CodeManagementPage() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          {[
+            { label: "Total Codes", value: codes.length, color: "text-white" },
+            {
+              label: "Active",
+              value: codes.filter((c) => c.is_active).length,
+              color: "text-green-400",
+            },
+            {
+              label: "Used Today",
+              value: codes.filter((c) => c.current_uses > 0).length,
+              color: "text-purple-400",
+            },
+            {
+              label: "Stickers",
+              value: codes.filter((c) => c.type === "sticker").length,
+              color: "text-amber-400",
+            },
+          ].map((stat, i) => (
+            <Card key={i} className="bg-white/5 border-white/10">
+              <CardContent className="p-4 text-center">
+                <p className={cn("text-2xl font-bold", stat.color)}>
+                  {stat.value}
+                </p>
+                <p className="text-xs text-white/40">{stat.label}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
         {/* Filters */}
         <Card className="bg-white/5 border-white/10 mb-6">
           <CardContent className="p-4">
@@ -443,9 +463,10 @@ export default function CodeManagementPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="sticker">Stickers</SelectItem>
+                  <SelectItem value="receipt">Receipts</SelectItem>
                   <SelectItem value="public">Public</SelectItem>
                   <SelectItem value="single_use">Single Use</SelectItem>
-                  <SelectItem value="time_limited">Timed</SelectItem>
                   <SelectItem value="qr">QR Code</SelectItem>
                 </SelectContent>
               </Select>
@@ -477,24 +498,35 @@ export default function CodeManagementPage() {
                 No Codes Yet
               </h3>
               <p className="text-white/40 mb-4">
-                Create your first access code to start engaging customers
+                Create codes or generate sticker batches to get started.
               </p>
-              <Button
-                onClick={() => {
-                  resetForm();
-                  setShowCreateDialog(true);
-                }}
-                style={{ backgroundColor: business?.brand_color }}
-              >
-                <Plus className="h-4 w-4 mr-2" /> Create Code
-              </Button>
+              <div className="flex gap-3 justify-center">
+                <Button
+                  onClick={() => {
+                    resetForm();
+                    setShowCreateDialog(true);
+                  }}
+                  style={{ backgroundColor: brandColor }}
+                >
+                  <Plus className="h-4 w-4 mr-2" /> Create Code
+                </Button>
+                <Button variant="outline" className="border-white/10" asChild>
+                  <Link href={`/admin/${businessSlug}/stickers`}>
+                    <Printer className="h-4 w-4 mr-2" /> Sticker Generator
+                  </Link>
+                </Button>
+              </div>
             </motion.div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {filteredCodes.map((code, i) => {
                 const config =
                   CODE_TYPE_CONFIG[code.type] || CODE_TYPE_CONFIG.public;
                 const TypeIcon = config.icon;
+                const TierIcon =
+                  code.tier && code.tier !== "standard"
+                    ? TIER_ICONS[code.tier]
+                    : null;
                 const usagePercent = code.max_uses
                   ? Math.min(100, (code.current_uses / code.max_uses) * 100)
                   : 0;
@@ -504,7 +536,7 @@ export default function CodeManagementPage() {
                     key={code.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.03 }}
+                    transition={{ delay: i * 0.02 }}
                   >
                     <Card
                       className={cn(
@@ -513,20 +545,39 @@ export default function CodeManagementPage() {
                       )}
                     >
                       <CardContent className="p-4">
-                        <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                          {/* Code Info */}
-                          <div className="flex-1 space-y-2">
+                        <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+                          <div className="flex-1 min-w-0 space-y-1.5">
                             <div className="flex items-center gap-2 flex-wrap">
                               <Badge className={cn("text-xs", config.color)}>
                                 <TypeIcon className="h-3 w-3 mr-1" />
                                 {config.label}
                               </Badge>
+                              {code.tier && code.tier !== "standard" && (
+                                <Badge
+                                  className={cn(
+                                    "text-xs",
+                                    TIER_COLORS[code.tier],
+                                  )}
+                                >
+                                  {TierIcon && (
+                                    <TierIcon className="h-3 w-3 mr-1" />
+                                  )}
+                                  {code.tier}
+                                </Badge>
+                              )}
+                              {code.point_value && (
+                                <Badge className="bg-green-500/10 text-green-400 text-xs">
+                                  {code.point_value} pts
+                                </Badge>
+                              )}
                               <Badge className="text-xs bg-white/10 text-white/60">
-                                {code.unlocks === "both"
-                                  ? "Spin + Trivia"
-                                  : code.unlocks === "trivia"
-                                    ? "Trivia"
-                                    : "Spin"}
+                                {code.unlocks === "all"
+                                  ? "All"
+                                  : code.unlocks === "spin_draw"
+                                    ? "Spin+Draw"
+                                    : code.unlocks === "trivia_draw"
+                                      ? "Trivia+Draw"
+                                      : code.unlocks}
                               </Badge>
                               {!code.is_active && (
                                 <Badge className="text-xs bg-red-500/20 text-red-400">
@@ -534,9 +585,8 @@ export default function CodeManagementPage() {
                                 </Badge>
                               )}
                             </div>
-
-                            <div className="flex items-center gap-3">
-                              <code className="text-lg font-mono font-bold text-yellow-400 tracking-wider">
+                            <div className="flex items-center gap-2">
+                              <code className="text-sm font-mono font-bold text-yellow-400 truncate">
                                 {code.code}
                               </code>
                               <Button
@@ -548,41 +598,25 @@ export default function CodeManagementPage() {
                                 <Copy className="h-3 w-3 text-white/30" />
                               </Button>
                             </div>
-
                             {code.label && (
-                              <p className="text-white/60 text-sm">
+                              <p className="text-white/50 text-xs truncate">
                                 {code.label}
                               </p>
                             )}
-
-                            <div className="flex items-center gap-4 text-xs text-white/40">
-                              <span className="flex items-center gap-1">
-                                <Users className="h-3 w-3" />
-                                {code.current_uses} / {code.max_uses || "∞"}{" "}
-                                uses
-                              </span>
-                              {code.valid_until && (
-                                <span className="flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  Expires{" "}
-                                  {format(
-                                    new Date(code.valid_until),
-                                    "MMM d, h:mm a",
-                                  )}
-                                </span>
-                              )}
+                            <div className="flex items-center gap-3 text-xs text-white/30">
                               <span>
-                                Created{" "}
+                                {code.current_uses || 0} /{" "}
+                                {code.max_uses || "∞"} uses
+                              </span>
+                              <span>
                                 {formatDistanceToNow(
                                   new Date(code.created_at),
                                   { addSuffix: true },
                                 )}
                               </span>
                             </div>
-
-                            {/* Usage bar */}
                             {code.max_uses && (
-                              <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                              <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
                                 <div
                                   className="h-full rounded-full transition-all"
                                   style={{
@@ -598,19 +632,16 @@ export default function CodeManagementPage() {
                               </div>
                             )}
                           </div>
-
-                          {/* Actions */}
-                          <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="flex items-center gap-1 flex-shrink-0">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => toggleCodeStatus(code)}
-                              title={code.is_active ? "Pause" : "Activate"}
                             >
                               {code.is_active ? (
-                                <Pause className="h-4 w-4 text-yellow-400" />
+                                <Pause className="h-3 w-3 text-yellow-400" />
                               ) : (
-                                <Play className="h-4 w-4 text-green-400" />
+                                <Play className="h-3 w-3 text-green-400" />
                               )}
                             </Button>
                             <Button
@@ -621,14 +652,14 @@ export default function CodeManagementPage() {
                                 setShowQRDialog(true);
                               }}
                             >
-                              <QrCode className="h-4 w-4 text-white/40" />
+                              <QrCode className="h-3 w-3 text-white/40" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => deleteCode(code)}
                             >
-                              <Trash2 className="h-4 w-4 text-red-400" />
+                              <Trash2 className="h-3 w-3 text-red-400" />
                             </Button>
                           </div>
                         </div>
@@ -648,7 +679,7 @@ export default function CodeManagementPage() {
           <DialogHeader>
             <DialogTitle className="text-white">Create Access Code</DialogTitle>
             <DialogDescription className="text-white/50">
-              Codes let customers access your spin wheel and trivia games
+              Codes let customers access your games
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -656,9 +687,7 @@ export default function CodeManagementPage() {
               <Label className="text-white">Code Type</Label>
               <Select
                 value={formData.type}
-                onValueChange={(v) =>
-                  setFormData((p) => ({ ...p, type: v as any }))
-                }
+                onValueChange={(v) => setFormData((p) => ({ ...p, type: v }))}
               >
                 <SelectTrigger className="bg-white/5 border-white/10 text-white">
                   <SelectValue />
@@ -668,19 +697,13 @@ export default function CodeManagementPage() {
                     <SelectItem key={value} value={value}>
                       <div className="flex items-center gap-2">
                         <config.icon className="h-4 w-4" />
-                        <div>
-                          <p>{config.label}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {config.description}
-                          </p>
-                        </div>
+                        {config.label}
                       </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
             <div>
               <Label className="text-white">Label (Optional)</Label>
               <Input
@@ -688,30 +711,66 @@ export default function CodeManagementPage() {
                 onChange={(e) =>
                   setFormData((p) => ({ ...p, label: e.target.value }))
                 }
-                placeholder="Friday Night Event, Receipt Codes..."
+                placeholder="Friday Night Event..."
                 className="bg-white/5 border-white/10 text-white"
               />
             </div>
-
+            <div>
+              <Label className="text-white">Unlocks</Label>
+              <Select
+                value={formData.unlocks}
+                onValueChange={(v) =>
+                  setFormData((p) => ({ ...p, unlocks: v }))
+                }
+              >
+                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {UNLOCKS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <div className="flex items-center gap-2">
+                        <opt.icon className="h-4 w-4" />
+                        {opt.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-white">Unlocks</Label>
+                <Label className="text-white">Tier</Label>
                 <Select
-                  value={formData.unlocks}
-                  onValueChange={(v) =>
-                    setFormData((p) => ({ ...p, unlocks: v as any }))
-                  }
+                  value={formData.tier}
+                  onValueChange={(v) => setFormData((p) => ({ ...p, tier: v }))}
                 >
                   <SelectTrigger className="bg-white/5 border-white/10 text-white">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="spin">Spin Only</SelectItem>
-                    <SelectItem value="trivia">Trivia Only</SelectItem>
-                    <SelectItem value="both">Both</SelectItem>
+                    <SelectItem value="standard">Standard</SelectItem>
+                    <SelectItem value="bronze">Bronze</SelectItem>
+                    <SelectItem value="silver">Silver</SelectItem>
+                    <SelectItem value="gold">Gold</SelectItem>
+                    <SelectItem value="diamond">Diamond</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label className="text-white">Points (optional)</Label>
+                <Input
+                  type="number"
+                  value={formData.point_value}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, point_value: e.target.value }))
+                  }
+                  placeholder="Default"
+                  className="bg-white/5 border-white/10 text-white"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-white">Max Uses Per Person</Label>
                 <Input
@@ -727,13 +786,8 @@ export default function CodeManagementPage() {
                   min="1"
                 />
               </div>
-            </div>
-
-            {formData.type !== "single_use" && (
               <div>
-                <Label className="text-white">
-                  Max Total Uses (empty = unlimited)
-                </Label>
+                <Label className="text-white">Max Total Uses</Label>
                 <Input
                   type="number"
                   value={formData.max_uses}
@@ -744,37 +798,7 @@ export default function CodeManagementPage() {
                   className="bg-white/5 border-white/10 text-white"
                 />
               </div>
-            )}
-
-            {formData.type === "time_limited" && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-white">Valid From</Label>
-                  <Input
-                    type="datetime-local"
-                    value={formData.valid_from}
-                    onChange={(e) =>
-                      setFormData((p) => ({ ...p, valid_from: e.target.value }))
-                    }
-                    className="bg-white/5 border-white/10 text-white"
-                  />
-                </div>
-                <div>
-                  <Label className="text-white">Valid Until</Label>
-                  <Input
-                    type="datetime-local"
-                    value={formData.valid_until}
-                    onChange={(e) =>
-                      setFormData((p) => ({
-                        ...p,
-                        valid_until: e.target.value,
-                      }))
-                    }
-                    className="bg-white/5 border-white/10 text-white"
-                  />
-                </div>
-              </div>
-            )}
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -787,7 +811,7 @@ export default function CodeManagementPage() {
             <Button
               onClick={handleCreateCode}
               disabled={creating}
-              style={{ backgroundColor: business?.brand_color }}
+              style={{ backgroundColor: brandColor }}
             >
               {creating ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -807,8 +831,7 @@ export default function CodeManagementPage() {
               Generate Bulk Codes
             </DialogTitle>
             <DialogDescription className="text-white/50">
-              Create multiple single-use codes at once. Perfect for printing on
-              receipts.
+              Create multiple codes at once
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -820,73 +843,32 @@ export default function CodeManagementPage() {
                 onChange={(e) => setBulkCount(parseInt(e.target.value) || 10)}
                 className="bg-white/5 border-white/10 text-white"
                 min={1}
-                max={1000}
-              />
-            </div>
-            <div>
-              <Label className="text-white">Label</Label>
-              <Input
-                value={formData.label}
-                onChange={(e) =>
-                  setFormData((p) => ({ ...p, label: e.target.value }))
-                }
-                placeholder="Receipt Codes - June 2026"
-                className="bg-white/5 border-white/10 text-white"
+                max={500}
               />
             </div>
             <div>
               <Label className="text-white">Unlocks</Label>
-
               <Select
                 value={formData.unlocks}
                 onValueChange={(v) =>
-                  setFormData((p) => ({ ...p, unlocks: v as any }))
+                  setFormData((p) => ({ ...p, unlocks: v }))
                 }
               >
                 <SelectTrigger className="bg-white/5 border-white/10 text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="spin">
-                    <div className="flex items-center gap-2">
-                      <RotateCcw className="h-4 w-4" />
-                      Spin Only
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="trivia">
-                    <div className="flex items-center gap-2">
-                      <Brain className="h-4 w-4" />
-                      Trivia Only
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="draw">
-                    <div className="flex items-center gap-2">
-                      <Trophy className="h-4 w-4" />
-                      Draw Only
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="spin_draw">
-                    <div className="flex items-center gap-2">
-                      <Gift className="h-4 w-4" />
-                      Spin + Draw
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="trivia_draw">
-                    <div className="flex items-center gap-2">
-                      <Brain className="h-4 w-4" />
-                      Trivia + Draw
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="all">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4" />
-                      All (Spin + Trivia + Draw)
-                    </div>
-                  </SelectItem>
+                  {UNLOCKS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <div className="flex items-center gap-2">
+                        <opt.icon className="h-4 w-4" />
+                        {opt.label}
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-
             {bulkCodes.length > 0 && (
               <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 max-h-40 overflow-y-auto">
                 <p className="text-green-400 text-sm font-medium mb-2">
@@ -915,7 +897,7 @@ export default function CodeManagementPage() {
                 onClick={() => exportCodes(bulkCodes)}
                 className="border-white/10 w-full"
               >
-                <Download className="h-4 w-4 mr-2" /> Export to CSV
+                <Download className="h-4 w-4 mr-2" /> Export CSV
               </Button>
             )}
             <div className="flex gap-2 w-full">
@@ -933,12 +915,12 @@ export default function CodeManagementPage() {
                 onClick={handleCreateBulkCodes}
                 disabled={creating}
                 className="flex-1"
-                style={{ backgroundColor: business?.brand_color }}
+                style={{ backgroundColor: brandColor }}
               >
                 {creating ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  "Generate Codes"
+                  "Generate"
                 )}
               </Button>
             </div>
@@ -946,16 +928,16 @@ export default function CodeManagementPage() {
         </DialogContent>
       </Dialog>
 
-      {/* QR Code Dialog */}
+      {/* QR Dialog */}
       <Dialog open={showQRDialog} onOpenChange={setShowQRDialog}>
+        <DialogHeader>
+          <DialogTitle className="text-white">QR Code</DialogTitle>
+          <DialogDescription>Scan</DialogDescription>
+        </DialogHeader>
         <DialogContent className="max-w-sm bg-gray-900 border-white/10 text-center">
-          <DialogHeader>
-            <DialogTitle className="text-white">QR Code</DialogTitle>
-          </DialogHeader>
           {selectedQRCode && (
             <div className="space-y-4 py-4">
               <div className="bg-white p-4 rounded-xl inline-block mx-auto">
-                {/* QR Code would be generated here using a library like qrcode.react */}
                 <div className="w-48 h-48 bg-gray-200 rounded-lg flex items-center justify-center">
                   <QrCode className="h-24 w-24 text-gray-400" />
                 </div>
@@ -964,21 +946,19 @@ export default function CodeManagementPage() {
                 {selectedQRCode.code}
               </p>
               <p className="text-white/50 text-sm">
-                Customers scan this to go directly to your spin page
-              </p>
-              <p className="text-white/30 text-xs">
-                URL: engagespin.com/spin?code={selectedQRCode.code}
+                Customers scan to go directly to your page
               </p>
               <Button
                 onClick={() => {
-                  const url = `engagespin.com/spin?code=${selectedQRCode.code}`;
-                  navigator.clipboard.writeText(url);
+                  navigator.clipboard.writeText(
+                    `engagespin.com/spin?code=${selectedQRCode.code}`,
+                  );
                   toast.success("URL copied!");
                 }}
                 variant="outline"
                 className="border-white/10 w-full"
               >
-                <Copy className="h-4 w-4 mr-2" /> Copy Spin URL
+                <Copy className="h-4 w-4 mr-2" /> Copy URL
               </Button>
             </div>
           )}

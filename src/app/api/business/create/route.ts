@@ -5,7 +5,7 @@ import {
   generateSlug,
 } from "@/lib/schemas/business-schema";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { createSessionForUser, findUserIdByEmail } from "@/lib/auth/server";
+import { findUserIdByEmail } from "@/lib/auth/server";
 import { resend, secureRatelimit } from "@/lib/limit";
 import { checkBotId } from "botid/server";
 
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { businessName, fullName, email, password } = parsed.data;
+    const { businessName, fullName, email, password, type } = parsed.data;
     const slug = generateSlug(businessName);
 
     // Check if business slug is taken
@@ -53,8 +53,20 @@ export async function POST(req: NextRequest) {
 
     let userId: string;
 
-    const existingId = await findUserIdByEmail(email);
-    if (!existingId) {
+    const existing = await findUserIdByEmail(email);
+
+    // 🚫 BLOCK: User already has a business
+    if (existing && existing.business_name) {
+      return NextResponse.json(
+        {
+          error: `You are already associated with "${existing.business_name}". You must delete or leave that business before creating a new one.`,
+          existingBusiness: existing.business_slug,
+        },
+        { status: 409 },
+      );
+    }
+
+    if (!existing) {
       // Try to create the user account
       const { data: authData, error: authError } =
         await supabaseAdmin.auth.admin.createUser({
@@ -75,7 +87,7 @@ export async function POST(req: NextRequest) {
 
       userId = authData.user!.id;
     } else {
-      userId = existingId;
+      userId = existing.id;
     }
 
     // Create business
@@ -84,6 +96,7 @@ export async function POST(req: NextRequest) {
       .insert({
         name: businessName,
         slug,
+        type,
         admin_email: email,
         admin_name: fullName,
         brand_color: "#8B5CF6",
@@ -113,7 +126,7 @@ export async function POST(req: NextRequest) {
         id: userId,
         email,
         full_name: fullName,
-        role: "business",
+        role: "business_owner",
         status: "active",
         business_name: business.name,
         business_type: business.type,
@@ -166,7 +179,7 @@ export async function POST(req: NextRequest) {
                   <div style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 20px 0;">
                     <p style="margin: 0 0 8px; font-size: 14px; color: #6b7280;">Your public page:</p>
                     <p style="margin: 0; font-family: monospace; font-size: 16px; color: #f59e0b;">
-                      engagespin.com/${slug}/spin
+                      engagespin.com/${slug}/code-entry
                     </p>
                   </div>
                   
@@ -192,11 +205,6 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         console.error("Welcome email failed:", e);
       }
-    }
-
-    const { error: sessionError } = await createSessionForUser(email, password);
-    if (sessionError) {
-      console.error("Session creation after signup failed:", sessionError);
     }
 
     return NextResponse.json({

@@ -1,4 +1,5 @@
-import { Sparkles, Crown, Zap, type LucideIcon } from "lucide-react";
+// src/lib/config/plans.ts
+import { Sparkles, Crown, Zap, type LucideIcon, Rocket } from "lucide-react";
 
 export const KES_TO_USD_RATE = 129;
 
@@ -35,7 +36,7 @@ export interface PlanFeature {
 export interface PlanDefinition {
   id: PlanId;
   name: string;
-  priceKes: number;
+  price: number;
   icon: LucideIcon;
   color: string;
   borderColor: string;
@@ -54,7 +55,7 @@ export interface PlanDefinition {
 export interface EarlyAccessPlanDefinition {
   id: PlanId;
   name: string;
-  priceKes: number;
+  price: number;
 }
 
 const UNLIMITED = 999;
@@ -168,7 +169,7 @@ export const PLANS: PlanDefinition[] = [
   {
     id: "starter",
     name: "Starter",
-    priceKes: 3999,
+    price: 29,
     icon: Sparkles,
     color: "from-blue-500 to-cyan-500",
     borderColor: "border-blue-500/30",
@@ -177,8 +178,8 @@ export const PLANS: PlanDefinition[] = [
     desc: "For small businesses getting started",
     limits: PLAN_LIMITS.starter,
     paystackPlanCodes: {
-      monthly: "PLN_ydgtlvrtrjpbtz8",
-      annual: "PLN_l2nu74bpwgmfckg",
+      monthly: "PLN_tnycmek89nlf8o4",
+      annual: "PLN_cvdw8uhpsxy6749",
     },
     features: [
       { text: "1 spin game", included: true },
@@ -200,7 +201,7 @@ export const PLANS: PlanDefinition[] = [
   {
     id: "pro",
     name: "Pro",
-    priceKes: 9999,
+    price: 79,
     icon: Crown,
     color: "from-purple-500 to-pink-500",
     borderColor: "border-purple-500/30",
@@ -209,8 +210,8 @@ export const PLANS: PlanDefinition[] = [
     desc: "For growing businesses running regular campaigns",
     limits: PLAN_LIMITS.pro,
     paystackPlanCodes: {
-      monthly: "PLN_1y7cuxm6auf2cxq",
-      annual: "PLN_f8njityjpmp6eal",
+      monthly: "PLN_b8q1ptwh4tyemyd",
+      annual: "PLN_kp2bk8mq4wdx6nc",
     },
     features: [
       { text: "3 spin games", included: true },
@@ -232,7 +233,7 @@ export const PLANS: PlanDefinition[] = [
   {
     id: "enterprise",
     name: "Enterprise",
-    priceKes: 24999,
+    price: 194,
     icon: Zap,
     color: "from-amber-500 to-orange-500",
     borderColor: "border-amber-500/30",
@@ -241,8 +242,8 @@ export const PLANS: PlanDefinition[] = [
     desc: "For chains and high-volume venues",
     limits: PLAN_LIMITS.enterprise,
     paystackPlanCodes: {
-      monthly: "PLN_99uja3f924723eg",
-      annual: "PLN_dquz9sky664pvk5",
+      monthly: "PLN_z5ur4kh042dd30y",
+      annual: "PLN_bqgtnx8m6mbay27",
     },
     features: [
       { text: "Unlimited spin games", included: true },
@@ -263,21 +264,124 @@ export const PLANS: PlanDefinition[] = [
   },
 ];
 
+// ─── Early Bird Packages (USD) ──────────────────────────
+export const EARLY_BIRD_PACKAGES = [
+  {
+    id: "bronze",
+    name: "Bronze",
+    priceUsd: 697, // Break-even at 24 months, saves $173 over 3 years
+    color: "from-amber-500 to-orange-500",
+    borderColor: "border-amber-500/30",
+    bgGlow: "bg-amber-500/10",
+    popular: false,
+    desc: "For small businesses ready to grow with gamification",
+    features: [
+      {
+        text: "Lifetime access — never pay again",
+        included: true,
+        highlight: true,
+      },
+      { text: "3 spin games", included: true },
+      { text: "3 trivia challenges", included: true },
+      { text: "3 active draws", included: true },
+      { text: "5,000 engagements/month", included: true },
+      { text: "12 prize slots on wheel", included: true },
+      { text: "Full branding customization", included: true },
+      { text: "Customer CSV + webhook export", included: true },
+      { text: "Live broadcast (OBS)", included: true },
+      { text: "Bulk code generation", included: true },
+      { text: "Analytics dashboard", included: true },
+      { text: "3 admin users", included: true },
+      { text: "Priority email support", included: true },
+      { text: "API access", included: false },
+      { text: "Dedicated support", included: false },
+      { text: "Custom integrations", included: false },
+    ],
+    bestFor: "Coffee shops, salons, small retailers",
+  },
+  {
+    id: "silver",
+    name: "Silver",
+    priceUsd: 1797, // Break-even at 23 months, saves $573 over 3 years
+    color: "from-gray-400 to-gray-500",
+    borderColor: "border-gray-400/30",
+    bgGlow: "bg-gray-400/10",
+    popular: true,
+    desc: "For growing businesses running regular campaigns",
+    features: [
+      {
+        text: "Lifetime access — never pay again",
+        included: true,
+        highlight: true,
+      },
+      { text: "10 spin games", included: true },
+      { text: "10 trivia challenges", included: true },
+      { text: "10 active draws", included: true },
+      { text: "25,000 engagements/month", included: true },
+      { text: "24 prize slots on wheel", included: true },
+      { text: "Full branding customization", included: true },
+      { text: "Customer CSV + API + Webhooks", included: true },
+      { text: "Live broadcast (OBS)", included: true },
+      { text: "Bulk code generation", included: true },
+      { text: "Advanced analytics", included: true },
+      { text: "10 admin users", included: true },
+      { text: "Priority support (email + chat)", included: true },
+      { text: "API access", included: true },
+      { text: "Dedicated support", included: false },
+      { text: "Custom integrations", included: false },
+    ],
+    bestFor: "Restaurants, event venues, mid-size retailers",
+  },
+  {
+    id: "gold",
+    name: "Gold",
+    priceUsd: 4997, // Break-even at 26 months, saves $823 over 3 years
+    color: "from-yellow-400 to-yellow-600",
+    borderColor: "border-yellow-500/30",
+    bgGlow: "bg-yellow-500/10",
+    popular: false,
+    desc: "For chains and high-volume venues with multiple locations",
+    features: [
+      {
+        text: "Lifetime access — never pay again",
+        included: true,
+        highlight: true,
+      },
+      { text: "Unlimited spin games", included: true },
+      { text: "Unlimited trivia challenges", included: true },
+      { text: "Unlimited active draws", included: true },
+      { text: "100,000 engagements/month", included: true },
+      { text: "24 prize slots on wheel", included: true },
+      { text: "Full white-label branding", included: true },
+      { text: "Customer CSV + API + Webhooks", included: true },
+      { text: "Live broadcast (OBS)", included: true },
+      { text: "Bulk code generation", included: true },
+      { text: "Advanced analytics + custom reports", included: true },
+      { text: "Unlimited admin users", included: true },
+      { text: "Dedicated account manager", included: true },
+      { text: "API access", included: true },
+      { text: "Custom integrations", included: true },
+      { text: "Multiple location support", included: true },
+    ],
+    bestFor: "Chains, franchises, agencies managing multiple clients",
+  },
+];
+
 export const EARLY_ACCESS_PLANS: EarlyAccessPlanDefinition[] = [
   {
     id: "early_bronze",
     name: "Early Bronze",
-    priceKes: 2999,
+    price: 697,
   },
   {
     id: "early_silver",
     name: "Early Silver",
-    priceKes: 6999,
+    price: 1797,
   },
   {
     id: "early_gold",
     name: "Early Gold",
-    priceKes: 14999,
+    price: 4997,
   },
 ];
 
@@ -290,31 +394,20 @@ export function getPaystackPlanCode(
   cycle: BillingCycle,
 ): string | undefined {
   let def: any = PLANS.find((p) => p.id === plan);
-
-  if (!def) {
-    def = EARLY_ACCESS_PLANS.find((p) => p.id === plan);
-  }
-
   return def?.paystackPlanCodes[cycle];
 }
 
-export function getPriceKes(plan: PlanDefinition, cycle: BillingCycle): number {
-  return cycle === "annual"
-    ? Math.round((plan.priceKes * 10) / 12)
-    : plan.priceKes;
+export function getPrice(plan: PlanDefinition, cycle: BillingCycle): number {
+  return cycle === "annual" ? plan.price * 10 : plan.price;
 }
 
-export function formatKES(amount: number): string {
-  return new Intl.NumberFormat("en-KE", {
+export function formatPrice(amount: number, currency: string = "USD"): string {
+  return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "KES",
+    currency: currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);
-}
-
-export function kesToUsd(kes: number): number {
-  return Math.round(kes / KES_TO_USD_RATE);
 }
 
 export function isUnlimited(value: number): boolean {

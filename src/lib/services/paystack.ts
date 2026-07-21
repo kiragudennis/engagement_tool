@@ -1,8 +1,8 @@
+// src/lib/services/paystack.ts
 import {
+  PLANS,
   EARLY_ACCESS_PLANS,
   getPaystackPlanCode,
-  getPriceKes,
-  PLANS,
 } from "@/lib/config/plans";
 
 const PAYSTACK_API = "https://api.paystack.co";
@@ -14,32 +14,39 @@ function paystackHeaders() {
   };
 }
 
-export function getSubscriptionAmountKes(
+// Get USD amount for subscription plans
+export function getSubscriptionAmount(
   plan: string,
   cycle: "monthly" | "annual" | "lifetime",
 ): number {
-  let def: any = PLANS.find((p) => p.id === plan);
-
-  if (!def) {
-    def = EARLY_ACCESS_PLANS.find((p) => p.id === plan);
-    console.log("Plan not found in PLANS, checking EARLY_ACCESS_PLANS:", def);
+  // Check regular plans first
+  const regularPlan = PLANS.find((p) => p.id === plan);
+  if (regularPlan) {
+    return cycle === "annual" ? regularPlan.price * 10 : regularPlan.price;
   }
 
-  if (!def) {
-    return 0;
+  // Check early access plans (one-time payment)
+  const earlyPlan = EARLY_ACCESS_PLANS.find((p) => p.id === plan);
+  if (earlyPlan) {
+    return earlyPlan.price;
   }
 
-  return cycle === "annual" ? def.priceKes * 10 : def.priceKes;
+  return 0;
 }
 
-export async function getLifetimeAmountKes(plan: string): Promise<number> {
-  const def = EARLY_ACCESS_PLANS.find((p) => p.id === plan);
-  if (!def) {
-    return 0;
+// Get Paystack plan code for subscription plans
+export function resolvePaystackPlanCode(
+  plan: string,
+  cycle: "monthly" | "annual" | "lifetime",
+): string | undefined {
+  // Early access plans don't have Paystack plan codes
+  if (plan.startsWith("early_")) {
+    return undefined;
   }
-  return def.priceKes;
+  return getPaystackPlanCode(plan, cycle);
 }
 
+// Create Paystack customer
 export async function paystackCreateCustomer(email: string, name: string) {
   const res = await fetch(`${PAYSTACK_API}/customer`, {
     method: "POST",
@@ -49,6 +56,7 @@ export async function paystackCreateCustomer(email: string, name: string) {
   return res.json();
 }
 
+// Create subscription (for recurring billing)
 export async function paystackCreateSubscription(
   customerCode: string,
   planCode: string,
@@ -61,42 +69,39 @@ export async function paystackCreateSubscription(
   return res.json();
 }
 
+// Initialize one-time transaction (for lifetime/early bird plans)
 export async function paystackInitializeTransaction(params: {
   email: string;
-  amountKes: number;
+  amount: number;
   plan: string;
   billingCycle: string;
   businessId: string;
   paymentId: string;
   callbackUrl: string;
+  isEarlyBird?: boolean;
 }) {
   const res = await fetch(`${PAYSTACK_API}/transaction/initialize`, {
     method: "POST",
     headers: paystackHeaders(),
     body: JSON.stringify({
       email: params.email,
-      amount: params.amountKes * 100,
-      currency: "KES",
+      amount: params.amount * 100, // Paystack expects cents
+      currency: "USD",
       callback_url: params.callbackUrl,
       metadata: {
         business_id: params.businessId,
         plan: params.plan,
         billing_cycle: params.billingCycle,
         payment_id: params.paymentId,
-        type: "subscription",
+        type: params.isEarlyBird ? "one_time" : "subscription",
+        is_early_bird: params.isEarlyBird ? "true" : "false",
       },
     }),
   });
   return res.json();
 }
 
-export function resolvePaystackPlanCode(
-  plan: string,
-  cycle: "monthly" | "annual" | "lifetime",
-): string | undefined {
-  return getPaystackPlanCode(plan, cycle);
-}
-
+// Verify webhook signature
 export async function verifyPaystackWebhook(
   rawBody: string,
   signature: string | null,
@@ -110,6 +115,7 @@ export async function verifyPaystackWebhook(
   return hash === signature;
 }
 
+// Activate business subscription
 export async function activateBusinessSubscription(params: {
   businessId: string;
   plan: string;
@@ -120,30 +126,148 @@ export async function activateBusinessSubscription(params: {
   mpesaPhone?: string;
 }) {
   const { supabaseAdmin } = await import("@/lib/supabase/admin");
-  const nextBilling = new Date();
-  nextBilling.setMonth(
-    nextBilling.getMonth() +
-      (params.billingCycle === "annual"
-        ? 12
-        : params.billingCycle === "lifetime"
-          ? 1200
-          : 1),
-  );
 
-  const { data: sub, error: errorSub } = await supabaseAdmin
+  const nextBilling = new Date();
+  if (params.billingCycle === "lifetime" || params.plan?.startsWith("early_")) {
+    // Set far future date for lifetime plans
+    nextBilling.setFullYear(nextBilling.getFullYear() + 100);
+  } else {
+    nextBilling.setMonth(
+      nextBilling.getMonth() + (params.billingCycle === "annual" ? 12 : 1),
+    );
+  }
+
+  const updateData: any = {
+    plan: params.plan,
+    subscription_status: "active",
+    payment_method: params.paymentMethod,
+    last_payment_at: new Date().toISOString(),
+    next_billing_at: nextBilling.toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  // Only update these if provided
+  if (params.paystackCustomerCode) {
+    updateData.paystack_customer_code = params.paystackCustomerCode;
+  }
+  if (params.paystackSubscriptionCode) {
+    updateData.paystack_subscription_code = params.paystackSubscriptionCode;
+  }
+  if (params.mpesaPhone) {
+    updateData.mpesa_phone = params.mpesaPhone;
+  }
+
+  const { data, error } = await supabaseAdmin
     .from("businesses")
-    .update({
-      plan: params.plan,
-      subscription_status: "active",
-      payment_method: params.paymentMethod,
-      last_payment_at: new Date().toISOString(),
-      next_billing_at: nextBilling.toISOString(),
-      paystack_customer_code: params.paystackCustomerCode ?? undefined,
-      paystack_subscription_code: params.paystackSubscriptionCode ?? undefined,
-      mpesa_phone: params.mpesaPhone ?? undefined,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq("id", params.businessId);
 
-  return { data: sub, error: errorSub };
+  return { data, error };
+}
+
+// Get subscription details from Paystack
+export async function paystackGetSubscription(subscriptionCode: string) {
+  const res = await fetch(`${PAYSTACK_API}/subscription/${subscriptionCode}`, {
+    headers: paystackHeaders(),
+  });
+  return res.json();
+}
+
+// Enable/Reactivate a subscription
+export async function paystackEnableSubscription(subscriptionCode: string) {
+  const res = await fetch(`${PAYSTACK_API}/subscription/enable`, {
+    method: "POST",
+    headers: paystackHeaders(),
+    body: JSON.stringify({ code: subscriptionCode, token: "reactivate_token" }),
+  });
+  return res.json();
+}
+
+// Disable/Cancel a subscription
+export async function paystackDisableSubscription(subscriptionCode: string) {
+  const res = await fetch(`${PAYSTACK_API}/subscription/disable`, {
+    method: "POST",
+    headers: paystackHeaders(),
+    body: JSON.stringify({ code: subscriptionCode, token: "cancel_token" }),
+  });
+  return res.json();
+}
+
+// Get customer details
+export async function paystackGetCustomer(customerCode: string) {
+  const res = await fetch(`${PAYSTACK_API}/customer/${customerCode}`, {
+    headers: paystackHeaders(),
+  });
+  return res.json();
+}
+
+// Get all subscriptions for a customer
+export async function paystackGetCustomerSubscriptions(customerCode: string) {
+  const res = await fetch(
+    `${PAYSTACK_API}/customer/${customerCode}/subscriptions`,
+    {
+      headers: paystackHeaders(),
+    },
+  );
+  return res.json();
+}
+
+// Update customer (e.g., change email)
+export async function paystackUpdateCustomer(
+  customerCode: string,
+  data: { email?: string; first_name?: string },
+) {
+  const res = await fetch(`${PAYSTACK_API}/customer/${customerCode}`, {
+    method: "PUT",
+    headers: paystackHeaders(),
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+// Generate a payment link for customer to retry failed payment
+export async function paystackGeneratePaymentLink(params: {
+  email: string;
+  amount: number;
+  plan: string;
+  businessId: string;
+  paymentId: string;
+  callbackUrl: string;
+}) {
+  const res = await fetch(`${PAYSTACK_API}/transaction/initialize`, {
+    method: "POST",
+    headers: paystackHeaders(),
+    body: JSON.stringify({
+      email: params.email,
+      amount: params.amount * 100,
+      currency: "USD",
+      callback_url: params.callbackUrl,
+      metadata: {
+        business_id: params.businessId,
+        plan: params.plan,
+        payment_id: params.paymentId,
+        type: "retry_payment",
+      },
+    }),
+  });
+  return res.json();
+}
+
+// Verify a transaction by reference
+export async function paystackVerifyTransaction(reference: string) {
+  const res = await fetch(`${PAYSTACK_API}/transaction/verify/${reference}`, {
+    headers: paystackHeaders(),
+  });
+  return res.json();
+}
+
+// Get all transactions for a customer (recent)
+export async function paystackGetCustomerTransactions(customerCode: string) {
+  const res = await fetch(
+    `${PAYSTACK_API}/transaction?customer=${customerCode}&perPage=10`,
+    {
+      headers: paystackHeaders(),
+    },
+  );
+  return res.json();
 }

@@ -6,15 +6,15 @@ import { getBusinessAccessStatus } from "@/lib/auth/access";
 
 export { getBusinessAccessStatus };
 
-export async function findUserIdByEmail(email: string): Promise<string | null> {
+export async function findUserIdByEmail(email: string) {
   const { data: userRow } = await supabaseAdmin
     .from("users")
-    .select("id")
+    .select("id, business_name, business_slug")
     .eq("email", email.toLowerCase())
     .maybeSingle();
 
   console.log("findUserIdByEmail:", email, "found user ID:", userRow?.id);
-  return userRow?.id ?? null;
+  return userRow ?? null;
 }
 
 export async function createSessionForUser(

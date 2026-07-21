@@ -28,7 +28,7 @@ import {
   Timer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PLANS, formatKES, kesToUsd } from "@/lib/config/plans";
+import { PLANS, formatPrice } from "@/lib/config/plans";
 import { DemoWheel } from "@/components/landing/demo-wheel";
 import Header from "@/components/layout/Header";
 // import spinAnimation from "@/assets/lottie/spin-1.json";
@@ -173,7 +173,7 @@ export default function LandingPage() {
   const heroOpacity = useTransform(scrollYProgress, [0, 1], [1, 0]);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
+    <div className="min-h-screen">
       {/* ─── NAV ─────────────────────────────────────── */}
       <Header />
       {/* ─── HERO ────────────────────────────────────── */}
@@ -185,10 +185,10 @@ export default function LandingPage() {
         />
 
         {/* Theme-aware overlay - light mode */}
-        <div className="absolute inset-0 bg-white/50 dark:hidden" />
+        <div className="absolute inset-0 bg-white/80 dark:hidden" />
 
         {/* Theme-aware overlay - dark mode */}
-        <div className="absolute inset-0 hidden dark:block bg-black/60" />
+        <div className="absolute inset-0 hidden dark:block bg-black/80" />
 
         {/* Decorative blur effects */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-purple-400/20 rounded-full blur-3xl" />
@@ -547,13 +547,13 @@ export default function LandingPage() {
                     </h3>
                     <div className="mt-4">
                       <span className="text-4xl font-bold text-gray-900 dark:text-white">
-                        {formatKES(plan.priceKes)}
+                        {formatPrice(plan.price)}
                       </span>
                       <span className="text-gray-400 dark:text-white/40 text-lg">
                         /mo
                       </span>
                       <p className="text-sm text-gray-400 dark:text-white/30 mt-1">
-                        ≈ ${kesToUsd(plan.priceKes)} USD
+                        ≈ ... KES
                       </p>
                     </div>
                     <p className="text-gray-500 dark:text-white/40 text-sm mt-1">

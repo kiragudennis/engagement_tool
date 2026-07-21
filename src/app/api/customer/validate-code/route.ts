@@ -1,4 +1,6 @@
+import { secureRatelimit } from "@/lib/limit";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { checkBotId } from "botid/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -10,6 +12,16 @@ const codeSchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
+  const { success } = await secureRatelimit(req);
+  if (!success) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+
   try {
     const code = req.nextUrl.searchParams.get("code");
     const parsed = codeSchema.safeParse({ code });

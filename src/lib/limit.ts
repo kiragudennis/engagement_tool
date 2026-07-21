@@ -5,7 +5,6 @@ import { supabaseAdmin } from "./supabase/admin";
 import { Resend } from "resend";
 import { createClient } from "./supabase/server";
 import { getPaystackPlanCode } from "./config/plans";
-import axios from "axios";
 
 // ✅ Shared Redis instance
 export const redis = new Redis({

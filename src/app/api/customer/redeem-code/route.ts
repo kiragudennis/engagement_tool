@@ -71,14 +71,14 @@ export async function POST(req: NextRequest) {
         authError.message?.includes("already been registered") ||
         authError.message?.includes("already exists")
       ) {
-        const existingId = await findUserIdByEmail(email);
-        if (!existingId) {
+        const existing = await findUserIdByEmail(email);
+        if (!existing) {
           return NextResponse.json(
             { error: "Failed to find existing account. Try logging in first." },
             { status: 500 },
           );
         }
-        userId = existingId;
+        userId = existing.id;
       } else {
         return NextResponse.json({ error: authError.message }, { status: 400 });
       }

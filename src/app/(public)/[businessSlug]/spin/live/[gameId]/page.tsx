@@ -28,6 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 import { SpinGame } from "@/types/spinning-wheel";
 import Link from "next/link";
+import { useSocket } from "@/lib/socket/useSocket";
 
 // ─── Types ──────────────────────────────────────────────
 interface Participant {
@@ -549,6 +550,38 @@ export default function BusinessLiveGamePage() {
       channel.unsubscribe();
     };
   }, [supabase, gameId]);
+
+  // Socket queue events
+  const { on: onSocket, emit: emitSocket } = useSocket();
+
+  useEffect(() => {
+    if (!gameId) return;
+    emitSocket("join:queue", gameId);
+
+    const unsub1 = onSocket("queue:called", (data: any) => {
+      setCurrentSpinner({ user_name: data.user_name || "Next Spinner" });
+      setWheelSpinning(true);
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => setMustSpin(true)),
+      );
+    });
+
+    const unsub2 = onSocket("queue:skipped", () => {
+      setCurrentSpinner(null);
+      setWheelSpinning(false);
+      setMustSpin(false);
+    });
+
+    const unsub3 = onSocket("queue:update", () => {
+      // Refresh queue data if needed
+    });
+
+    return () => {
+      unsub1?.();
+      unsub2?.();
+      unsub3?.();
+    };
+  }, [gameId, onSocket, emitSocket]);
 
   const handleStopSpinning = useCallback(() => {
     setMustSpin(false);

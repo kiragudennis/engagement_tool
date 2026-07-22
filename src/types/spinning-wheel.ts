@@ -30,6 +30,8 @@ export interface SpinGame {
   live_theme: string;
   show_confetti: boolean;
   play_sounds: boolean;
+
+  queue_enabled?: boolean;
 }
 
 export interface PrizeSegment {

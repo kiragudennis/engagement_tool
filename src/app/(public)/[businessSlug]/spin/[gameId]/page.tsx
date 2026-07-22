@@ -45,6 +45,7 @@ import Link from "next/link";
 import { SpinningWheelClientService } from "@/lib/services/spining-wheel-service.client";
 import { PointsService } from "@/lib/services/points-service";
 import { SpinGame, UserSpinState, PrizeSegment } from "@/types/spinning-wheel";
+import { useSocket } from "@/lib/socket/useSocket";
 import confetti from "canvas-confetti";
 import { Input } from "@/components/ui/input";
 
@@ -239,12 +240,119 @@ export default function BusinessSpinPage() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Queue state
+  const [queueEnabled, setQueueEnabled] = useState(false);
+  const [inQueue, setInQueue] = useState(false);
+  const [queuePosition, setQueuePosition] = useState<number | null>(null);
+  const [queueStatus, setQueueStatus] = useState<string | null>(null);
+  const [isMyTurn, setIsMyTurn] = useState(false);
+  const [joiningQueue, setJoiningQueue] = useState(false);
+  const [queueError, setQueueError] = useState<string | null>(null);
+
   // Services
   const wheelServiceRef = useRef<SpinningWheelClientService | null>(null);
   if (!wheelServiceRef.current && supabase) {
     wheelServiceRef.current = new SpinningWheelClientService(supabase);
   }
   const wheelService = wheelServiceRef.current;
+
+  // Socket for queue events
+  const { on: onSocket, emit: emitSocket } = useSocket();
+
+  useEffect(() => {
+    if (!gameId) return;
+    emitSocket("join:queue", gameId);
+  }, [gameId, emitSocket]);
+
+  useEffect(() => {
+    if (!gameId) return;
+    const unsub1 = onSocket(`queue:${gameId}:called`, (data: any) => {
+      if (data.user_id === profile?.id) {
+        setIsMyTurn(true);
+        setQueueStatus("current");
+      }
+    });
+    const unsub2 = onSocket(`queue:${gameId}:skipped`, (data: any) => {
+      if (data.user_id === profile?.id) {
+        setIsMyTurn(false);
+        setInQueue(false);
+        setQueueStatus(null);
+        setQueuePosition(null);
+        toast.info("You were skipped from the queue");
+      }
+    });
+    const unsub3 = onSocket(`queue:${gameId}:update`, () => {
+      if (profile?.id && gameId) {
+        checkQueueStatus();
+      }
+    });
+    return () => {
+      unsub1?.();
+      unsub2?.();
+      unsub3?.();
+    };
+  }, [gameId, profile?.id, onSocket]);
+
+  const checkQueueStatus = async () => {
+    if (!gameId || !profile?.id || !supabase) return;
+    try {
+      const { data } = await supabase.rpc("get_user_queue_position", {
+        p_game_id: gameId,
+        p_user_id: profile.id,
+      });
+      if (data) {
+        setInQueue(data.in_queue || false);
+        setQueuePosition(data.queue_position || null);
+        setQueueStatus(data.status || null);
+        setIsMyTurn(data.status === "current");
+      }
+    } catch (err) {
+      console.error("Queue status check failed:", err);
+    }
+  };
+
+  const joinQueue = async () => {
+    if (!gameId || !profile?.id || !supabase) return;
+    setJoiningQueue(true);
+    setQueueError(null);
+    try {
+      const { data, error } = await supabase.rpc("join_spin_queue", {
+        p_game_id: gameId,
+        p_user_id: profile.id,
+      });
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error);
+      setInQueue(true);
+      setQueuePosition(data.queue_position);
+      setQueueStatus("waiting");
+      toast.success(`You're #${data.queue_position} in queue!`);
+    } catch (err: any) {
+      setQueueError(err.message || "Failed to join queue");
+      toast.error(err.message || "Failed to join queue");
+    } finally {
+      setJoiningQueue(false);
+    }
+  };
+
+  const leaveQueue = async () => {
+    if (!gameId || !profile?.id || !supabase) return;
+    try {
+      await supabase.from("spin_queue_entries").delete().eq("game_id", gameId).eq("user_id", profile.id);
+      setInQueue(false);
+      setQueuePosition(null);
+      setQueueStatus(null);
+      setIsMyTurn(false);
+      toast.success("Left queue");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to leave queue");
+    }
+  };
+
+  useEffect(() => {
+    if (!queueEnabled || !gameId || !profile?.id) return;
+    const interval = setInterval(checkQueueStatus, 3000);
+    return () => clearInterval(interval);
+  }, [queueEnabled, gameId, profile?.id]);
 
   // ─── Load Business & Games ────────────────────────────
   const loadData = useCallback(async () => {
@@ -275,6 +383,21 @@ export default function BusinessSpinPage() {
         .maybeSingle();
 
       setGame(gameData || null);
+
+      // Check queue settings
+      if (gameData && profile?.id) {
+        const { data: queueSettings } = await supabase
+          .from("spin_queue_settings")
+          .select("queue_enabled")
+          .eq("game_id", gameData.id)
+          .maybeSingle();
+        
+        setQueueEnabled(queueSettings?.queue_enabled || false);
+        
+        if (queueSettings?.queue_enabled) {
+          checkQueueStatus();
+        }
+      }
 
       // Check user activation
       if (profile?.id) {
@@ -648,35 +771,116 @@ export default function BusinessSpinPage() {
 
                 {/* Spin Buttons */}
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button
-                      size="lg"
-                      onClick={() => handleSpin(false)}
-                      disabled={
-                        spinning || !isGameLive || !userState?.can_spin_free
-                      }
-                      className="h-12 gap-2"
-                      style={{ backgroundColor: business.brand_color }}
-                    >
-                      <Gift className="h-5 w-5" />
-                      Free Spin
-                      <Badge className="ml-1 bg-white/20 text-xs">
-                        {userState.free_remaining_today} left
-                      </Badge>
-                    </Button>
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      onClick={() => handleSpin(true)}
-                      disabled={
-                        spinning || !isGameLive || !userState.can_spin_paid
-                      }
-                      className="h-12 gap-2 border-amber-300 dark:border-amber-500/30 text-amber-600 dark:text-amber-400"
-                    >
-                      <Coins className="h-5 w-5" />
-                      {activeGame.points_per_paid_spin} Pts
-                    </Button>
-                  </div>
+                  {queueEnabled ? (
+                    <>
+                      {isMyTurn ? (
+                        <div className="grid grid-cols-2 gap-3">
+                          <Button
+                            size="lg"
+                            onClick={() => handleSpin(false)}
+                            disabled={
+                              spinning || !isGameLive || !userState?.can_spin_free
+                            }
+                            className="h-12 gap-2"
+                            style={{ backgroundColor: business.brand_color }}
+                          >
+                            <Gift className="h-5 w-5" />
+                            Free Spin
+                            <Badge className="ml-1 bg-white/20 text-xs">
+                              {userState.free_remaining_today} left
+                            </Badge>
+                          </Button>
+                          <Button
+                            size="lg"
+                            variant="outline"
+                            onClick={() => handleSpin(true)}
+                            disabled={
+                              spinning || !isGameLive || !userState.can_spin_paid
+                            }
+                            className="h-12 gap-2 border-amber-300 dark:border-amber-500/30 text-amber-600 dark:text-amber-400"
+                          >
+                            <Coins className="h-5 w-5" />
+                            {activeGame.points_per_paid_spin} Pts
+                          </Button>
+                        </div>
+                      ) : inQueue ? (
+                        <div className="p-4 rounded-xl text-center bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-500/30">
+                          <p className="text-purple-700 dark:text-purple-300 font-medium mb-1">
+                            You're in the queue!
+                          </p>
+                          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                            #{queuePosition}
+                          </p>
+                          <p className="text-xs text-purple-600 dark:text-purple-400 mb-3">
+                            {queueStatus === "current" ? "It's your turn!" : "Waiting to be called..."}
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={leaveQueue}
+                            className="text-red-600 border-red-200 hover:bg-red-50"
+                          >
+                            Leave Queue
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="text-center">
+                          <p className="text-sm text-gray-500 mb-3">
+                            Join the queue and wait for your turn to spin!
+                          </p>
+                          <Button
+                            size="lg"
+                            onClick={joinQueue}
+                            disabled={joiningQueue || !isGameLive}
+                            className="h-12 gap-2"
+                            style={{ backgroundColor: business.brand_color }}
+                          >
+                            {joiningQueue ? (
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                            ) : (
+                              <>
+                                <Users className="h-5 w-5" />
+                                Join Queue
+                              </>
+                            )}
+                          </Button>
+                          {queueError && (
+                            <p className="text-xs text-red-500 mt-2">{queueError}</p>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        size="lg"
+                        onClick={() => handleSpin(false)}
+                        disabled={
+                          spinning || !isGameLive || !userState?.can_spin_free
+                        }
+                        className="h-12 gap-2"
+                        style={{ backgroundColor: business.brand_color }}
+                      >
+                        <Gift className="h-5 w-5" />
+                        Free Spin
+                        <Badge className="ml-1 bg-white/20 text-xs">
+                          {userState.free_remaining_today} left
+                        </Badge>
+                      </Button>
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        onClick={() => handleSpin(true)}
+                        disabled={
+                          spinning || !isGameLive || !userState.can_spin_paid
+                        }
+                        className="h-12 gap-2 border-amber-300 dark:border-amber-500/30 text-amber-600 dark:text-amber-400"
+                      >
+                        <Coins className="h-5 w-5" />
+                        {activeGame.points_per_paid_spin} Pts
+                      </Button>
+                    </div>
+                  )}
 
                   {spinning && (
                     <div className="flex items-center justify-center gap-2 text-gray-500 dark:text-white/40">

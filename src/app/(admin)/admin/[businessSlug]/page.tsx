@@ -335,14 +335,14 @@ export default function BusinessAdminDashboard() {
                     ? "Customize your wheel"
                     : "Set up your first spin game"
                 }
-                href={`/admin/${businessSlug}/code-entry`}
+                href={`/admin/${businessSlug}/spin`}
                 color={business.brand_color}
               />
               <QuickActionCard
                 icon={Ticket}
-                title="Manage Codes"
-                description={`${stats.activeCodes} active codes`}
-                href={`/admin/${businessSlug}/codes`}
+                title="Draw Setup"
+                description={`Configure your draws`}
+                href={`/admin/${businessSlug}/draws`}
                 color={business.brand_color}
               />
               <QuickActionCard

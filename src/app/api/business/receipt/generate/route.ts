@@ -36,7 +36,7 @@ const receiptSchema = z.object({
   pointsOverride: z.number().optional(), // If POS wants to set exact points
 
   // Optional - what this code unlocks
-  unlocks: z.enum(["spin", "draw", "trivia", "both"]).default("spin"),
+  unlocks: z.enum(["spin", "draw", "spin_draw", "points"]).default("points"),
 
   // Optional - print preferences
   printReceipt: z.boolean().default(false),
@@ -187,6 +187,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── CALCULATE POINTS ───────────────────────────────
+    // Takes points only, spin only, spin + draw or draw only
     const pointsEarned =
       pointsOverride ||
       Math.floor(amount * (business.points_multiplier || 1.0));

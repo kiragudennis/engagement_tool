@@ -575,3 +575,296 @@ GRANT EXECUTE ON FUNCTION get_user_allocation(UUID, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_business_spin_games(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_game_participant_stats(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_game_participants(UUID, INT) TO authenticated;
+
+-- ============================================
+-- SPIN QUEUE SYSTEM
+-- ============================================
+
+-- 5. Spin queue entries
+CREATE TABLE IF NOT EXISTS spin_queue_entries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    game_id UUID REFERENCES spin_games(id) ON DELETE CASCADE,
+    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    
+    ticket_number INTEGER NOT NULL,
+    queue_position INTEGER NOT NULL,
+    
+    status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'current', 'spinning', 'completed', 'skipped')),
+    
+    prize_type TEXT,
+    prize_value TEXT,
+    prize_display TEXT,
+    points_awarded INTEGER DEFAULT 0,
+    points_spent INTEGER DEFAULT 0,
+    segment_index INTEGER,
+    
+    joined_at TIMESTAMPTZ DEFAULT NOW(),
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    
+    metadata JSONB DEFAULT '{}'::jsonb,
+    
+    UNIQUE(game_id, user_id),
+    UNIQUE(game_id, ticket_number)
+);
+
+-- 6. Spin queue settings per game
+CREATE TABLE IF NOT EXISTS spin_queue_settings (
+    game_id UUID PRIMARY KEY REFERENCES spin_games(id) ON DELETE CASCADE,
+    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+    
+    queue_enabled BOOLEAN DEFAULT FALSE,
+    max_queue_size INTEGER DEFAULT 50,
+    auto_call_next BOOLEAN DEFAULT TRUE,
+    call_duration_seconds INTEGER DEFAULT 30,
+    
+    announcement_text TEXT DEFAULT 'Next up:',
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for queue
+CREATE INDEX IF NOT EXISTS idx_spin_queue_game ON spin_queue_entries(game_id, queue_position);
+CREATE INDEX IF NOT EXISTS idx_spin_queue_user ON spin_queue_entries(game_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_spin_queue_status ON spin_queue_entries(game_id, status);
+CREATE INDEX IF NOT EXISTS idx_spin_queue_business ON spin_queue_entries(business_id);
+
+-- RLS Policies for queue
+ALTER TABLE spin_queue_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE spin_queue_settings ENABLE ROW LEVEL SECURITY;
+
+-- Anyone can view queue entries for active games
+CREATE POLICY "Anyone can view queue entries" ON spin_queue_entries
+    FOR SELECT USING (true);
+
+-- Users can join queue for themselves
+CREATE POLICY "Users can join queue" ON spin_queue_entries
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Users can update their own queue entries
+CREATE POLICY "Users can update own queue entries" ON spin_queue_entries
+    FOR UPDATE USING (auth.uid() = user_id);
+
+-- Admin policies for queue
+CREATE POLICY "Admins can manage own queue entries" ON spin_queue_entries
+    FOR ALL USING (
+        business_id IN (SELECT business_id FROM business_admins WHERE user_id = auth.uid())
+    );
+
+CREATE POLICY "Admins can manage own queue settings" ON spin_queue_settings
+    FOR ALL USING (
+        business_id IN (SELECT business_id FROM business_admins WHERE user_id = auth.uid())
+    );
+
+-- ============================================
+-- QUEUE FUNCTIONS
+-- ============================================
+
+-- Join spin queue
+CREATE OR REPLACE FUNCTION join_spin_queue(p_game_id UUID, p_user_id UUID)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_game spin_games%ROWTYPE;
+    v_business_id UUID;
+    v_queue_settings spin_queue_settings%ROWTYPE;
+    v_current_position INTEGER;
+    v_ticket_number INTEGER;
+    v_existing spin_queue_entries%ROWTYPE;
+    v_is_active BOOLEAN;
+BEGIN
+    -- Get game
+    SELECT * INTO v_game FROM spin_games WHERE id = p_game_id AND is_active = true;
+    IF NOT FOUND THEN
+        RETURN json_build_object('success', false, 'error', 'Game not found or not active');
+    END IF;
+    
+    v_business_id := v_game.business_id;
+    
+    -- Get queue settings
+    SELECT * INTO v_queue_settings FROM spin_queue_settings WHERE game_id = p_game_id;
+    IF NOT FOUND THEN
+        v_queue_settings.queue_enabled := FALSE;
+    END IF;
+    
+    IF NOT v_queue_settings.queue_enabled THEN
+        RETURN json_build_object('success', false, 'error', 'Queue is not enabled for this game');
+    END IF;
+    
+    -- Check if user is active with business
+    SELECT is_active INTO v_is_active
+    FROM customer_business_activations
+    WHERE user_id = p_user_id AND business_id = v_business_id
+      AND is_active = TRUE AND expires_at > NOW();
+    
+    IF NOT v_is_active THEN
+        RETURN json_build_object('success', false, 'error', 'You need an active code from this business');
+    END IF;
+    
+    -- Check if already in queue
+    SELECT * INTO v_existing FROM spin_queue_entries WHERE game_id = p_game_id AND user_id = p_user_id;
+    IF FOUND THEN
+        IF v_existing.status = 'waiting' OR v_existing.status = 'current' THEN
+            RETURN json_build_object('success', false, 'error', 'You are already in the queue', 'ticket_number', v_existing.ticket_number, 'queue_position', v_existing.queue_position);
+        END IF;
+    END IF;
+    
+    -- Check queue size limit
+    IF v_queue_settings.max_queue_size > 0 THEN
+        SELECT COUNT(*) INTO v_current_position FROM spin_queue_entries WHERE game_id = p_game_id AND status IN ('waiting', 'current');
+        IF v_current_position >= v_queue_settings.max_queue_size THEN
+            RETURN json_build_object('success', false, 'error', 'Queue is full');
+        END IF;
+    ELSE
+        v_current_position := 0;
+    END IF;
+    
+    -- Get next ticket number
+    SELECT COALESCE(MAX(ticket_number), 0) + 1 INTO v_ticket_number FROM spin_queue_entries WHERE game_id = p_game_id;
+    
+    -- Insert queue entry
+    INSERT INTO spin_queue_entries (game_id, business_id, user_id, ticket_number, queue_position, status)
+    VALUES (p_game_id, v_business_id, p_user_id, v_ticket_number, v_current_position + 1, 'waiting');
+    
+    RETURN json_build_object('success', true, 'ticket_number', v_ticket_number, 'queue_position', v_current_position + 1);
+END;
+$$;
+
+-- Call next in queue
+CREATE OR REPLACE FUNCTION call_next_spin(p_game_id UUID, p_admin_user_id UUID DEFAULT NULL)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_next spin_queue_entries%ROWTYPE;
+    v_old_current spin_queue_entries%ROWTYPE;
+    v_result JSON;
+BEGIN
+    -- Mark any current/spinning as skipped if they exceeded duration
+    UPDATE spin_queue_entries
+    SET status = 'skipped', completed_at = NOW()
+    WHERE game_id = p_game_id 
+      AND status IN ('current', 'spinning')
+      AND started_at < NOW() - INTERVAL '1 hour';
+    
+    -- Get next in queue
+    SELECT * INTO v_next FROM spin_queue_entries
+    WHERE game_id = p_game_id AND status = 'waiting'
+    ORDER BY queue_position ASC
+    LIMIT 1;
+    
+    IF NOT FOUND THEN
+        RETURN json_build_object('success', false, 'error', 'No one in queue');
+    END IF;
+    
+    -- Mark as current
+    UPDATE spin_queue_entries
+    SET status = 'current', started_at = NOW()
+    WHERE id = v_next.id;
+    
+    RETURN json_build_object('success', true, 'ticket_number', v_next.ticket_number, 'user_id', v_next.user_id, 'queue_position', v_next.queue_position);
+END;
+$$;
+
+-- Complete spin in queue
+CREATE OR REPLACE FUNCTION complete_queued_spin(p_game_id UUID, p_user_id UUID, p_prize_type TEXT DEFAULT NULL, p_prize_value TEXT DEFAULT NULL, p_prize_display TEXT DEFAULT NULL, p_points_awarded INTEGER DEFAULT 0, p_points_spent INTEGER DEFAULT 0, p_segment_index INTEGER DEFAULT NULL)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_entry spin_queue_entries%ROWTYPE;
+BEGIN
+    SELECT * INTO v_entry FROM spin_queue_entries WHERE game_id = p_game_id AND user_id = p_user_id AND status = 'current';
+    IF NOT FOUND THEN
+        RETURN json_build_object('success', false, 'error', 'No active queue entry found');
+    END IF;
+    
+    UPDATE spin_queue_entries
+    SET status = 'completed', completed_at = NOW(),
+        prize_type = p_prize_type, prize_value = p_prize_value, prize_display = p_prize_display,
+        points_awarded = p_points_awarded, points_spent = p_points_spent,
+        segment_index = p_segment_index
+    WHERE id = v_entry.id;
+    
+    RETURN json_build_object('success', true);
+END;
+$$;
+
+-- Skip current spinner
+CREATE OR REPLACE FUNCTION skip_current_spinner(p_game_id UUID)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_current spin_queue_entries%ROWTYPE;
+BEGIN
+    SELECT * INTO v_current FROM spin_queue_entries WHERE game_id = p_game_id AND status = 'current';
+    IF NOT FOUND THEN
+        RETURN json_build_object('success', false, 'error', 'No current spinner');
+    END IF;
+    
+    UPDATE spin_queue_entries SET status = 'skipped', completed_at = NOW() WHERE id = v_current.id;
+    RETURN json_build_object('success', true);
+END;
+$$;
+
+-- Get queue for a game
+CREATE OR REPLACE FUNCTION get_spin_queue(p_game_id UUID)
+RETURNS TABLE(
+    id UUID, user_id UUID, ticket_number INTEGER, queue_position INTEGER, status TEXT,
+    prize_type TEXT, prize_value TEXT, prize_display TEXT, points_awarded INTEGER,
+    joined_at TIMESTAMPTZ, started_at TIMESTAMPTZ, completed_at TIMESTAMPTZ,
+    user_name TEXT, user_avatar TEXT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT sq.*, COALESCE(u.full_name, 'Customer') as user_name, UPPER(LEFT(COALESCE(u.full_name, '?'), 1)) as user_avatar
+    FROM spin_queue_entries sq
+    LEFT JOIN users u ON sq.user_id = u.id
+    WHERE sq.game_id = p_game_id
+    ORDER BY sq.queue_position ASC;
+END;
+$$;
+
+-- Get user's queue position
+CREATE OR REPLACE FUNCTION get_user_queue_position(p_game_id UUID, p_user_id UUID)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_entry spin_queue_entries%ROWTYPE;
+BEGIN
+    SELECT * INTO v_entry FROM spin_queue_entries WHERE game_id = p_game_id AND user_id = p_user_id;
+    IF NOT FOUND THEN
+        RETURN json_build_object('in_queue', false);
+    END IF;
+    
+    RETURN json_build_object(
+        'in_queue', true,
+        'ticket_number', v_entry.ticket_number,
+        'queue_position', v_entry.queue_position,
+        'status', v_entry.status,
+        'joined_at', v_entry.joined_at,
+        'started_at', v_entry.started_at
+    );
+END;
+$$;
+
+-- Grant queue permissions
+GRANT EXECUTE ON FUNCTION join_spin_queue(UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION call_next_spin(UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION complete_queued_spin(UUID, UUID, TEXT, TEXT, TEXT, INTEGER, INTEGER, INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION skip_current_spinner(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_spin_queue(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_queue_position(UUID, UUID) TO authenticated;

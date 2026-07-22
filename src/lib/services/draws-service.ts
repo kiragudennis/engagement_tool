@@ -28,12 +28,16 @@ export class DrawsService {
    * Get all draws (with optional filtering by group or status)
    */
   async getDraws(options?: {
+    businessId?: string;
     groupId?: string;
     status?: string[];
     active?: boolean;
   }): Promise<any[]> {
     let query = this.supabase.from("draws").select("*");
 
+    if (options?.businessId) {
+      query = query.eq("business_id", options.businessId);
+    }
     if (options?.groupId) {
       query = query.eq("draw_group_id", options.groupId);
     }
@@ -58,11 +62,17 @@ export class DrawsService {
   /**
    * Get draw groups (for managing multiple concurrent draws)
    */
-  async getDrawGroups(): Promise<any[]> {
-    const { data, error } = await this.supabase
+  async getDrawGroups(businessId?: string): Promise<any[]> {
+    let query = this.supabase
       .from("draw_groups")
       .select("*, draws!draw_group_id(id, name, status, prize_name)")
       .order("created_at", { ascending: false });
+
+    if (businessId) {
+      query = query.eq("business_id", businessId);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     return data || [];

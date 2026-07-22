@@ -3,6 +3,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { DrawsService } from "@/lib/services/draws-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +37,8 @@ import {
   X,
   LayoutGrid,
   List,
+  FileText,
+  Radio,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -73,7 +76,10 @@ interface Draw {
 }
 
 export default function AdminDrawsPage() {
+  const { businessSlug } = useParams<{ businessSlug: string }>();
   const { supabase } = useAuth();
+  const router = useRouter();
+  const [business, setBusiness] = useState<any>(null);
   const [draws, setDraws] = useState<Draw[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,15 +90,15 @@ export default function AdminDrawsPage() {
   const drawsService = new DrawsService(supabase);
 
   const fetchData = useCallback(async () => {
+    if (!businessSlug || !business?.id) return;
     try {
       const [drawsData, groupsData] = await Promise.all([
-        drawsService.getDraws({ groupId: selectedGroup || undefined }),
-        drawsService.getDrawGroups(),
+        drawsService.getDraws({ businessId: business.id, groupId: selectedGroup || undefined }),
+        drawsService.getDrawGroups(business.id),
       ]);
       setDraws(drawsData);
       setGroups(groupsData);
 
-      // Fetch stats for each draw
       const stats: Record<string, any> = {};
       for (const draw of drawsData) {
         const [entriesCount, participantsCount, winnersCount] =
@@ -120,11 +126,24 @@ export default function AdminDrawsPage() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, drawsService, selectedGroup]);
+  }, [businessSlug, supabase, drawsService, selectedGroup, business?.id]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    const loadBusiness = async () => {
+      if (!businessSlug) return;
+      const { data: biz } = await supabase
+        .from("businesses")
+        .select("id, name, slug")
+        .eq("slug", businessSlug)
+        .single();
+      if (biz) setBusiness(biz);
+    };
+    loadBusiness();
+  }, [businessSlug, supabase]);
+
+  useEffect(() => {
+    if (business?.id) fetchData();
+  }, [business?.id, fetchData]);
 
   const updateDrawStatus = async (drawId: string, newStatus: string) => {
     try {
@@ -259,6 +278,7 @@ export default function AdminDrawsPage() {
               stats={drawStats[draw.id]}
               onUpdateStatus={updateDrawStatus}
               onPerformDraw={performDraw}
+              businessSlug={businessSlug}
             />
           ))}
         </div>
@@ -271,6 +291,7 @@ export default function AdminDrawsPage() {
               stats={drawStats[draw.id]}
               onUpdateStatus={updateDrawStatus}
               onPerformDraw={performDraw}
+              businessSlug={businessSlug}
             />
           ))}
         </div>
@@ -298,7 +319,7 @@ export default function AdminDrawsPage() {
 }
 
 // Draw Card Component
-function DrawCard({ draw, stats, onUpdateStatus, onPerformDraw }: any) {
+function DrawCard({ draw, stats, onUpdateStatus, onPerformDraw, businessSlug }: any) {
   const isEntryOpen =
     new Date(draw.entry_starts_at) <= new Date() &&
     new Date(draw.entry_ends_at) >= new Date();
@@ -421,7 +442,7 @@ function DrawCard({ draw, stats, onUpdateStatus, onPerformDraw }: any) {
             </Link>
           </Button>
           <Button variant="outline" size="sm" className="flex-1" asChild>
-            <Link href={`/admin/marketing/draws/${draw.id}/control`}>
+            <Link href={`/admin/${businessSlug}/draws/${draw.id}/control`}>
               <Trophy className="h-4 w-4 mr-2" />
               Control
             </Link>
@@ -475,7 +496,7 @@ function DrawCard({ draw, stats, onUpdateStatus, onPerformDraw }: any) {
 }
 
 // Draw List Item Component
-function DrawListItem({ draw, stats, onUpdateStatus, onPerformDraw }: any) {
+function DrawListItem({ draw, stats, onUpdateStatus, onPerformDraw, businessSlug }: any) {
   const isDrawTime = new Date(draw.draw_time) <= new Date();
   return (
     <Card>
@@ -836,6 +857,4 @@ function getStatusBadge(status: string) {
   );
 }
 
-// Missing imports
-import { FileText } from "lucide-react";
-import { Radio } from "lucide-react";
+// Missing imports removed - now at top of file

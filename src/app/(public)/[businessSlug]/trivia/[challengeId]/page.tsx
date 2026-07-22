@@ -30,6 +30,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useSocket } from "@/lib/socket/useSocket";
 
 // ─── Types ──────────────────────────────────────────────
 interface TriviaQuestion {
@@ -369,6 +370,38 @@ export default function BusinessTriviaPage() {
       channel.unsubscribe();
     };
   }, [challenge?.id, profile?.id]);
+
+  // ─── Socket real-time (offload Supabase) ────────────────
+  const { on: onSocket, emit: emitSocket } = useSocket();
+
+  useEffect(() => {
+    if (!challenge?.id) return;
+
+    emitSocket("join:trivia-queue", challenge.id);
+
+    const unsub1 = onSocket("trivia:queue:called", (data: any) => {
+      setCurrentAnsweringUser({
+        user_name: data.user_name,
+        ticket_number: data.ticket_number,
+      });
+      loadQueueStatus();
+    });
+
+    const unsub2 = onSocket("trivia:queue:skipped", () => {
+      setCurrentAnsweringUser(null);
+      loadQueueStatus();
+    });
+
+    const unsub3 = onSocket("trivia:queue:update", () => {
+      loadQueueStatus();
+    });
+
+    return () => {
+      unsub1?.();
+      unsub2?.();
+      unsub3?.();
+    };
+  }, [challenge?.id, onSocket, emitSocket, loadQueueStatus]);
 
   // ─── Timer ────────────────────────────────────────────
   useEffect(() => {

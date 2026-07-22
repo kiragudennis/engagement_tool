@@ -1,0 +1,43 @@
+Spinning strength functionality to be applied - Important in eliminating doubt of out of luck.
+Use a Real-time websocket server instead of relying fully on supabase for everything.
+Add trust pilot.
+
+-- Marketing
+(a). Early birds should be available to use immediately.
+(b). Customers should have only one account (ID or Licence linked to it, use it while collecting prices), Engage end shall enhance this.
+(c). Get a free subscription at the end of Engage stream when you win.
+(d). Only the business is allowed to create two or more accounts (Maybe you want to enjoy more than one subription).
+(e). Referral and recommendation (They get something small).
+(f). Connect your POS or your existing Ecommerce business.
+(g). Can see active vs total customers.
+
+-- LATEST
+Here's what's now in place for the queue-based spin system:
+
+Database (src/db/spinning_wheel_advanced.sql)
+
+New tables: spin_queue_entries, spin_queue_settings
+New functions: join_spin_queue, call_next_spin, complete_queued_spin, skip_current_spinner, get_spin_queue, get_user_queue_position
+Socket.IO server (socket-server/src/index.ts)
+
+New room: queue:{gameId}
+Admin broadcasts: admin:queue:called, admin:queue:skipped, admin:queue:update → forwarded to the queue room
+Client hook (src/lib/socket/useSocket.ts)
+
+Wraps socket.io-client for React
+Public spin page (src/app/(public)/[businessSlug]/spin/[gameId]/page.tsx)
+
+Queue state: queueEnabled, inQueue, queuePosition, isMyTurn
+Actions: joinQueue(), leaveQueue(), checkQueueStatus()
+UI switches between Join Queue, waiting #N, and your turn → spin buttons
+Socket listens for queue:called, queue:skipped, queue:update
+Live broadcast page (src/app/(public)/[businessSlug]/spin/live/[gameId]/page.tsx)
+
+Socket listens for queue events and triggers the live wheel animation when someone is called
+Admin spin page (src/app/(admin)/admin/[businessSlug]/spin/page.tsx)
+
+Queue Management section at the bottom
+Select a game → enable/disable queue
+Call Next → advances queue and broadcasts via socket
+Skip Current → skips the current spinner
+Live queue list with ticket numbers and status

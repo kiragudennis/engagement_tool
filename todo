@@ -41,3 +41,38 @@ Select a game → enable/disable queue
 Call Next → advances queue and broadcasts via socket
 Skip Current → skips the current spinner
 Live queue list with ticket numbers and status
+
+**Admin page fixes**
+
+- `src/app/(admin)/admin/[businessSlug]/draws/page.tsx` — fixed broken imports (`FileText`, `Radio`), replaced hardcoded `/admin/marketing/...` links with `/admin/${businessSlug}/...`, added `businessId` scoping to draws/groups fetches, and removed duplicate imports at EOF.
+- `src/app/(admin)/admin/[businessSlug]/spin/page.tsx` — added `useParams`/`useRouter`, scoped `spin_games` queries by `business_id`, set `business_id` on new game inserts, added `useSocketRealtime` hook placeholder, and added full **Queue Management** section (select game, enable/disable queue, Call Next, Skip Current, live queue list).
+- `src/app/(admin)/admin/[businessSlug]/trivia/page.tsx` — added `useParams`/`useRouter`, scoped `challenges` queries by `business_id`, set `business_id` on new challenge upserts.
+- `src/lib/services/draws-service.ts` — added `businessId` parameter to `getDraws()` and `getDrawGroups()` for multi-tenant scoping.
+
+**Socket.IO server**
+
+- New `socket-server/` package with `src/index.ts` (ESM, NodeNext, `tsx` dev).
+- Rooms: `business:{id}`, `admin:{id}`, `spin:{gameId}`, `draw:{drawId}`, `trivia:{challengeId}`, `queue:{gameId}`, `trivia-queue:{challengeId}`.
+- Admin forwarding for queue events:
+  - `admin:queue:called` / `admin:queue:skipped` / `admin:queue:update`
+  - `admin:trivia:queue:called` / `admin:trivia:queue:skipped` / `admin:trivia:queue:update`
+- Broadcast helpers: `broadcastToBusiness`, `broadcastToAdmins`, `broadcastToSpin`, `broadcastToDraw`, `broadcastToTrivia`, `broadcastToQueue`, `broadcastToTriviaQueue`.
+
+**Client-side hooks**
+
+- `src/lib/socket/useSocket.ts` — React wrapper around `socket.io-client` with `on`, `emit`, and cleanup.
+
+**Public/spin queue integration**
+
+- Schema additions in `src/db/spinning_wheel_advanced.sql` — new tables `spin_queue_entries`, `spin_queue_settings`, and queue functions (`join_spin_queue`, `call_next_spin`, `complete_queued_spin`, `skip_current_spinner`, `get_spin_queue`, `get_user_queue_position`).
+- `src/app/(public)/[businessSlug]/spin/[gameId]/page.tsx` — queue state (`inQueue`, `queuePosition`, `isMyTurn`), UI branches for Join Queue / Waiting / Your Turn with spin buttons, socket listeners for `queue:called`, `queue:skipped`, `queue:update`, and periodic queue status polling.
+- `src/app/(public)/[businessSlug]/spin/live/[gameId]/page.tsx` — socket listeners wired to drive the live broadcast wheel when a queue event fires.
+
+**Public/trivia queue integration**
+
+- `src/app/(public)/[businessSlug]/trivia/[challengeId]/page.tsx` — socket listeners for `trivia:queue:called`, `trivia:queue:skipped`, `trivia:queue:update` to refresh `currentAnsweringUser` and queue state.
+- `src/app/(admin)/admin/[businessSlug]/trivia/[triviaId]/live-controls/page.tsx` — emits `admin:trivia:queue:update` on status changes, extensions, score adjustments, and announcements.
+
+**Removed**
+
+- Deleted `src/app/api/engage/spin/route.ts` per your request.

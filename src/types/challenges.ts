@@ -35,7 +35,7 @@ export interface TriviaScoringConfig {
 
 export interface PrizeTier {
   rank: number;
-  prize_type: "points" | "discount" | "product";
+  prize_type: "points" | "discount" | "product" | "badge";
   prize_value: string | number;
   badge?: string;
   description?: string;
@@ -88,7 +88,14 @@ export interface TriviaSelection {
   question_shown_at: string;
   answer_submitted_at: string | null;
   response_time_ms: number | null;
-  status: "queued" | "current" | "answered" | "timeout" | "passed" | "skipped" | "eliminated";
+  status:
+    | "queued"
+    | "current"
+    | "answered"
+    | "timeout"
+    | "passed"
+    | "skipped"
+    | "eliminated";
 }
 
 export interface TriviaScore {

@@ -31,10 +31,9 @@ import { PlanLimitBanner } from "@/components/billing/PlanLimitBanner";
 
 export default function BusinessAdminDashboard() {
   const { businessSlug } = useParams<{ businessSlug: string }>();
-  const { supabase, profile } = useAuth();
+  const { supabase, profile, business, setBusiness } = useAuth();
   const router = useRouter();
 
-  const [business, setBusiness] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalSpins: 0,

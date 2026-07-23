@@ -42,6 +42,16 @@ CREATE TABLE IF NOT EXISTS spin_games (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Spin Game Eligibility
+-- Eligibility rules
+    ALTER TABLE spin_games ADD COLUMN IF NOT EXISTS eligible_tiers text[] DEFAULT '{}';
+    ALTER TABLE spin_games ADD COLUMN IF NOT EXISTS min_points_required integer DEFAULT 0;
+    ALTER TABLE spin_games ADD COLUMN IF NOT EXISTS requires_purchase_count integer DEFAULT 0;
+    ALTER TABLE spin_games ADD COLUMN IF NOT EXISTS new_customer_only boolean DEFAULT false;
+    ALTER TABLE spin_games ADD COLUMN IF NOT EXISTS game_type text NOT NULL DEFAULT 'standard' CHECK (game_type IN ('standard', 'vip', 'new_customer', 'weekend', 'flash'));
+    ALTER TABLE spin_games ADD COLUMN IF NOT EXISTS live_theme text DEFAULT 'default';
+    ALTER TABLE spin_games ADD COLUMN IF NOT EXISTS queue_enabled boolean default false;
+
 -- 2. Spin attempts
 CREATE TABLE IF NOT EXISTS spin_attempts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

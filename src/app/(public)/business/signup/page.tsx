@@ -32,13 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
+import { generateSlug } from "@/lib/utils";
 
 export default function BusinessSignupPage() {
   const [step, setStep] = useState<"form" | "creating" | "done">("form");

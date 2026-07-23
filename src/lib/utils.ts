@@ -26,6 +26,13 @@ export function formatCurrency(
   }).format(amount);
 }
 
+export function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
 export const formatKES = (amount: number) => {
   return new Intl.NumberFormat("en-KE", {
     style: "currency",

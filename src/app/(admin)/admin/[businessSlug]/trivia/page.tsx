@@ -116,10 +116,7 @@ const CHALLENGE_TYPES = [
 ];
 
 export default function AdminChallengesPage() {
-  const { businessSlug } = useParams<{ businessSlug: string }>();
-  const { supabase } = useAuth();
-  const router = useRouter();
-  const [business, setBusiness] = useState<any>(null);
+  const { supabase, business } = useAuth();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(
@@ -145,19 +142,6 @@ export default function AdminChallengesPage() {
   useEffect(() => {
     fetchChallenges();
   }, [fetchChallenges]);
-
-  useEffect(() => {
-    const loadBusiness = async () => {
-      if (!businessSlug) return;
-      const { data: biz } = await supabase
-        .from("businesses")
-        .select("id")
-        .eq("slug", businessSlug)
-        .single();
-      if (biz) setBusiness(biz);
-    };
-    loadBusiness();
-  }, [businessSlug, supabase]);
 
   const updateChallengeStatus = async (id: string, status: string) => {
     const { error } = await supabase
@@ -369,16 +353,6 @@ export default function AdminChallengesPage() {
                   </div>
                 </div>
 
-                {/* Teams Indicator */}
-                {challenge.allow_teams && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <UsersRound className="h-3 w-3" />
-                    <span>
-                      Team challenge • Max {challenge.max_team_size} per team
-                    </span>
-                  </div>
-                )}
-
                 {/* Actions */}
                 <div className="flex gap-2 pt-2">
                   <Button
@@ -524,7 +498,7 @@ function ChallengeForm({
   initialChallenge: Challenge | null;
   onSave: () => void;
 }) {
-  const { supabase } = useAuth();
+  const { supabase, business } = useAuth();
   const [formData, setFormData] = useState<any>(() => {
     if (initialChallenge) return initialChallenge;
 

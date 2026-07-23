@@ -18,10 +18,13 @@ import {
 } from "@supabase/supabase-js";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { ProfileData } from "@/types/customer";
+import { Business } from "@/types/business";
 
 interface AuthContextType {
   profile: ProfileData | null;
   setProfile: React.Dispatch<React.SetStateAction<ProfileData | null>>;
+  business: Business | null;
+  setBusiness: React.Dispatch<React.SetStateAction<Business | null>>;
   codeResponse: any;
   setCodeResponse: React.Dispatch<React.SetStateAction<any | null>>;
   loading: boolean;
@@ -47,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState<boolean>(true);
   const [supabase] = useState(() => getSupabaseClient());
   const [codeResponse, setCodeResponse] = useState<any>(null);
+  const [business, setBusiness] = useState<any>(null);
 
   const fetchUser = useCallback(
     async (supabaseUser: SupabaseUser) => {
@@ -288,6 +292,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return {
       profile,
       setProfile,
+      business,
+      setBusiness,
       codeResponse,
       setCodeResponse,
       loading,
@@ -301,6 +307,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [
     profile,
+    business,
     loading,
     supabase,
     deleteFileFromSupabase,

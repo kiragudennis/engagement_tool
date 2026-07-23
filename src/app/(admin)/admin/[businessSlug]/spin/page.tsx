@@ -65,6 +65,7 @@ import {
 import { toast } from "sonner";
 import { SpinGame, PrizeSegment } from "@/types/spinning-wheel";
 import { useSocket } from "@/lib/socket/useSocket";
+import { generateSlug } from "@/lib/utils";
 
 const PRIZE_COLORS = [
   "#FF6B6B",
@@ -151,10 +152,8 @@ const PRIZE_TYPES = [
 ];
 
 export default function SpinningWheelAdmin() {
-  const { businessSlug } = useParams<{ businessSlug: string }>();
-  const { supabase } = useAuth();
+  const { supabase, business } = useAuth();
   const router = useRouter();
-  const [business, setBusiness] = useState<any>(null);
   const [games, setGames] = useState<SpinGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGame, setSelectedGame] = useState<SpinGame | null>(null);
@@ -266,8 +265,12 @@ export default function SpinningWheelAdmin() {
       }
       toast.success(`Called ticket #${data.ticket_number}`);
       await loadQueue(queueGameId);
-      
-      emitQueue(`admin:queue:called`, { gameId: queueGameId, user_id: data.user_id, ticket_number: data.ticket_number });
+
+      emitQueue(`admin:queue:called`, {
+        gameId: queueGameId,
+        user_id: data.user_id,
+        ticket_number: data.ticket_number,
+      });
     } catch (err: any) {
       toast.error(err.message || "Failed to call next");
     } finally {
@@ -288,7 +291,7 @@ export default function SpinningWheelAdmin() {
       }
       toast.success("Skipped current spinner");
       await loadQueue(queueGameId);
-      
+
       emitQueue(`admin:queue:skipped`, { gameId: queueGameId });
     } catch (err: any) {
       toast.error(err.message || "Failed to skip");
@@ -296,14 +299,12 @@ export default function SpinningWheelAdmin() {
   };
 
   const toggleQueue = async (gameId: string, currentEnabled: boolean) => {
-    const { error } = await supabase
-      .from("spin_queue_settings")
-      .upsert({
-        game_id: gameId,
-        business_id: business?.id,
-        queue_enabled: !currentEnabled,
-        updated_at: new Date().toISOString(),
-      });
+    const { error } = await supabase.from("spin_queue_settings").upsert({
+      game_id: gameId,
+      business_id: business?.id,
+      queue_enabled: !currentEnabled,
+      updated_at: new Date().toISOString(),
+    });
     if (error) {
       toast.error("Failed to update queue settings");
     } else {
@@ -320,19 +321,6 @@ export default function SpinningWheelAdmin() {
     );
   };
 
-  useEffect(() => {
-    const loadBusiness = async () => {
-      if (!businessSlug) return;
-      const { data: biz } = await supabase
-        .from("businesses")
-        .select("id")
-        .eq("slug", businessSlug)
-        .single();
-      if (biz) setBusiness(biz);
-    };
-    loadBusiness();
-  }, [businessSlug, supabase]);
-
   if (loading) {
     return (
       <div className="container mx-auto py-8 flex justify-center items-center h-64">
@@ -341,36 +329,8 @@ export default function SpinningWheelAdmin() {
     );
   }
 
-  function useSocketRealtime(
-    businessId: string | undefined,
-    onEvent: () => void,
-  ) {
-    const { on } = useSocket();
-
-    useEffect(() => {
-      if (!businessId) return;
-
-      const unsub1 = on("spin:result", (data: any) => {
-        if (data.business_id === businessId) {
-          onEvent();
-        }
-      });
-
-      const unsub2 = on("spin:start", (data: any) => {
-        if (data.business_id === businessId) {
-          onEvent();
-        }
-      });
-
-      return () => {
-        unsub1?.();
-        unsub2?.();
-      };
-    }, [businessId, on, onEvent]);
-  }
-
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="container mx-auto py-6 px-4 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -405,6 +365,140 @@ export default function SpinningWheelAdmin() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Queue Management */}
+      {games.length > 0 && (
+        <Card className="border-white/10 mt-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Queue Management
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-3 w-full">
+              <Select
+                value={queueGameId || ""}
+                onValueChange={(e) => {
+                  const id = e;
+                  setQueueGameId(id || null);
+                  if (id) loadQueue(id);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a game to manage queue.." />
+                </SelectTrigger>
+                <SelectContent className="w-full">
+                  {games.map((g) => (
+                    <SelectItem key={g.id} value={g.id}>
+                      {g.name} {g.queue_enabled ? "(Queue ON)" : "(Queue OFF)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {queueGameId && (
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    toggleQueue(
+                      queueGameId,
+                      games.find((g) => g.id === queueGameId)?.queue_enabled ||
+                        false,
+                    )
+                  }
+                  className="gap-2"
+                >
+                  <Settings className="h-4 w-4" />
+                  {games.find((g) => g.id === queueGameId)?.queue_enabled
+                    ? "Disable Queue"
+                    : "Enable Queue"}
+                </Button>
+              )}
+            </div>
+
+            {queueGameId && (
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleCallNext}
+                    disabled={callingNext || !queueGameId}
+                    className="gap-2"
+                  >
+                    {callingNext ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Play className="h-4 w-4" />
+                    )}
+                    Call Next
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleSkipCurrent}
+                    className="gap-2"
+                  >
+                    <SkipForward className="h-4 w-4" />
+                    Skip Current
+                  </Button>
+                </div>
+
+                {queueLoading ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
+                  </div>
+                ) : (
+                  <div className="max-h-[400px] overflow-y-auto space-y-2">
+                    {queueEntries.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-4">
+                        No one in queue
+                      </p>
+                    ) : (
+                      queueEntries.map((entry) => (
+                        <div
+                          key={entry.id}
+                          className={`flex items-center justify-between p-3 rounded-lg ${
+                            entry.status === "current"
+                              ? "bg-green-500/10 border border-green-500/30"
+                              : entry.status === "spinning"
+                                ? "bg-blue-500/10 border border-blue-500/30"
+                                : entry.status === "completed"
+                                  ? "bg-gray-500/10 border border-gray-500/30"
+                                  : "bg-white/5"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Badge
+                              variant={
+                                entry.status === "current"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                            >
+                              #{entry.ticket_number}
+                            </Badge>
+                            <div>
+                              <p className="text-sm font-medium">
+                                {entry.user_name || "Customer"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {entry.status}
+                              </p>
+                            </div>
+                          </div>
+                          {entry.prize_display && (
+                            <Badge variant="outline" className="text-xs">
+                              {entry.prize_display}
+                            </Badge>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Games Grid - Active Games Section */}
       {games.filter((g) => g.is_active).length > 0 && (
@@ -493,123 +587,6 @@ export default function SpinningWheelAdmin() {
                 </Button>
               </DialogTrigger>
             </Dialog>
-          </CardContent>
-        </Card>
-      )}
-      
-      {/* Queue Management */}
-      {games.length > 0 && (
-        <Card className="border-white/10 mt-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Queue Management
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-3">
-              <select
-                className="flex-1 min-w-[200px] p-2 rounded-lg border border-white/10 bg-transparent"
-                value={queueGameId || ""}
-                onChange={(e) => {
-                  const id = e.target.value;
-                  setQueueGameId(id || null);
-                  if (id) loadQueue(id);
-                }}
-              >
-                <option value="">Select a game to manage queue...</option>
-                {games.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name} {g.queue_enabled ? "(Queue ON)" : "(Queue OFF)"}
-                  </option>
-                ))}
-              </select>
-              {queueGameId && (
-                <Button
-                  variant="outline"
-                  onClick={() => toggleQueue(queueGameId, games.find(g => g.id === queueGameId)?.queue_enabled || false)}
-                  className="gap-2"
-                >
-                  <Settings className="h-4 w-4" />
-                  {games.find(g => g.id === queueGameId)?.queue_enabled ? "Disable Queue" : "Enable Queue"}
-                </Button>
-              )}
-            </div>
-
-            {queueGameId && (
-              <div className="space-y-3">
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleCallNext}
-                    disabled={callingNext || !queueGameId}
-                    className="gap-2"
-                  >
-                    {callingNext ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Play className="h-4 w-4" />
-                    )}
-                    Call Next
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleSkipCurrent}
-                    className="gap-2"
-                  >
-                    <SkipForward className="h-4 w-4" />
-                    Skip Current
-                  </Button>
-                </div>
-
-                {queueLoading ? (
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
-                  </div>
-                ) : (
-                  <div className="max-h-[400px] overflow-y-auto space-y-2">
-                    {queueEntries.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-4">
-                        No one in queue
-                      </p>
-                    ) : (
-                      queueEntries.map((entry) => (
-                        <div
-                          key={entry.id}
-                          className={`flex items-center justify-between p-3 rounded-lg ${
-                            entry.status === "current"
-                              ? "bg-green-500/10 border border-green-500/30"
-                              : entry.status === "spinning"
-                              ? "bg-blue-500/10 border border-blue-500/30"
-                              : entry.status === "completed"
-                              ? "bg-gray-500/10 border border-gray-500/30"
-                              : "bg-white/5"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <Badge variant={entry.status === "current" ? "default" : "secondary"}>
-                              #{entry.ticket_number}
-                            </Badge>
-                            <div>
-                              <p className="text-sm font-medium">
-                                {entry.user_name || "Customer"}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {entry.status}
-                              </p>
-                            </div>
-                          </div>
-                          {entry.prize_display && (
-                            <Badge variant="outline" className="text-xs">
-                              {entry.prize_display}
-                            </Badge>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
           </CardContent>
         </Card>
       )}
@@ -998,6 +975,7 @@ function GameForm({
         starts_at: formData.starts_at,
         ends_at: formData.ends_at,
         is_active: formData.is_active,
+        queue_enabled: formData.queue_enabled,
         live_theme: formData.live_theme,
         show_confetti: formData.show_confetti,
         play_sounds: formData.play_sounds,
@@ -1034,9 +1012,14 @@ function GameForm({
             <Label>Game Name *</Label>
             <Input
               value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
+              onChange={(e) => {
+                const name = e.target.value;
+                setFormData({
+                  ...formData,
+                  name, // Auto-generate slug when name changes
+                  slug: generateSlug(name),
+                });
+              }}
               placeholder="e.g., Weekend Wonder Wheel"
             />
           </div>
@@ -1047,7 +1030,7 @@ function GameForm({
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  slug: e.target.value.toLowerCase().replace(/\s+/g, "-"),
+                  slug: generateSlug(e.target.value),
                 })
               }
               placeholder="weekend-wonder-wheel"
@@ -1069,8 +1052,8 @@ function GameForm({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
+          <div className="flex flex-col gap-2">
             <Label>Game Type</Label>
             <Select
               value={formData.game_type}
@@ -1093,7 +1076,7 @@ function GameForm({
               </SelectContent>
             </Select>
           </div>
-          <div>
+          <div className="flex flex-col gap-2">
             <Label>Eligible Tiers</Label>
             <Select
               value={formData.eligible_tiers.join(",")}
@@ -1118,10 +1101,19 @@ function GameForm({
               </SelectContent>
             </Select>
           </div>
+          <div className="flex flex-col gap-2">
+            <Label>Enable Queue</Label>
+            <Switch
+              checked={formData.queue_enabled}
+              onCheckedChange={(checked) =>
+                setFormData({ ...formData, queue_enabled: checked })
+              }
+            />
+          </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
-          <div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
+          <div className="flex flex-col gap-2">
             <Label>Free Spins / Day</Label>
             <Input
               type="number"
@@ -1134,7 +1126,7 @@ function GameForm({
               }
             />
           </div>
-          <div>
+          <div className="flex flex-col gap-2">
             <Label>Free Spins / Week</Label>
             <Input
               type="number"
@@ -1147,7 +1139,7 @@ function GameForm({
               }
             />
           </div>
-          <div>
+          <div className="flex flex-col gap-2">
             <Label>Free Spins (Lifetime)</Label>
             <Input
               type="number"
@@ -1162,7 +1154,7 @@ function GameForm({
           </div>
         </div>
 
-        <div>
+        <div className="flex flex-col gap-2">
           <Label>Points Per Paid Spin</Label>
           <Input
             type="number"

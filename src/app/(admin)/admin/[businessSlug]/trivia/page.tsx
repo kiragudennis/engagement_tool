@@ -62,6 +62,7 @@ import { format } from "date-fns";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Challenge } from "@/types/challenges";
+import { getPlanLimits, isUnlimited } from "@/lib/config/plans";
 
 const CHALLENGE_TYPES = [
   {
@@ -582,6 +583,15 @@ function ChallengeForm({
   const handleSubmit = async () => {
     setSaving(true);
     try {
+      if (!initialChallenge) {
+        const limits = business?.plan ? getPlanLimits(business.plan) : null;
+        if (!limits || (!isUnlimited(limits.maxTriviaChallenges) && challenges.length >= limits.maxTriviaChallenges)) {
+          toast.error(`You've reached your plan limit of ${limits?.maxTriviaChallenges || 0} trivia challenges. Upgrade to add more.`);
+          setSaving(false);
+          return;
+        }
+      }
+
       const slug = formData.slug || generateSlug(formData.name);
       const { error } = await supabase
         .from("challenges")

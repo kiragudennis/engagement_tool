@@ -2,7 +2,6 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,6 +24,8 @@ import {
   Radio,
   FunnelPlus,
   CirclePause,
+  Trophy,
+  Coins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -321,32 +322,52 @@ export default function DocsPage() {
                       <h3 className="text-white font-semibold mb-4">
                         Code Types
                       </h3>
+                      <p className="text-white/50 text-sm mb-4">
+                        All codes are generated through a unified{" "}
+                        <code className="text-purple-400">
+                          business code generator
+                        </code>
+                        . The pattern includes your business prefix, plan type,
+                        code subtype, sequence number, and a random string.
+                      </p>
                       <div className="space-y-4">
                         {[
                           {
+                            type: "Receipt Codes",
+                            pattern: "{PREFIX}-{PLAN}R-{SEQ}-{RAND}",
+                            example: "BREW-PR-00042-A7X9",
+                            desc: "Generated via API from POS, e-commerce, or manual checkout. Points = Cart Amount × Business Multiplier. Activates the customer.",
+                            tiers: "Calculated per transaction",
+                            badge: "R",
+                            color: "green",
+                          },
+                          {
                             type: "Sticker Codes",
-                            pattern: "BREW-S-0001-A7X9",
+                            pattern: "{PREFIX}-{PLAN}S-{SEQ}-{RAND}",
+                            example: "BREW-PS-00001-B3K2",
                             desc: "Pre-printed on products. Each tier has a fixed point value. Activates the customer for 30 days.",
                             tiers:
                               "Bronze (5pts), Silver (25pts), Gold (100pts), Diamond (500pts)",
-                          },
-                          {
-                            type: "Receipt Codes",
-                            pattern: "BREW-R-260714-A7X9",
-                            desc: "Generated via POS API. Points = Cart Amount × Business Multiplier. Activates the customer.",
-                            tiers: "Calculated per transaction",
+                            badge: "S",
+                            color: "blue",
                           },
                           {
                             type: "Public Marketing Codes",
-                            pattern: "BREW-PUB-WEEKEND",
+                            pattern: "{PREFIX}-{PLAN}P-{SEQ}-{RAND}",
+                            example: "BREW-PP-00015-C7D1",
                             desc: "Shared on social media. Requires prior activation. Awards default points. Does NOT extend activation.",
                             tiers: "Business default points",
+                            badge: "P",
+                            color: "amber",
                           },
                           {
                             type: "QR Codes",
-                            pattern: "BREW-QR-0001",
+                            pattern: "{PREFIX}-{PLAN}Q-{SEQ}-{RAND}",
+                            example: "BREW-PQ-00008-E5F3",
                             desc: "Printed at the counter. Activates new customers who scan it in-store.",
                             tiers: "Business default points",
+                            badge: "Q",
+                            color: "purple",
                           },
                         ].map((code, i) => (
                           <div
@@ -354,21 +375,66 @@ export default function DocsPage() {
                             className="p-4 rounded-lg bg-white/5 border border-white/10"
                           >
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
-                              <h4 className="text-white font-medium">
-                                {code.type}
-                              </h4>
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-white font-medium">
+                                  {code.type}
+                                </h4>
+                                <Badge
+                                  className={cn(
+                                    "text-xs border-0",
+                                    code.badge === "R" &&
+                                      "bg-green-500/20 text-green-400",
+                                    code.badge === "S" &&
+                                      "bg-blue-500/20 text-blue-400",
+                                    code.badge === "P" &&
+                                      "bg-amber-500/20 text-amber-400",
+                                    code.badge === "Q" &&
+                                      "bg-purple-500/20 text-purple-400",
+                                  )}
+                                >
+                                  {code.badge}
+                                </Badge>
+                              </div>
                               <code className="text-purple-400 text-xs font-mono break-all">
-                                {code.pattern}
+                                {code.example}
                               </code>
                             </div>
-                            <p className="text-white/50 text-sm mb-2">
+                            <p className="text-white/50 text-sm mb-1">
                               {code.desc}
+                            </p>
+                            <p className="text-white/30 text-xs mb-1">
+                              Pattern:{" "}
+                              <code className="text-purple-400/60 font-mono">
+                                {code.pattern}
+                              </code>
                             </p>
                             <p className="text-white/30 text-xs">
                               Points: {code.tiers}
                             </p>
                           </div>
                         ))}
+                      </div>
+
+                      <div className="mt-4 p-3 rounded-lg bg-black/30">
+                        <p className="text-white/40 text-xs">
+                          <strong className="text-white">Plan Types:</strong>{" "}
+                          S=Starter, P=Pro, E=Enterprise &nbsp;|&nbsp;
+                          <strong className="text-white">
+                            {" "}
+                            Subtypes:
+                          </strong>{" "}
+                          R=Receipt, S=Sticker, P=Public, Q=QR &nbsp;|&nbsp;
+                          <strong className="text-white"> Prefix:</strong> First
+                          4 letters of your business slug
+                        </p>
+                        <p className="text-white/30 text-xs mt-2">
+                          Example:{" "}
+                          <code className="text-purple-400/60">
+                            BREW-PR-00042-A7X9
+                          </code>{" "}
+                          = Business "Brew & Bean" (BREW) + Pro Plan (P) +
+                          Receipt (R) + Sequence #42 + Random code A7X9
+                        </p>
                       </div>
                     </CardContent>
                   </Card>
@@ -416,8 +482,8 @@ export default function DocsPage() {
                         <p>
                           Each new sticker or receipt code{" "}
                           <strong className="text-white">extends</strong>
-                          the activation by another 30 days. Loyal customers
-                          stay active as long as they keep engaging.
+                          the activation by another 30 days (default). Loyal
+                          customers stay active as long as they keep engaging.
                         </p>
                       </div>
                     </CardContent>
@@ -435,11 +501,12 @@ export default function DocsPage() {
                   <Card className="bg-white/5 border-white/10">
                     <CardContent className="p-6">
                       <h3 className="text-white font-semibold mb-4">
-                        Rarity Tiers
+                        Rarity Tiers & Unlocks
                       </h3>
                       <p className="text-white/50 text-sm mb-4">
                         Create a treasure hunt experience by mixing different
-                        rarity codes on your products.
+                        rarity codes on your products. Higher tiers don't just
+                        give more points — they unlock better experiences.
                       </p>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         {[
@@ -449,6 +516,8 @@ export default function DocsPage() {
                             color: "#CD7F32",
                             points: 5,
                             pct: "70%",
+                            unlocks: "Points Only",
+                            unlocksDesc: "Earn points, come back to spin",
                             desc: "Most common",
                           },
                           {
@@ -457,6 +526,8 @@ export default function DocsPage() {
                             color: "#C0C0C0",
                             points: 25,
                             pct: "20%",
+                            unlocks: "Spin Access",
+                            unlocksDesc: "Unlocks the spin wheel",
                             desc: "Uncommon",
                           },
                           {
@@ -465,6 +536,8 @@ export default function DocsPage() {
                             color: "#FFD700",
                             points: 100,
                             pct: "8%",
+                            unlocks: "Spin + Draws",
+                            unlocksDesc: "Spin wheel & auto-enter draws",
                             desc: "Rare",
                           },
                           {
@@ -473,6 +546,8 @@ export default function DocsPage() {
                             color: "#B9F2FF",
                             points: 500,
                             pct: "2%",
+                            unlocks: "VIP Access",
+                            unlocksDesc: "Spins, draws, VIP status",
                             desc: "Ultra rare",
                           },
                         ].map((t) => (
@@ -492,7 +567,7 @@ export default function DocsPage() {
                               {t.points} points
                             </p>
                             <Badge
-                              className="mt-1 text-xs"
+                              className="mt-1 mb-1 text-xs"
                               style={{
                                 backgroundColor: `${t.color}20`,
                                 color: t.color,
@@ -500,11 +575,160 @@ export default function DocsPage() {
                             >
                               {t.pct} of codes
                             </Badge>
-                            <p className="text-white/30 text-xs mt-1">
+                            <p className="text-white/50 text-xs font-medium">
+                              {t.unlocks}
+                            </p>
+                            <p className="text-white/30 text-xs mt-0.5">
+                              {t.unlocksDesc}
+                            </p>
+                            <p className="text-white/20 text-xs mt-1">
                               {t.desc}
                             </p>
                           </div>
                         ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-6">
+                      <h3 className="text-white font-semibold mb-4">
+                        How Unlocks Work
+                      </h3>
+                      <div className="space-y-3 text-white/60 text-sm leading-relaxed">
+                        <p>
+                          Each rarity tier can be configured with different{" "}
+                          <strong className="text-white">unlock levels</strong>{" "}
+                          that control what a customer can do after redeeming
+                          that code:
+                        </p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                          {[
+                            {
+                              level: "Points Only",
+                              icon: Coins,
+                              desc: "Customer earns points but needs another code to access the spin wheel. Creates urgency to find more codes.",
+                              example:
+                                "Bronze stickers: 'You earned 5 points! Find a Silver code to unlock the spin wheel!'",
+                            },
+                            {
+                              level: "Spin Access",
+                              icon: RotateCcw,
+                              desc: "Customer can spin the wheel. Good for mid-tier rewards that feel like a real prize unlock.",
+                              example:
+                                "Silver stickers: 'You unlocked the spin wheel! 25 bonus points!'",
+                            },
+                            {
+                              level: "Spin + Draws",
+                              icon: Gift,
+                              desc: "Customer gets spin access AND is automatically entered into active prize draws. Premium experience.",
+                              example:
+                                "Gold/Diamond: 'JACKPOT! Spins, draws, and points!'",
+                            },
+                            {
+                              level: "Draws Only",
+                              icon: Trophy,
+                              desc: "Customer is entered into draws but can't spin. Useful for special promotional stickers.",
+                              example:
+                                "Event stickers: 'You've been entered into our grand prize draw!'",
+                            },
+                          ].map((item, i) => (
+                            <div key={i} className="p-3 rounded-lg bg-white/5">
+                              <div className="flex items-center gap-2 mb-1">
+                                <item.icon className="h-4 w-4 text-purple-400" />
+                                <span className="text-white font-medium text-sm">
+                                  {item.level}
+                                </span>
+                              </div>
+                              <p className="text-white/50 text-xs mb-2">
+                                {item.desc}
+                              </p>
+                              <p className="text-purple-400/60 text-xs italic">
+                                {item.example}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+
+                        <p className="mt-4">
+                          <strong className="text-white">
+                            Why this matters:
+                          </strong>{" "}
+                          A Diamond sticker shouldn't just give more points — it
+                          should <em>feel</em> like finding a golden ticket. By
+                          gating features behind rarity tiers, you create
+                          genuine excitement when customers find rare codes.
+                          They'll buy more products hoping for that Silver or
+                          Gold sticker.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-6">
+                      <h3 className="text-white font-semibold mb-4">
+                        Customer Experience by Tier
+                      </h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-white/10">
+                              <th className="text-left p-2 text-white/40 font-medium">
+                                Tier
+                              </th>
+                              <th className="text-left p-2 text-white/40 font-medium">
+                                Points
+                              </th>
+                              <th className="text-left p-2 text-white/40 font-medium">
+                                Unlocks
+                              </th>
+                              <th className="text-left p-2 text-white/40 font-medium">
+                                Customer Sees
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[
+                              [
+                                "🥉 Bronze",
+                                "5 pts",
+                                "Points Only",
+                                "You earned 5 points! Come back with another code to spin!",
+                              ],
+                              [
+                                "🥈 Silver",
+                                "25 pts",
+                                "Spin Access",
+                                "You unlocked the spin wheel! 25 bonus points!",
+                              ],
+                              [
+                                "🥇 Gold",
+                                "100 pts",
+                                "Spin + Draws",
+                                "You unlocked spins AND entered our monthly draw! 100 points!",
+                              ],
+                              [
+                                "💎 Diamond",
+                                "500 pts",
+                                "VIP Access",
+                                "JACKPOT! Spins, draws, and 500 points! You're a VIP!",
+                              ],
+                            ].map((row, i) => (
+                              <tr key={i} className="border-b border-white/5">
+                                <td className="p-2 text-white/70">{row[0]}</td>
+                                <td className="p-2 text-white/50">{row[1]}</td>
+                                <td className="p-2 text-purple-400">
+                                  {row[2]}
+                                </td>
+                                <td className="p-2 text-white/40 text-xs">
+                                  {row[3]}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </CardContent>
                   </Card>
@@ -534,7 +758,7 @@ export default function DocsPage() {
                               Sticker Batch Generator
                             </strong>{" "}
                             in your dashboard to create batches with your chosen
-                            rarity distribution.
+                            rarity distribution and per-tier unlocks.
                           </span>
                         </li>
                         <li className="flex gap-3">
@@ -542,8 +766,9 @@ export default function DocsPage() {
                             3
                           </span>
                           <span>
-                            Print the stickers and apply them to your products
-                            before customers arrive.
+                            Each sticker is printed with its rarity color, point
+                            value, unlock level, QR code, and unique code.
+                            Customers can immediately see what they've won.
                           </span>
                         </li>
                         <li className="flex gap-3">
@@ -568,7 +793,7 @@ export default function DocsPage() {
                   Integration
                 </h2>
 
-                <Card className="bg-white/5 border-white/10">
+                <Card className="bg-white/5 border-white/10 mb-6">
                   <CardContent className="p-6 space-y-4">
                     <div className="flex items-center gap-2">
                       <Badge className="bg-blue-500/20 text-blue-400 border-0">
@@ -576,51 +801,211 @@ export default function DocsPage() {
                       </Badge>
                     </div>
                     <p className="text-white/50 text-sm">
-                      Available on Pro and Enterprise plans. Your POS system
-                      sends the cart total to Engage, and we return a unique
-                      code with calculated points.
+                      Connect your existing POS system to Engage. Every
+                      transaction automatically generates a unique code with
+                      points based on the cart total. Printed directly on your
+                      existing receipts.
                     </p>
 
-                    <div className="p-4 rounded-lg bg-black/30 font-mono text-sm overflow-x-auto">
-                      <p className="text-white/40 mb-2">
-                        // Example: Your POS sends this to Engage
-                      </p>
-                      <p className="text-green-400">POST</p>
-                      <p className="text-yellow-400">
-                        https://engagespin.com/api/business/receipt/generate
-                      </p>
-                      <p className="text-white/40 mt-2">Headers:</p>
-                      <p className="text-purple-400">
-                        {" "}
-                        x-api-key: engage_live_abc123...
-                      </p>
-                      <p className="text-purple-400">
-                        {" "}
-                        Content-Type: application/json
-                      </p>
-                      <p className="text-white/40 mt-2">Body:</p>
-                      <p className="text-white/60 whitespace-pre-wrap">{`{
-  "amount": 250.00,
-  "items": [
-    { "name": "Latte", "qty": 2, "price": 125.00 }
-  ],
-  "cashier": "Jane"
-}`}</p>
-                      <p className="text-white/40 mt-2">Response:</p>
-                      <p className="text-white/60 whitespace-pre-wrap">{`{
-  "success": true,
-  "receipt": {
-    "code": "BREW-R-260714-A7X9",
-    "points_earned": 500,
-    "amount": 250.00
-  }
-}`}</p>
-                    </div>
+                    {/* What the customer gets based on what you send */}
+                    <Card className="bg-white/5 border-white/10">
+                      <CardContent className="p-4">
+                        <h4 className="text-white font-medium text-sm mb-3 flex items-center gap-2">
+                          <Gift className="h-4 w-4 text-purple-400" />
+                          What Your Customer Gets
+                        </h4>
+                        <p className="text-white/50 text-xs mb-3">
+                          When your POS sends a request to Engage, you can
+                          control exactly what the customer unlocks by setting
+                          the <code className="text-purple-400">unlocks</code>{" "}
+                          parameter. This lets you tailor the experience based
+                          on purchase value, customer loyalty, or promotional
+                          campaigns.
+                        </p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {[
+                            {
+                              unlock: "points",
+                              icon: Coins,
+                              desc: "Customer earns points only. They'll need another code (sticker or receipt) to access the spin wheel. Best for small purchases where you want to encourage repeat visits.",
+                              example: "Cart total < KES 100 → Points only",
+                              label: "Points Only",
+                            },
+                            {
+                              unlock: "spin",
+                              icon: RotateCcw,
+                              desc: "Customer unlocks the spin wheel immediately. Great for mid-tier purchases that deserve a reward.",
+                              example: "Cart total KES 100-500 → Spin access",
+                              label: "Spin Access",
+                            },
+                            {
+                              unlock: "draw",
+                              icon: Trophy,
+                              desc: "Customer is automatically entered into your active prize draws but can't spin. Perfect for promotional periods or when you want to build anticipation.",
+                              example: "Weekend promotion → Draw entry",
+                              label: "Draw Entry",
+                            },
+                            {
+                              unlock: "spin_draw",
+                              icon: Crown,
+                              desc: "The premium experience — customer gets both spin access AND automatic entry into prize draws. Use this for high-value purchases or VIP customers.",
+                              example: "Cart total > KES 500 → Spin + Draw",
+                              label: "Spin + Draw (Premium)",
+                            },
+                          ].map((item, i) => (
+                            <div
+                              key={i}
+                              className="p-3 rounded-lg bg-white/5 border border-white/10"
+                            >
+                              <div className="flex items-center gap-2 mb-2">
+                                <item.icon className="h-4 w-4 text-purple-400" />
+                                <Badge
+                                  className={cn(
+                                    "text-xs border-0",
+                                    item.unlock === "points" &&
+                                      "bg-gray-500/20 text-gray-400",
+                                    item.unlock === "spin" &&
+                                      "bg-blue-500/20 text-blue-400",
+                                    item.unlock === "draw" &&
+                                      "bg-amber-500/20 text-amber-400",
+                                    item.unlock === "spin_draw" &&
+                                      "bg-purple-500/20 text-purple-400",
+                                  )}
+                                >
+                                  {item.label}
+                                </Badge>
+                              </div>
+                              <p className="text-white/50 text-xs mb-2">
+                                {item.desc}
+                              </p>
+                              <p className="text-purple-400/60 text-xs italic">
+                                {item.example}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="mt-4 p-3 rounded-lg bg-purple-500/5 border border-purple-500/20">
+                          <h5 className="text-purple-400 font-medium text-xs mb-1">
+                            💡 How to Use This
+                          </h5>
+                          <ul className="space-y-1 text-purple-400/60 text-xs">
+                            <li>
+                              •{" "}
+                              <strong className="text-purple-300">
+                                Lower spend:
+                              </strong>{" "}
+                              Send{" "}
+                              <code className="text-purple-400">
+                                "unlocks": "points"
+                              </code>{" "}
+                              — customer earns points, needs to come back
+                            </li>
+                            <li>
+                              •{" "}
+                              <strong className="text-purple-300">
+                                Mid spend:
+                              </strong>{" "}
+                              Send{" "}
+                              <code className="text-purple-400">
+                                "unlocks": "spin"
+                              </code>{" "}
+                              — customer can spin immediately
+                            </li>
+                            <li>
+                              •{" "}
+                              <strong className="text-purple-300">
+                                High spend:
+                              </strong>{" "}
+                              Send{" "}
+                              <code className="text-purple-400">
+                                "unlocks": "spin_draw"
+                              </code>{" "}
+                              — premium experience rewards loyalty
+                            </li>
+                            <li>
+                              •{" "}
+                              <strong className="text-purple-300">
+                                Promotions:
+                              </strong>{" "}
+                              Send{" "}
+                              <code className="text-purple-400">
+                                "unlocks": "draw"
+                              </code>{" "}
+                              — build excitement for upcoming events
+                            </li>
+                          </ul>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* What Engage needs from your POS */}
+                    <Card className="bg-white/5 border-white/10">
+                      <CardContent className="p-4">
+                        <h4 className="text-white font-medium text-sm mb-3 flex items-center gap-2">
+                          <ShoppingBag className="h-4 w-4 text-blue-400" />
+                          What Engage Needs From Your POS
+                        </h4>
+                        <p className="text-white/50 text-xs mb-3">
+                          Engage does{" "}
+                          <strong className="text-white">not</strong> record
+                          your receipts or store your sales data. We only need
+                          the <strong className="text-white">cart total</strong>{" "}
+                          to calculate points. Everything else is optional.
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 rounded-lg bg-green-500/5 border border-green-500/20">
+                            <h5 className="text-green-400 font-medium text-xs mb-2 flex items-center gap-1">
+                              <Check className="h-3 w-3" /> Required
+                            </h5>
+                            <ul className="space-y-1 text-white/50 text-xs">
+                              <li>
+                                • <code className="text-green-400">amount</code>{" "}
+                                — Cart total (KES)
+                              </li>
+                            </ul>
+                          </div>
+                          <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                            <h5 className="text-blue-400 font-medium text-xs mb-2 flex items-center gap-1">
+                              <Zap className="h-3 w-3" /> Optional (for control)
+                            </h5>
+                            <ul className="space-y-1 text-white/50 text-xs">
+                              <li>
+                                • <code className="text-blue-400">unlocks</code>{" "}
+                                — What customer gets (default: "points")
+                              </li>
+                              <li>
+                                •{" "}
+                                <code className="text-blue-400">
+                                  pointsOverride
+                                </code>{" "}
+                                — Set exact points
+                              </li>
+                              <li>
+                                • <code className="text-blue-400">items</code> —
+                                Line items (for your records)
+                              </li>
+                              <li>
+                                •{" "}
+                                <code className="text-blue-400">
+                                  customerPhone
+                                </code>{" "}
+                                — Pre-fill customer info
+                              </li>
+                            </ul>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
 
                     <p className="text-white/50 text-sm">
-                      Your POS prints the code on the existing receipt. Points
-                      are automatically calculated based on your configured
-                      multiplier (e.g., 2.0 × KES 250 = 500 points).
+                      Points are automatically calculated based on your
+                      configured multiplier (e.g., 2.0 × KES 250 = 500 points).
+                      You can override this with{" "}
+                      <code className="text-purple-400">pointsOverride</code> if
+                      needed.
                     </p>
 
                     <Link href="/docs/api">
@@ -631,6 +1016,98 @@ export default function DocsPage() {
                         <Zap className="h-4 w-4" /> Full API Reference
                       </Button>
                     </Link>
+                  </CardContent>
+                </Card>
+
+                {/* Example scenarios */}
+                <Card className="bg-white/5 border-white/10">
+                  <CardContent className="p-6">
+                    <h3 className="text-white font-semibold mb-4">
+                      Real-World Examples
+                    </h3>
+                    <div className="space-y-4">
+                      {[
+                        {
+                          scenario: "Coffee Shop: Regular Customer",
+                          amount: "KES 150",
+                          multiplier: "2.0",
+                          points: "300",
+                          unlocks: "spin",
+                          result:
+                            "Spin the wheel for a chance to win a free drink next visit",
+                        },
+                        {
+                          scenario: "Restaurant: Big Group Order",
+                          amount: "KES 2,500",
+                          multiplier: "1.5",
+                          points: "3,750",
+                          unlocks: "spin_draw",
+                          result:
+                            "Spin the wheel AND entered into the monthly dinner draw",
+                        },
+                        {
+                          scenario: "Retail: Small Purchase (Promo Period)",
+                          amount: "KES 50",
+                          multiplier: "1.0",
+                          points: "50",
+                          unlocks: "draw",
+                          result:
+                            "Entered into the weekend prize draw, no spin access",
+                        },
+                        {
+                          scenario: "Loyalty Program: Points Only",
+                          amount: "KES 75",
+                          multiplier: "3.0 (Double points week)",
+                          points: "225",
+                          unlocks: "points",
+                          result:
+                            "Earn 225 loyalty points. Collect more codes to unlock the wheel!",
+                        },
+                      ].map((example, i) => (
+                        <div
+                          key={i}
+                          className="p-4 rounded-lg bg-white/5 border border-white/10"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                            <div>
+                              <h4 className="text-white font-medium text-sm">
+                                {example.scenario}
+                              </h4>
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                <Badge className="bg-white/10 text-white/60 text-xs">
+                                  Amount: {example.amount}
+                                </Badge>
+                                <Badge className="bg-white/10 text-white/60 text-xs">
+                                  Multiplier: {example.multiplier}
+                                </Badge>
+                                <Badge className="bg-green-500/20 text-green-400 text-xs">
+                                  Points: {example.points}
+                                </Badge>
+                                <Badge
+                                  className={cn(
+                                    "text-xs border-0",
+                                    example.unlocks === "points" &&
+                                      "bg-gray-500/20 text-gray-400",
+                                    example.unlocks === "spin" &&
+                                      "bg-blue-500/20 text-blue-400",
+                                    example.unlocks === "draw" &&
+                                      "bg-amber-500/20 text-amber-400",
+                                    example.unlocks === "spin_draw" &&
+                                      "bg-purple-500/20 text-purple-400",
+                                  )}
+                                >
+                                  {example.unlocks.replace("_", " + ")}
+                                </Badge>
+                              </div>
+                            </div>
+                            <div className="text-white/50 text-sm flex-shrink-0">
+                              <span className="text-white/30">→</span>{" "}
+                              {example.result}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </CardContent>
                 </Card>
               </section>
@@ -929,15 +1406,15 @@ export default function DocsPage() {
                         </thead>
                         <tbody>
                           {[
-                            ["Spin Games", "1", "3", "Unlimited"],
-                            ["Trivia Challenges", "1", "3", "Unlimited"],
-                            ["Active Draws", "1", "3", "Unlimited"],
-                            ["Engagements/month", "500", "5,000", "25,000"],
-                            ["Prize Slots", "6", "12", "24"],
-                            ["Trivia Questions", "20", "100", "Unlimited"],
-                            ["Access Codes", "10", "50", "Unlimited"],
-                            ["Admin Users", "1", "3", "10"],
-                            ["API Access", "❌", "✅", "✅"],
+                            ["Spin Games", "3", "10", "Unlimited"],
+                            ["Trivia Challenges", "3", "10", "Unlimited"],
+                            ["Active Draws", "3", "10", "Unlimited"],
+                            ["Engagements/month", "1,000", "10,000", "50,000"],
+                            ["Prize Slots", "12", "24", "36"],
+                            ["Trivia Questions", "50", "200", "Unlimited"],
+                            ["Access Codes", "50", "200", "Unlimited"],
+                            ["Admin Users", "1", "5", "20"],
+                            ["API Access", "❌", "❌", "✅"],
                             ["POS Integration", "❌", "✅", "✅"],
                           ].map((row, i) => (
                             <tr key={i} className="border-b border-white/5">
@@ -986,25 +1463,29 @@ export default function DocsPage() {
 
                       <p>
                         <strong className="text-white">Draws:</strong> The{" "}
-                        <code className="text-purple-400 text-xs">
-                          redeem_access_code
-                        </code>
-                        function automatically enters customers into the first
-                        open draw for your business. If a draw is full or
-                        closed, it moves to the next one.
+                        <code className="text-purple-400 text-xs">system</code>
+                        automatically enters customers into the first open draw
+                        for your business. If a draw is full or closed, it moves
+                        to the next one.
                       </p>
 
-                      <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
-                        <h4 className="text-purple-400 font-medium text-sm mb-2">
-                          💡 Pro Tip: Calendar Planning
-                        </h4>
-                        <p className="text-purple-400/60 text-xs">
-                          Schedule your games like a content calendar. Run a
-                          spin game all week, host trivia on Friday nights, and
-                          run a monthly draw. The system automatically manages
-                          capacity across all active games.
-                        </p>
-                      </div>
+                       <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
+                         <h4 className="text-purple-400 font-medium text-sm mb-2">
+                           💡 Pro Tip: Calendar Planning
+                         </h4>
+                         <p className="text-purple-400/60 text-xs">
+                           Schedule your games like a content calendar. Run a
+                           spin game all week, host trivia on Friday nights, and
+                           run a monthly draw. The system automatically manages
+                           capacity across all active games.
+                         </p>
+                         <p className="text-purple-400/60 text-xs mt-2">
+                           <strong>Queue mode:</strong> For high-traffic venues,
+                           enable queue mode on your spin game to call customers
+                           one-by-one by name. This prevents overcrowding and
+                           creates a live show experience.
+                         </p>
+                       </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1048,12 +1529,19 @@ export default function DocsPage() {
                       ))}
                     </div>
 
-                    <p className="text-white/40 text-xs mt-4">
-                      Engagement counters reset on the 1st of each month. You'll
-                      receive a notification when you reach 80% of your monthly
-                      limit. Upgrade anytime to increase your limits
-                      immediately.
-                    </p>
+                      <p className="text-white/40 text-xs mt-4">
+                        Engagement counters reset on the 1st of each month. You'll
+                        receive a notification when you reach 80% of your monthly
+                        limit. Upgrade anytime to increase your limits
+                        immediately.
+                      </p>
+                      <p className="text-white/40 text-xs mt-2">
+                        <strong className="text-white">Prize slots</strong> control
+                        how many segments appear on your spin wheel. Each slot
+                        represents a distinct prize type (points, discount, free
+                        service, etc.). Higher plans unlock more slots so you can
+                        offer richer, more varied rewards.
+                      </p>
                   </CardContent>
                 </Card>
               </section>

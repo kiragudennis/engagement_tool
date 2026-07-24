@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect, JSX } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,10 +61,13 @@ import {
   X,
   Settings,
   Loader2,
+  Star,
+  Ticket,
 } from "lucide-react";
 import { toast } from "sonner";
 import { SpinGame, PrizeSegment } from "@/types/spinning-wheel";
 import { useSocket } from "@/lib/socket/useSocket";
+import { usePlanLimit } from "@/lib/hooks/usePlanLimit";
 import { generateSlug } from "@/lib/utils";
 
 const PRIZE_COLORS = [
@@ -136,6 +139,34 @@ const PRIZE_TYPES = [
     unit: "",
   },
   {
+    value: "free_service",
+    label: "Free Service",
+    icon: <Sparkles className="h-4 w-4" />,
+    placeholder: "e.g. free consultation",
+    unit: "",
+  },
+  {
+    value: "free_drink",
+    label: "Free Drink",
+    icon: <Gift className="h-4 w-4" />,
+    placeholder: "e.g. free coffee",
+    unit: "",
+  },
+  {
+    value: "free_meal",
+    label: "Free Meal",
+    icon: <Gift className="h-4 w-4" />,
+    placeholder: "e.g. free burger",
+    unit: "",
+  },
+  {
+    value: "vip_access",
+    label: "VIP Access",
+    icon: <Crown className="h-4 w-4" />,
+    placeholder: "e.g. VIP lounge",
+    unit: "",
+  },
+  {
     value: "product",
     label: "Product",
     icon: <Package className="h-4 w-4" />,
@@ -149,7 +180,108 @@ const PRIZE_TYPES = [
     placeholder: "select bundle",
     unit: "",
   },
+  {
+    value: "trivia_ticket",
+    label: "Trivia Ticket",
+    icon: <Ticket className="h-4 w-4" />,
+    placeholder: "trivia challenge",
+    unit: "",
+  },
+  {
+    value: "other",
+    label: "Other",
+    icon: <Star className="h-4 w-4" />,
+    placeholder: "custom prize",
+    unit: "",
+  },
 ];
+
+const BUSINESS_TYPE_PRIZE_SUGGESTIONS: Record<
+  string,
+  Array<{ type: string; label: string; placeholder: string }>
+> = {
+  retail: [
+    { type: "discount", label: "Discount %", placeholder: "e.g. 20% off" },
+    {
+      type: "product",
+      label: "Free Product",
+      placeholder: "product name or ID",
+    },
+    { type: "bundle", label: "Bundle", placeholder: "bundle name or ID" },
+    { type: "free_shipping", label: "Free Shipping", placeholder: "free" },
+    { type: "points", label: "Loyalty Points", placeholder: "points amount" },
+    { type: "other", label: "Other", placeholder: "custom prize" },
+  ],
+  restaurant: [
+    { type: "free_meal", label: "Free Meal", placeholder: "e.g. free burger" },
+    {
+      type: "free_drink",
+      label: "Free Drink",
+      placeholder: "e.g. free coffee",
+    },
+    { type: "discount", label: "Discount %", placeholder: "e.g. 30% off" },
+    { type: "product", label: "Free Product", placeholder: "menu item" },
+    { type: "bundle", label: "Meal Bundle", placeholder: "bundle name" },
+    { type: "points", label: "Loyalty Points", placeholder: "points amount" },
+    { type: "other", label: "Other", placeholder: "custom prize" },
+  ],
+  service: [
+    {
+      type: "free_service",
+      label: "Free Service",
+      placeholder: "e.g. free consultation",
+    },
+    {
+      type: "discount",
+      label: "Discount %",
+      placeholder: "e.g. 50% off service",
+    },
+    {
+      type: "vip_access",
+      label: "VIP Access",
+      placeholder: "e.g. priority booking",
+    },
+    { type: "points", label: "Loyalty Points", placeholder: "points amount" },
+    {
+      type: "trivia_ticket",
+      label: "Trivia Ticket",
+      placeholder: "trivia challenge",
+    },
+    { type: "other", label: "Other", placeholder: "custom prize" },
+  ],
+  event: [
+    {
+      type: "discount",
+      label: "Discount %",
+      placeholder: "e.g. 25% off ticket",
+    },
+    {
+      type: "free_service",
+      label: "Free Entry",
+      placeholder: "e.g. free entry",
+    },
+    {
+      type: "vip_access",
+      label: "VIP Access",
+      placeholder: "e.g. backstage pass",
+    },
+    { type: "product", label: "Free Merch", placeholder: "merchandise" },
+    { type: "bundle", label: "Event Bundle", placeholder: "bundle name" },
+    { type: "points", label: "Loyalty Points", placeholder: "points amount" },
+    { type: "other", label: "Other", placeholder: "custom prize" },
+  ],
+  other: [
+    { type: "discount", label: "Discount %", placeholder: "e.g. 15% off" },
+    { type: "points", label: "Loyalty Points", placeholder: "points amount" },
+    { type: "free_shipping", label: "Free Shipping", placeholder: "free" },
+    {
+      type: "trivia_ticket",
+      label: "Trivia Ticket",
+      placeholder: "trivia challenge",
+    },
+    { type: "other", label: "Other", placeholder: "custom prize" },
+  ],
+};
 
 export default function SpinningWheelAdmin() {
   const { supabase, business } = useAuth();
@@ -165,6 +297,7 @@ export default function SpinningWheelAdmin() {
   const [queueLoading, setQueueLoading] = useState(false);
   const [callingNext, setCallingNext] = useState(false);
   const { emit: emitQueue } = useSocket();
+  const { canCreateGame, canAddPrizeSlot } = usePlanLimit(business);
 
   useEffect(() => {
     if (business?.id) fetchGames();
@@ -183,6 +316,14 @@ export default function SpinningWheelAdmin() {
   };
 
   const saveGame = async (game: Partial<SpinGame>) => {
+    if (!selectedGame?.id) {
+      const check = canCreateGame(games.length);
+      if (!check.allowed) {
+        toast.error(check.reason);
+        return;
+      }
+    }
+
     try {
       if (selectedGame?.id) {
         const { error } = await supabase
@@ -361,6 +502,7 @@ export default function SpinningWheelAdmin() {
               initialGame={selectedGame}
               onSave={saveGame}
               onCancel={() => setDialogOpen(false)}
+              business={business}
             />
           </DialogContent>
         </Dialog>
@@ -791,14 +933,16 @@ function GameForm({
   initialGame,
   onSave,
   onCancel,
+  business,
 }: {
   initialGame: SpinGame | null;
   onSave: (game: any) => void;
   onCancel: () => void;
+  business?: any;
 }) {
-  const { supabase } = useAuth();
   const [activeTab, setActiveTab] = useState("basic");
   const [saving, setSaving] = useState(false);
+  const { canAddPrizeSlot } = usePlanLimit(business);
 
   const [formData, setFormData] = useState<any>(
     initialGame || {
@@ -870,6 +1014,8 @@ function GameForm({
       starts_at: null,
       ends_at: null,
       is_active: true,
+      queue_enabled: false,
+      participant_limit: null,
       live_theme: "default",
       show_confetti: true,
       play_sounds: true,
@@ -900,7 +1046,6 @@ function GameForm({
     const newPrizes = [...formData.prize_config];
     newPrizes[index][field] = value;
 
-    // Auto-generate label based on prize type and value (without fetching)
     if (
       field === "type" ||
       field === "value" ||
@@ -914,12 +1059,25 @@ function GameForm({
         prize.label = `${prize.value}% Off`;
       } else if (prize.type === "free_shipping") {
         prize.label = "Free Shipping";
+      } else if (prize.type === "free_service") {
+        prize.label = prize.value ? `Free ${prize.value}` : "Free Service";
+      } else if (prize.type === "free_drink") {
+        prize.label = prize.value ? `Free ${prize.value}` : "Free Drink";
+      } else if (prize.type === "free_meal") {
+        prize.label = prize.value ? `Free ${prize.value}` : "Free Meal";
+      } else if (prize.type === "vip_access") {
+        prize.label = prize.value ? `VIP: ${prize.value}` : "VIP Access";
       } else if (prize.type === "product" && prize.product_id) {
         prize.label = `Product (${prize.product_id.slice(0, 8)}...)`;
         prize.value = prize.product_id;
       } else if (prize.type === "bundle" && prize.bundle_id) {
         prize.label = `Bundle (${prize.bundle_id.slice(0, 8)}...)`;
         prize.value = prize.bundle_id;
+      } else if (prize.type === "trivia_ticket") {
+        prize.label = prize.label || "Trivia Challenge Entry";
+        prize.value = prize.value || "ticket";
+      } else if (prize.type === "other") {
+        prize.label = prize.value || "Custom Prize";
       }
     }
 
@@ -976,6 +1134,8 @@ function GameForm({
         ends_at: formData.ends_at,
         is_active: formData.is_active,
         queue_enabled: formData.queue_enabled,
+        participant_limit: formData.participant_limit,
+        spin_limit_per_user: formData.spin_limit_per_user,
         live_theme: formData.live_theme,
         show_confetti: formData.show_confetti,
         play_sounds: formData.play_sounds,
@@ -1168,6 +1328,47 @@ function GameForm({
           />
         </div>
 
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label>Participant Limit</Label>
+            <Input
+              type="number"
+              value={formData.participant_limit || ""}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  participant_limit: e.target.value
+                    ? parseInt(e.target.value)
+                    : null,
+                })
+              }
+              placeholder="No limit"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Max number of participants (leave empty for unlimited)
+            </p>
+          </div>
+          <div>
+            <Label>Spin Limit Per User</Label>
+            <Input
+              type="number"
+              value={formData.spin_limit_per_user || ""}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  spin_limit_per_user: e.target.value
+                    ? parseInt(e.target.value)
+                    : null,
+                })
+              }
+              placeholder="No limit"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Max spins per user (leave empty for unlimited)
+            </p>
+          </div>
+        </div>
+
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <Switch
@@ -1201,8 +1402,18 @@ function GameForm({
               Probabilities sum to {totalProbability}%{" "}
               {!isProbabilityValid && "(must be 100%)"}
             </p>
+            {canAddPrizeSlot(formData.prize_config.length) && !canAddPrizeSlot(formData.prize_config.length).allowed && (
+              <p className="text-xs text-red-400 mt-1">
+                {canAddPrizeSlot(formData.prize_config.length).reason}
+              </p>
+            )}
           </div>
-          <Button type="button" size="sm" onClick={addPrize}>
+          <Button 
+            type="button" 
+            size="sm" 
+            onClick={addPrize}
+            disabled={!canAddPrizeSlot(formData.prize_config.length).allowed}
+          >
             <Plus className="h-4 w-4 mr-1" />
             Add Prize
           </Button>
@@ -1228,6 +1439,44 @@ function GameForm({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        {business?.type &&
+                          BUSINESS_TYPE_PRIZE_SUGGESTIONS[business.type] && (
+                            <>
+                              <SelectItem
+                                value="__suggested_header"
+                                disabled
+                                className="text-xs text-muted-foreground"
+                              >
+                                Suggested for {business.type}
+                              </SelectItem>
+                              {BUSINESS_TYPE_PRIZE_SUGGESTIONS[
+                                business.type
+                              ].map((suggestion) => {
+                                const found = PRIZE_TYPES.find(
+                                  (t) => t.value === suggestion.type,
+                                );
+                                if (!found) return null;
+                                return (
+                                  <SelectItem
+                                    key={suggestion.type}
+                                    value={suggestion.type}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      {found.icon}
+                                      {suggestion.label}
+                                    </div>
+                                  </SelectItem>
+                                );
+                              })}
+                            </>
+                          )}
+                        <SelectItem
+                          value="__all_header"
+                          disabled
+                          className="text-xs text-muted-foreground"
+                        >
+                          All Types
+                        </SelectItem>
                         {PRIZE_TYPES.map((type) => (
                           <SelectItem key={type.value} value={type.value}>
                             <div className="flex items-center gap-2">

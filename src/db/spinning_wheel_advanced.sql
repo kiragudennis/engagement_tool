@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS spin_games (
     ALTER TABLE spin_games ADD COLUMN IF NOT EXISTS game_type text NOT NULL DEFAULT 'standard' CHECK (game_type IN ('standard', 'vip', 'new_customer', 'weekend', 'flash'));
     ALTER TABLE spin_games ADD COLUMN IF NOT EXISTS live_theme text DEFAULT 'default';
     ALTER TABLE spin_games ADD COLUMN IF NOT EXISTS queue_enabled boolean default false;
+    ALTER TABLE spin_games ADD COLUMN IF NOT EXISTS participant_limit integer;
+    ALTER TABLE spin_games ADD COLUMN IF NOT EXISTS spin_limit_per_user integer;
 
 -- 2. Spin attempts
 CREATE TABLE IF NOT EXISTS spin_attempts (
@@ -285,6 +287,18 @@ BEGIN
         RAISE EXCEPTION 'This business has reached its monthly engagement limit. Try again next month or ask them to upgrade.';
     END IF;
 
+    -- Participant limit
+    IF v_game.participant_limit IS NOT NULL THEN
+        DECLARE v_current_participants INTEGER;
+        SELECT COUNT(DISTINCT user_id) INTO v_current_participants
+        FROM spin_attempts
+        WHERE game_id = p_game_id;
+        
+        IF v_current_participants >= v_game.participant_limit THEN
+            RAISE EXCEPTION 'This spin game has reached its participant limit.';
+        END IF;
+    END IF;
+
     -- Live broadcast: spin animation start
     PERFORM record_spin_start(p_game_id, v_user_id);
     
@@ -302,6 +316,18 @@ BEGIN
         INSERT INTO user_spin_allocations (user_id, game_id, date, spins_used_today, spins_used_this_week, spins_used_total)
         VALUES (v_user_id, p_game_id, v_today, 0, 0, 0)
         RETURNING * INTO v_allocation;
+    END IF;
+    
+    -- Spin limit per user
+    IF v_game.spin_limit_per_user IS NOT NULL THEN
+        DECLARE v_user_total_spins INTEGER;
+        SELECT spins_used_total INTO v_user_total_spins
+        FROM user_spin_allocations
+        WHERE user_id = v_user_id AND game_id = p_game_id;
+        
+        IF v_user_total_spins IS NOT NULL AND v_user_total_spins >= v_game.spin_limit_per_user THEN
+            RAISE EXCEPTION 'You have reached the spin limit for this game.';
+        END IF;
     END IF;
     
     -- Check eligibility
@@ -363,6 +389,21 @@ BEGIN
             
         WHEN 'discount' THEN
             v_prize_display := (v_selected_prize->>'value') || '% off';
+            
+        WHEN 'free_shipping' THEN
+            v_prize_display := 'Free Shipping';
+            
+        WHEN 'free_service' THEN
+            v_prize_display := COALESCE(NULLIF(v_selected_prize->>'value', ''), 'Free Service');
+            
+        WHEN 'free_drink' THEN
+            v_prize_display := COALESCE(NULLIF(v_selected_prize->>'value', ''), 'Free Drink');
+            
+        WHEN 'free_meal' THEN
+            v_prize_display := COALESCE(NULLIF(v_selected_prize->>'value', ''), 'Free Meal');
+            
+        WHEN 'vip_access' THEN
+            v_prize_display := COALESCE(NULLIF(v_selected_prize->>'value', ''), 'VIP Access');
             
         WHEN 'product' THEN
             v_prize_display := 'Free ' || (v_selected_prize->>'value');

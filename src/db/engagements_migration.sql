@@ -231,3 +231,29 @@ GRANT EXECUTE ON FUNCTION increment_business_engagement(UUID, TEXT) TO authentic
 GRANT EXECUTE ON FUNCTION check_business_engagement_allowed(UUID) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION perform_draw(UUID) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION get_live_engagement_stats(UUID) TO authenticated, service_role;
+
+-- Engagement notifications table
+CREATE TABLE IF NOT EXISTS engagement_notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+    notification_type TEXT NOT NULL DEFAULT 'limit_warning',
+    threshold_percent INTEGER,
+    channel TEXT NOT NULL DEFAULT 'email',
+    status TEXT NOT NULL DEFAULT 'pending',
+    metadata JSONB DEFAULT '{}',
+    sent_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_engagement_notifications_business ON engagement_notifications(business_id);
+CREATE INDEX IF NOT EXISTS idx_engagement_notifications_status ON engagement_notifications(status);
+
+ALTER TABLE engagement_notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Businesses can view own notifications" ON engagement_notifications
+    FOR SELECT USING (
+        business_id IN (SELECT business_id FROM business_admins WHERE user_id = auth.uid())
+    );
+
+CREATE POLICY "Service role can manage notifications" ON engagement_notifications
+    FOR ALL USING (auth.role() = 'service_role');

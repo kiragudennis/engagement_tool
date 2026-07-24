@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { getPlanLimits, isUnlimited } from "@/lib/config/plans";
 
 const createCodeSchema = z.object({
   slug: z.string().min(1),
@@ -80,6 +81,21 @@ export async function POST(req: NextRequest) {
       .single();
     if (!admin) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+    }
+
+    const limits = getPlanLimits(business.plan);
+    if (!isUnlimited(limits.maxCodes)) {
+      const { count: existingCount } = await supabaseAdmin
+        .from("access_codes")
+        .select("*", { count: "exact", head: true })
+        .eq("business_id", business.id);
+
+      if ((existingCount || 0) >= limits.maxCodes) {
+        return NextResponse.json(
+          { error: `Plan limit reached. You can only create ${limits.maxCodes} access codes.` },
+          { status: 403 },
+        );
+      }
     }
 
     // Determine code type from plan

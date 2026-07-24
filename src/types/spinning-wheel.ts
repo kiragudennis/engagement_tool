@@ -32,6 +32,8 @@ export interface SpinGame {
   play_sounds: boolean;
 
   queue_enabled?: boolean;
+  participant_limit?: number | null;
+  spin_limit_per_user?: number | null;
 }
 
 export interface PrizeSegment {
@@ -40,10 +42,15 @@ export interface PrizeSegment {
     | "points"
     | "discount"
     | "free_shipping"
+    | "free_service"
+    | "free_drink"
+    | "free_meal"
+    | "vip_access"
     | "product"
     | "bundle"
     | "trivia_ticket"
-    | "challenge_entry";
+    | "challenge_entry"
+    | "other";
   value: string | number;
   color: string;
   probability: number; // 0-100, sum should be 100

@@ -124,7 +124,6 @@ export default function BusinessSignupPage() {
   };
 
   const items = [
-    { label: "Select a business type", value: "" },
     { label: "Retail", value: "retail" },
     { label: "Restaurant", value: "restaurant" },
     { label: "Service", value: "service" },
@@ -257,11 +256,11 @@ export default function BusinessSignupPage() {
                 onValueChange={(e) => setFormData((p) => ({ ...p, type: e }))}
               >
                 <SelectTrigger className="w-full max-w-48">
-                  <SelectValue />
+                  <SelectValue placeholder="Select a business type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectLabel>Fruits</SelectLabel>
+                    <SelectLabel>Industries</SelectLabel>
                     {items.map((item) => (
                       <SelectItem key={item.value} value={item.value}>
                         {item.label}

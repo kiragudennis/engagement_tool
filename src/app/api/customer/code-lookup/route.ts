@@ -14,10 +14,9 @@ export async function GET(req: NextRequest) {
     const { data: codeData } = await supabaseAdmin
       .from("access_codes")
       .select(
-        `id, business_id, code, unlocks, type, businesses!inner(id, name, slug, logo_url, brand_color)`,
+        `id, business_id, code, unlocks, type, tier, is_active, max_uses, current_uses, max_uses_per_user, valid_from, valid_until, businesses!inner(id, name, slug, logo_url, brand_color)`,
       )
       .eq("code", code)
-      .eq("is_active", true)
       .single();
 
     if (!codeData) {
@@ -40,7 +39,15 @@ export async function GET(req: NextRequest) {
 
     const result: any = {
       code: codeData.code,
+      type: codeData.type,
+      tier: codeData.tier,
       unlocks: codeData.unlocks,
+      is_active: codeData.is_active,
+      max_uses: codeData.max_uses,
+      current_uses: codeData.current_uses,
+      max_uses_per_user: codeData.max_uses_per_user,
+      valid_from: codeData.valid_from,
+      valid_until: codeData.valid_until,
       business_id: business.id,
       business_name: business.name,
       business_slug: business.slug,

@@ -59,6 +59,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import Link from "next/link";
+import { usePlanLimit } from "@/lib/hooks/usePlanLimit";
 
 // ─── Config ─────────────────────────────────────────────
 const CODE_TYPE_CONFIG: Record<
@@ -148,8 +149,9 @@ const UNLOCKS_OPTIONS = [
 // ─── Main Component ─────────────────────────────────────
 export default function CodeManagementPage() {
   const { businessSlug } = useParams<{ businessSlug: string }>();
-  const { supabase } = useAuth();
+  const { supabase, business: authBusiness } = useAuth();
   const router = useRouter();
+  const { canCreateCode } = usePlanLimit(authBusiness);
 
   const [business, setBusiness] = useState<any>(null);
   const [codes, setCodes] = useState<any[]>([]);
@@ -222,6 +224,13 @@ export default function CodeManagementPage() {
   // ─── Create Single Code ────────────────────────────────
   const handleCreateCode = async () => {
     if (!business) return;
+
+    const check = canCreateCode(codes.length);
+    if (!check.allowed) {
+      toast.error(check.reason);
+      return;
+    }
+
     setCreating(true);
     try {
       const res = await fetch("/api/business/codes/create", {
@@ -262,6 +271,13 @@ export default function CodeManagementPage() {
   // ─── Create Bulk Codes ────────────────────────────────
   const handleCreateBulkCodes = async () => {
     if (!business) return;
+
+    const check = canCreateCode(codes.length);
+    if (!check.allowed) {
+      toast.error(check.reason);
+      return;
+    }
+
     setCreating(true);
     try {
       const res = await fetch("/api/business/codes/bulk-create", {

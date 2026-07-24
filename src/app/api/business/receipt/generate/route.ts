@@ -187,12 +187,12 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── CALCULATE POINTS ───────────────────────────────
-    // Takes points only, spin only, spin + draw or draw only
     const pointsEarned =
       pointsOverride ||
       Math.floor(amount * (business.points_multiplier || 1.0));
 
     // ─── GENERATE CODE ──────────────────────────────────
+    // Takes points only, spin only, spin + draw or draw only
     const { data: receipt, error: receiptError } = await supabaseAdmin.rpc(
       "generate_receipt_code",
       {

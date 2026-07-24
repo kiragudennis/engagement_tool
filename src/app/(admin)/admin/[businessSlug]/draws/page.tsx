@@ -43,6 +43,7 @@ import {
 import { toast } from "sonner";
 import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
+import { usePlanLimit } from "@/lib/hooks/usePlanLimit";
 
 interface Draw {
   id: string;
@@ -88,6 +89,7 @@ export default function AdminDrawsPage() {
   const [drawStats, setDrawStats] = useState<Record<string, any>>({});
 
   const drawsService = new DrawsService(supabase);
+  const { canCreateDraw } = usePlanLimit(business);
 
   const fetchData = useCallback(async () => {
     if (!businessSlug || !business?.id) return;
@@ -230,7 +232,15 @@ export default function AdminDrawsPage() {
           </Button>
           <Dialog>
             <DialogTrigger asChild>
-              <Button>
+              <Button
+                onClick={(e) => {
+                  const check = canCreateDraw(draws.length);
+                  if (!check.allowed) {
+                    e.preventDefault();
+                    toast.error(check.reason);
+                  }
+                }}
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 New Draw
               </Button>

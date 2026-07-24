@@ -10,6 +10,7 @@ Add trust pilot.
 (e). Referral and recommendation (They get something small).
 (f). Connect your POS or your existing Ecommerce business.
 (g). Can see active vs total customers.
+(h). Win a spin and get free POS/E-commerce integration.
 
 -- LATEST
 Here's what's now in place for the queue-based spin system:
@@ -76,3 +77,71 @@ Live queue list with ticket numbers and status
 **Removed**
 
 - Deleted `src/app/api/engage/spin/route.ts` per your request.
+
+Here's what was completed for the spin system expansion:
+
+**New prize types**
+
+- Added `free_service`, `free_drink`, `free_meal`, `vip_access`, and `other` to `PrizeSegment` type in `src/types/spinning-wheel.ts`
+- Updated `PRIZE_TYPES` in admin spin page with icons/placeholders for all new types
+- Updated `updatePrize` auto-label logic to handle the new types
+- Updated `perform_spin` in SQL to award and display the new prize types
+
+**Business-type-aware prize suggestions**
+
+- Added `BUSINESS_TYPE_PRIZE_SUGGESTIONS` map keyed by `retail`, `restaurant`, `service`, `event`, `other`
+- Admin prize type dropdown now shows a suggested section based on the business's `type` field, followed by all types
+
+**Spin/participant limits**
+
+- Added `participant_limit` and `spin_limit_per_user` columns to `spin_games` in `src/db/spinning_wheel_advanced.sql`
+- Added both fields to the admin spin form under Advanced tab
+- Wired them into `handleSave` and `SpinGame` type
+- Added runtime checks in `perform_spin` to enforce both limits before allowing a spin
+
+**Engagement tracking & upgrade nudges**
+
+- Created `src/lib/services/engagement-service.ts` with threshold-based notification logic
+- Created `src/app/api/admin/engagement/notify/route.ts` to send Resend emails and Twilio SMS when businesses hit 80%/95% of their plan limit
+- Added `engagement_notifications` table to `src/db/engagements_migration.sql` for logging
+- Plan limits already exist via `get_plan_engagement_limit` (starter=1000, pro=10000, enterprise=50000)
+
+Here's a summary of what was completed in this session:
+
+**Plan limits & pricing alignment**
+
+- Raised plan limits in `src/lib/config/plans.ts`: Starter now gets 3 spin games, 3 trivia, 3 draws, 1,000 engagements/month, 12 prize slots, 50 codes; Pro gets 10/10/10, 10,000 engagements, 24 prize slots, 200 codes; Enterprise gets unlimited/50,000/36 prize slots/unlimited codes.
+- Updated `src/app/(public)/docs/page.tsx` limits table to match.
+- Updated pricing page feature text to reflect new numbers.
+
+**Prize types expansion**
+
+- Added `free_service`, `free_drink`, `free_meal`, `vip_access`, and `other` to `PrizeSegment` type and admin spin form.
+- Added business-type-aware prize suggestions (`BUSINESS_TYPE_PRIZE_SUGGESTIONS`) keyed by `retail`, `restaurant`, `service`, `event`, `other`.
+- Updated `perform_spin` SQL to award and display the new prize types.
+
+**Spin/participant limits**
+
+- Added `participant_limit` and `spin_limit_per_user` columns to `spin_games` in SQL.
+- Added both fields to admin spin form under Advanced tab.
+- Wired them into `handleSave` and `SpinGame` type.
+- Added runtime enforcement in `perform_spin` before allowing a spin.
+
+**Engagement tracking & upgrade nudges**
+
+- Created `src/lib/services/engagement-service.ts` with threshold-based notification logic.
+- Created `src/app/api/admin/engagement/notify/route.ts` to send Resend emails and Twilio SMS when businesses hit 80%/95% of their plan limit.
+- Added `engagement_notifications` table to `src/db/engagements_migration.sql`.
+
+**Admin enforcement**
+
+- Created `src/lib/hooks/usePlanLimit.ts` with `canCreateGame`, `canAddPrizeSlot`, `canCreateCode`, `canCreateTrivia`, `canCreateDraw`.
+- Wired spin game creation limit in admin spin page.
+- Wired prize slot limit in admin spin form.
+- Wired trivia creation limit in admin trivia page.
+- Wired draw creation limit in admin draws page.
+- Wired code creation/bulk creation limits in admin codes page and API routes (`/api/business/codes/create` and `/api/business/codes/bulk-create`).
+
+**Docs**
+
+- Added queue mode note and prize slots explanation to `src/app/(public)/docs/page.tsx`.

@@ -255,5 +255,48 @@ CREATE POLICY "Businesses can view own notifications" ON engagement_notification
         business_id IN (SELECT business_id FROM business_admins WHERE user_id = auth.uid())
     );
 
-CREATE POLICY "Service role can manage notifications" ON engagement_notifications
-    FOR ALL USING (auth.role() = 'service_role');
+-- ============================================
+-- PLAN PERIOD CHALLENGE COUNT
+-- ============================================
+
+-- Count trivia challenges created in current billing period
+CREATE OR REPLACE FUNCTION get_challenges_in_current_period(p_business_id UUID)
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_business businesses%ROWTYPE;
+    v_period_start TIMESTAMPTZ;
+    v_period_end TIMESTAMPTZ;
+    v_count INTEGER;
+BEGIN
+    SELECT * INTO v_business FROM businesses WHERE id = p_business_id;
+    IF NOT FOUND THEN
+        RETURN 0;
+    END IF;
+
+    -- Determine subscription period based on last_payment_at and next_billing_at
+    IF v_business.last_payment_at IS NOT NULL AND v_business.next_billing_at IS NOT NULL THEN
+        v_period_start := v_business.last_payment_at;
+        v_period_end := v_business.next_billing_at;
+    ELSIF v_business.subscription_status = 'trial' THEN
+        v_period_start := date_trunc('month', NOW());
+        v_period_end := v_period_start + INTERVAL '1 month';
+    ELSE
+        -- Fallback: use calendar month
+        v_period_start := date_trunc('month', NOW());
+        v_period_end := v_period_start + INTERVAL '1 month';
+    END IF;
+
+    SELECT COUNT(*) INTO v_count
+    FROM challenges
+    WHERE business_id = p_business_id
+      AND created_at >= v_period_start
+      AND created_at < v_period_end;
+
+    RETURN v_count;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION get_challenges_in_current_period(UUID) TO authenticated, service_role;

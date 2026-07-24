@@ -1542,6 +1542,15 @@ export default function DocsPage() {
                         service, etc.). Higher plans unlock more slots so you can
                         offer richer, more varied rewards.
                       </p>
+                      <p className="text-white/40 text-xs mt-2">
+                        <strong className="text-white">Trivia challenges</strong> are
+                        limited per billing period (monthly). If you created
+                        challenges earlier in the month, they count toward your
+                        limit. Unused slots roll over only if you stay on the same
+                        plan. Trivia challenges created during your current billing
+                        period (from last payment to next billing) are counted, not
+                        lifetime total.
+                      </p>
                   </CardContent>
                 </Card>
               </section>

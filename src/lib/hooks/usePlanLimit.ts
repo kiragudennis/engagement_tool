@@ -49,6 +49,16 @@ export function usePlanLimit(business: any) {
     };
   };
 
+  const canCreateTriviaInPeriod = (periodCount: number) => {
+    if (!limits) return { allowed: false, reason: "No plan found" };
+    if (isUnlimited(limits.maxTriviaChallenges)) return { allowed: true };
+    if (periodCount < limits.maxTriviaChallenges) return { allowed: true };
+    return {
+      allowed: false,
+      reason: `You've created ${periodCount} trivia challenge(s) this billing period. Your plan allows ${limits.maxTriviaChallenges}. Upgrade to add more.`,
+    };
+  };
+
   const canCreateDraw = (currentCount: number) => {
     if (!limits) return { allowed: false, reason: "No plan found" };
     if (isUnlimited(limits.maxActiveDraws)) return { allowed: true };
@@ -65,6 +75,7 @@ export function usePlanLimit(business: any) {
     canAddPrizeSlot,
     canCreateCode,
     canCreateTrivia,
+    canCreateTriviaInPeriod,
     canCreateDraw,
   };
 }

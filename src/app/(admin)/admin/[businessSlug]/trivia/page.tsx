@@ -3,7 +3,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,7 +61,7 @@ import { format } from "date-fns";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Challenge } from "@/types/challenges";
-import { getPlanLimits, isUnlimited } from "@/lib/config/plans";
+import { usePlanLimit } from "@/lib/hooks/usePlanLimit";
 
 const CHALLENGE_TYPES = [
   {
@@ -266,6 +265,7 @@ export default function AdminChallengesPage() {
             </DialogHeader>
             <ChallengeForm
               initialChallenge={selectedChallenge}
+              challenges={challenges || []}
               onSave={() => {
                 fetchChallenges();
                 setDialogOpen(false);
@@ -494,9 +494,11 @@ export default function AdminChallengesPage() {
 // Challenge Form Component (Setup Wizard)
 function ChallengeForm({
   initialChallenge,
+  challenges,
   onSave,
 }: {
   initialChallenge: Challenge | null;
+  challenges: Challenge[] | [];
   onSave: () => void;
 }) {
   const { supabase, business } = useAuth();
@@ -540,6 +542,7 @@ function ChallengeForm({
 
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
+  const { canCreateTriviaInPeriod } = usePlanLimit(business);
 
   const updateScoringConfig = (key: string, value: any) => {
     setFormData({
@@ -583,12 +586,19 @@ function ChallengeForm({
   const handleSubmit = async () => {
     setSaving(true);
     try {
-      if (!initialChallenge) {
-        const limits = business?.plan ? getPlanLimits(business.plan) : null;
-        if (!limits || (!isUnlimited(limits.maxTriviaChallenges) && challenges.length >= limits.maxTriviaChallenges)) {
-          toast.error(`You've reached your plan limit of ${limits?.maxTriviaChallenges || 0} trivia challenges. Upgrade to add more.`);
-          setSaving(false);
-          return;
+      if (!initialChallenge && business?.id) {
+        const { data: periodCount, error: rpcError } = await supabase.rpc(
+          "get_challenges_in_current_period",
+          { p_business_id: business.id },
+        );
+
+        if (!rpcError) {
+          const check = canCreateTriviaInPeriod(periodCount || 0);
+          if (!check.allowed) {
+            toast.error(check.reason);
+            setSaving(false);
+            return;
+          }
         }
       }
 

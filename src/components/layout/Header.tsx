@@ -31,6 +31,7 @@ const navigation = [
   { name: "About", href: "/about" },
   { name: "How It Works", href: "/how-it-works" },
   { name: "Pricing", href: "/pricing" },
+  { name: "Documentation", href: "/docs" },
   { name: "Contact", href: "/contact" },
 ];
 
@@ -90,6 +91,12 @@ export default function Header() {
             className="text-gray-500 dark:text-white/60 hover:text-gray-900 dark:hover:text-white text-sm transition-colors"
           >
             About
+          </Link>
+          <Link
+            href="/docs"
+            className="text-gray-500 dark:text-white/60 hover:text-gray-900 dark:hover:text-white text-sm transition-colors"
+          >
+            Docs
           </Link>
         </div>
 

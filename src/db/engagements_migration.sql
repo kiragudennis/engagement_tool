@@ -1,3 +1,4 @@
+-- src/db/engagements_migration.sql
 -- ============================================
 -- Engagements meter, billing columns, live RPCs
 -- Run after engagement_tool.sql
@@ -20,6 +21,18 @@ ALTER TABLE businesses
 ADD COLUMN IF NOT EXISTS billing_cycle TEXT DEFAULT 'monthly'
 CHECK (billing_cycle IN ('monthly', 'annual'));
 
+ALTER TABLE businesses
+ADD COLUMN IF NOT EXISTS spins_this_month INTEGER DEFAULT 0;
+
+ALTER TABLE businesses
+ADD COLUMN IF NOT EXISTS trivia_answers_this_month INTEGER DEFAULT 0;
+
+ALTER TABLE businesses
+ADD COLUMN IF NOT EXISTS draw_entries_this_month INTEGER DEFAULT 0;
+
+ALTER TABLE businesses
+ADD COLUMN IF NOT EXISTS code_redemptions_this_month INTEGER DEFAULT 0;
+
 -- Backfill from legacy column
 UPDATE businesses
 SET engagements_this_month = COALESCE(spins_this_month, 0)
@@ -41,9 +54,10 @@ LANGUAGE sql
 IMMUTABLE
 AS $$
   SELECT CASE p_plan
-    WHEN 'starter' THEN 500
-    WHEN 'pro' THEN 5000
-    WHEN 'enterprise' THEN 25000
+    WHEN 'trial' THEN 100
+    WHEN 'starter' THEN 1000
+    WHEN 'pro' THEN 10000
+    WHEN 'enterprise' THEN 50000
     ELSE 100
   END;
 $$;
@@ -78,18 +92,33 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION increment_business_engagement(
-  p_business_id UUID,
-  p_type TEXT DEFAULT 'spin'
+    p_business_id UUID,
+    p_type TEXT DEFAULT 'spin'
 )
 RETURNS VOID
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  UPDATE businesses
-  SET
-    engagements_this_month = COALESCE(engagements_this_month, 0) + 1,
-    spins_this_month = COALESCE(spins_this_month, 0) + 1
-  WHERE id = p_business_id;
+    UPDATE businesses
+    SET
+        engagements_this_month = COALESCE(engagements_this_month, 0) + 1,
+        spins_this_month = CASE
+            WHEN p_type = 'spin' THEN COALESCE(spins_this_month, 0) + 1
+            ELSE spins_this_month
+        END,
+        trivia_answers_this_month = CASE
+            WHEN p_type = 'trivia' THEN COALESCE(trivia_answers_this_month, 0) + 1
+            ELSE trivia_answers_this_month
+        END,
+        draw_entries_this_month = CASE
+            WHEN p_type = 'draw' THEN COALESCE(draw_entries_this_month, 0) + 1
+            ELSE draw_entries_this_month
+        END,
+        code_redemptions_this_month = CASE
+            WHEN p_type = 'code_redeem' THEN COALESCE(code_redemptions_this_month, 0) + 1
+            ELSE code_redemptions_this_month
+        END
+    WHERE id = p_business_id;
 END;
 $$;
 
@@ -108,7 +137,12 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
   UPDATE businesses
-  SET engagements_this_month = 0, spins_this_month = 0;
+  SET
+    engagements_this_month = 0,
+    spins_this_month = 0,
+    trivia_answers_this_month = 0,
+    draw_entries_this_month = 0,
+    code_redemptions_this_month = 0;
 END;
 $$;
 
@@ -300,3 +334,127 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION get_challenges_in_current_period(UUID) TO authenticated, service_role;
+
+-- ============================================
+-- Viewer Engagement Tracking
+-- ============================================
+
+-- Viewer prize configuration per challenge/game
+CREATE TABLE IF NOT EXISTS viewer_prizes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+    challenge_id UUID REFERENCES challenges(id) ON DELETE SET NULL,
+    game_type TEXT NOT NULL CHECK (game_type IN ('spin', 'draw', 'trivia')),
+    game_id UUID,
+    prize_type TEXT NOT NULL DEFAULT 'points' CHECK (prize_type IN ('points', 'discount', 'free_service', 'custom')),
+    prize_value INTEGER DEFAULT 100,
+    min_watch_seconds INTEGER NOT NULL DEFAULT 60,
+    max_claims_per_user INTEGER DEFAULT 1,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Viewer engagement records (track who watched for long enough)
+CREATE TABLE IF NOT EXISTS viewer_engagements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    challenge_id UUID REFERENCES challenges(id) ON DELETE SET NULL,
+    game_id UUID,
+    game_type TEXT NOT NULL CHECK (game_type IN ('spin', 'draw', 'trivia')),
+    stream_type TEXT NOT NULL DEFAULT 'internal',
+    watched_seconds INTEGER DEFAULT 0,
+    claimed_at TIMESTAMPTZ,
+    viewer_prize_id UUID REFERENCES viewer_prizes(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(business_id, user_id, game_id, stream_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_viewer_engagements_business ON viewer_engagements(business_id);
+CREATE INDEX IF NOT EXISTS idx_viewer_engagements_user ON viewer_engagements(user_id);
+CREATE INDEX IF NOT EXISTS idx_viewer_engagements_challenge ON viewer_engagements(challenge_id);
+CREATE INDEX IF NOT EXISTS idx_viewer_engagements_unclaimed ON viewer_engagements(business_id, game_id) WHERE claimed_at IS NULL;
+
+-- ============================================
+-- Viewer Prize Claim RPC
+-- ============================================
+CREATE OR REPLACE FUNCTION claim_viewer_prize(
+    p_business_id UUID,
+    p_user_id UUID,
+    p_game_type TEXT,
+    p_game_id UUID,
+    p_stream_type TEXT DEFAULT 'internal'
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_prize viewer_prizes%ROWTYPE;
+    v_viewer viewer_engagements%ROWTYPE;
+    v_user_points INTEGER;
+BEGIN
+    -- Only count internal stream viewers
+    IF p_stream_type != 'internal' THEN
+        RETURN json_build_object('success', false, 'error', 'Only internal stream viewers can claim prizes');
+    END IF;
+
+    -- Find active viewer prize for this game
+    SELECT * INTO v_prize
+    FROM viewer_prizes
+    WHERE business_id = p_business_id
+      AND game_type = p_game_type
+      AND (game_id IS NULL OR game_id = p_game_id)
+      AND is_active = TRUE
+    ORDER BY game_id NULLS FIRST
+    LIMIT 1;
+
+    IF NOT FOUND THEN
+        RETURN json_build_object('success', false, 'error', 'No viewer prize configured');
+    END IF;
+
+    -- Check if user watched long enough
+    SELECT * INTO v_viewer
+    FROM viewer_engagements
+    WHERE business_id = p_business_id
+      AND user_id = p_user_id
+      AND game_type = p_game_type
+      AND game_id = p_game_id
+      AND stream_type = 'internal';
+
+    IF NOT FOUND OR v_viewer.watched_seconds < v_prize.min_watch_seconds THEN
+        RETURN json_build_object('success', false, 'error', 'Minimum watch time not reached');
+    END IF;
+
+    -- Prevent duplicate claims
+    IF v_viewer.claimed_at IS NOT NULL THEN
+        RETURN json_build_object('success', false, 'error', 'Prize already claimed');
+    END IF;
+
+    -- Award prize
+    IF v_prize.prize_type = 'points' THEN
+        INSERT INTO loyalty_points (user_id, business_id, points, points_earned)
+        VALUES (p_user_id, p_business_id, v_prize.prize_value, v_prize.prize_value)
+        ON CONFLICT (user_id, business_id)
+        DO UPDATE SET
+            points = loyalty_points.points + v_prize.prize_value,
+            points_earned = loyalty_points.points_earned + v_prize.prize_value,
+            updated_at = NOW();
+
+        INSERT INTO loyalty_transactions (user_id, business_id, points_change, current_points, transaction_type, description)
+        VALUES (p_user_id, p_business_id, v_prize.prize_value, v_prize.prize_value, 'viewer_prize',
+                'Viewer prize: ' || v_prize.prize_value || ' points for watching');
+    END IF;
+
+    -- Mark as claimed
+    UPDATE viewer_engagements
+    SET claimed_at = NOW(),
+        viewer_prize_id = v_prize.id
+    WHERE id = v_viewer.id;
+
+    RETURN json_build_object('success', true, 'prize_type', v_prize.prize_type, 'prize_value', v_prize.prize_value);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION claim_viewer_prize(UUID, UUID, TEXT, UUID, TEXT) TO authenticated;

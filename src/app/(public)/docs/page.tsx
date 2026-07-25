@@ -423,7 +423,12 @@ export default function DocsPage() {
                             {" "}
                             Subtypes:
                           </strong>{" "}
-                          R=Receipt, S=Sticker, P=Public, Q=QR &nbsp;|&nbsp;
+                          R=Receipt (POS), S=Sticker, P=Public, Q=QR
+                          &nbsp;|&nbsp;
+                          <strong className="text-white"> Limits:</strong>{" "}
+                          Sticker codes and POS codes have separate per-plan
+                          caps. Public codes share the general access code
+                          limit. &nbsp;|&nbsp;
                           <strong className="text-white"> Prefix:</strong> First
                           4 letters of your business slug
                         </p>
@@ -1210,15 +1215,30 @@ export default function DocsPage() {
                         <strong className="text-white">
                           How tickets work:
                         </strong>{" "}
-                        The spin wheel has a "trivia_ticket" prize type. When a
-                        customer lands on it,{" "}
+                        There are two ways to get a trivia ticket.
+                        <strong className="text-white"> Spin-based:</strong> The
+                        spin wheel has a{" "}
+                        <code className="text-purple-400 text-xs">
+                          trivia ticket
+                        </code>{" "}
+                        prize type. When a customer lands on it,{" "}
                         <code className="text-purple-400 text-xs">System</code>{" "}
-                        calls
+                        calls{" "}
                         <code className="text-purple-400 text-xs">
                           add trivia participant from spin
                         </code>{" "}
                         which assigns them a ticket number and places them in
                         the trivia queue.
+                        <strong className="text-white">
+                          {" "}
+                          Code-based:
+                        </strong>{" "}
+                        Customers redeem an access code that unlocks trivia
+                        directly. This assigns a ticket number and adds them to
+                        the trivia queue without spinning.{" "}
+                        <strong className="text-purple-400 text-xs">
+                          Both paths count as 1 engagement each.
+                        </strong>
                       </p>
                       <p>
                         <strong className="text-white">Live event flow:</strong>{" "}
@@ -1409,13 +1429,25 @@ export default function DocsPage() {
                             ["Spin Games", "3", "10", "Unlimited"],
                             ["Trivia Challenges", "3", "10", "Unlimited"],
                             ["Active Draws", "3", "10", "Unlimited"],
-                            ["Engagements/month", "1,000", "10,000", "50,000"],
+                            ["Engagements/month", "5,000", "50,000", "500,000"],
                             ["Prize Slots", "12", "24", "36"],
                             ["Trivia Questions", "50", "200", "Unlimited"],
-                            ["Access Codes", "50", "200", "Unlimited"],
+                            ["Sticker Codes", "500", "1,000", "Unlimited"],
+                            ["POS Codes", "0", "5,000", "Unlimited"],
+                            [
+                              "Access Codes (Public)",
+                              "200",
+                              "2,000",
+                              "Unlimited",
+                            ],
                             ["Admin Users", "1", "5", "20"],
-                            ["API Access", "❌", "❌", "✅"],
-                            ["POS Integration", "❌", "✅", "✅"],
+                            ["API Access", "✗", "✓", "✓"],
+                            [
+                              "POS Integration",
+                              "✗",
+                              "Spin to win",
+                              "Spin to win",
+                            ],
                           ].map((row, i) => (
                             <tr key={i} className="border-b border-white/5">
                               <td className="p-3 text-white/70">{row[0]}</td>
@@ -1433,6 +1465,19 @@ export default function DocsPage() {
                         </tbody>
                       </table>
                     </div>
+
+                    <p className="text-white/30 text-xs mt-2">
+                      <strong className="text-white/60">POS Integration</strong>{" "}
+                      is not included in Pro or Enterprise plans. Businesses can
+                      win POS integration access by spinning{" "}
+                      <strong className="text-white/80">
+                        <a href="https://engagespin.com/engage/spin">
+                          engagespin.com/engage/spin
+                        </a>
+                      </strong>{" "}
+                      — look for the POS Integration prize card. Your business
+                      must be at least free-tier active to participate.
+                    </p>
                   </CardContent>
                 </Card>
 
@@ -1464,28 +1509,28 @@ export default function DocsPage() {
                       <p>
                         <strong className="text-white">Draws:</strong> The{" "}
                         <code className="text-purple-400 text-xs">system</code>
-                        automatically enters customers into the first open draw
-                        for your business. If a draw is full or closed, it moves
-                        to the next one.
+                        &nbsp;automatically enters customers into the first open
+                        draw for your business. If a draw is full or closed, it
+                        moves to the next one.
                       </p>
 
-                       <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
-                         <h4 className="text-purple-400 font-medium text-sm mb-2">
-                           💡 Pro Tip: Calendar Planning
-                         </h4>
-                         <p className="text-purple-400/60 text-xs">
-                           Schedule your games like a content calendar. Run a
-                           spin game all week, host trivia on Friday nights, and
-                           run a monthly draw. The system automatically manages
-                           capacity across all active games.
-                         </p>
-                         <p className="text-purple-400/60 text-xs mt-2">
-                           <strong>Queue mode:</strong> For high-traffic venues,
-                           enable queue mode on your spin game to call customers
-                           one-by-one by name. This prevents overcrowding and
-                           creates a live show experience.
-                         </p>
-                       </div>
+                      <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
+                        <h4 className="text-purple-400 font-medium text-sm mb-2">
+                          💡 Pro Tip: Calendar Planning
+                        </h4>
+                        <p className="text-purple-400/60 text-xs">
+                          Schedule your games like a content calendar. Run a
+                          spin game all week, host trivia on Friday nights, and
+                          run a monthly draw. The system automatically manages
+                          capacity across all active games.
+                        </p>
+                        <p className="text-purple-400/60 text-xs mt-2">
+                          <strong>Queue mode:</strong> For high-traffic venues,
+                          enable queue mode on your spin game to call customers
+                          one-by-one by name. This prevents overcrowding and
+                          creates a live show experience.
+                        </p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1504,14 +1549,24 @@ export default function DocsPage() {
                           desc: "Free or paid spins count the same",
                         },
                         {
+                          action: "Draw Entry",
+                          count: "1 engagement per entry",
+                          desc: "Code redemption or manual entry",
+                        },
+                        {
                           action: "Trivia Answer",
                           count: "1 engagement per answer",
                           desc: "Whether correct or wrong",
                         },
                         {
-                          action: "Draw Entry",
-                          count: "1 engagement per entry",
-                          desc: "Code redemption or manual entry",
+                          action: "Code Redemption",
+                          count: "1 engagement per redemption",
+                          desc: "Codes unlocking spin, trivia, or draw",
+                        },
+                        {
+                          action: "Viewer Prize Claim",
+                          count: "1 engagement per claim",
+                          desc: "When a viewer claims their prize after watching",
                         },
                       ].map((item, i) => (
                         <div
@@ -1529,28 +1584,66 @@ export default function DocsPage() {
                       ))}
                     </div>
 
-                      <p className="text-white/40 text-xs mt-4">
-                        Engagement counters reset on the 1st of each month. You'll
-                        receive a notification when you reach 80% of your monthly
-                        limit. Upgrade anytime to increase your limits
-                        immediately.
-                      </p>
-                      <p className="text-white/40 text-xs mt-2">
-                        <strong className="text-white">Prize slots</strong> control
-                        how many segments appear on your spin wheel. Each slot
-                        represents a distinct prize type (points, discount, free
-                        service, etc.). Higher plans unlock more slots so you can
-                        offer richer, more varied rewards.
-                      </p>
-                      <p className="text-white/40 text-xs mt-2">
-                        <strong className="text-white">Trivia challenges</strong> are
-                        limited per billing period (monthly). If you created
-                        challenges earlier in the month, they count toward your
-                        limit. Unused slots roll over only if you stay on the same
-                        plan. Trivia challenges created during your current billing
-                        period (from last payment to next billing) are counted, not
-                        lifetime total.
-                      </p>
+                    <p className="text-white/40 text-xs mt-4">
+                      <strong className="text-white">Code types</strong> — Two
+                      types with separate limits: sticker codes
+                      (batch-generated, no API needed) and POS codes (API-based
+                      receipt scanning). Sticker codes are ideal for small
+                      businesses; POS codes integrate directly with your
+                      checkout system.
+                    </p>
+                    <p className="text-white/40 text-xs mt-4">
+                      <strong className="text-white">
+                        Engagement counters
+                      </strong>{" "}
+                      reset on the 1st of each month. You'll receive a
+                      notification when you reach 80% of your monthly limit.
+                      Upgrade anytime to increase your limits immediately.
+                    </p>
+                    <p className="text-white/40 text-xs mt-2">
+                      <strong className="text-white">Prize slots</strong>{" "}
+                      control how many segments appear on your spin wheel. Each
+                      slot represents a distinct prize type (points, discount,
+                      free service, etc.). Higher plans unlock more slots so you
+                      can offer richer, more varied rewards.
+                    </p>
+                    <p className="text-white/40 text-xs mt-2">
+                      <strong className="text-white">Viewers</strong> count as
+                      engagements only for internal streams (not external social
+                      media). When your live page is embedded on your own site,
+                      every unique viewer is counted. You can decide per game
+                      whether the stream is internal-only or shared externally.
+                      External viewers (e.g., social media) are not counted.
+                    </p>
+                    <p className="text-white/40 text-xs mt-2">
+                      <strong className="text-white">Viewer Prizes</strong> —
+                      Businesses set a prize (default: points) and a minimum
+                      watch duration. When the stream ends, a{" "}
+                      <em>"Claim Prize"</em> button appears abruptly for
+                      eligible viewers. Each claim is timestamped and counts as
+                      1 engagement.{" "}
+                      <span className="text-purple-400/60 text-xs">System</span>{" "}
+                      notifies viewers in real time so the button appears during
+                      the stream at the configured moment. Viewers who claim are
+                      recorded in{" "}
+                      <code className="bg-white/10 px-1 rounded text-white/60">
+                        viewer_engagements
+                      </code>{" "}
+                      with{" "}
+                      <code className="bg-white/10 px-1 rounded text-white/60">
+                        claimed_at
+                      </code>
+                      .
+                    </p>
+                    <p className="text-white/40 text-xs mt-2">
+                      <strong className="text-white">Trivia challenges</strong>{" "}
+                      are limited per billing period (monthly). If you created
+                      challenges earlier in the month, they count toward your
+                      limit. Unused slots roll over only if you stay on the same
+                      plan. Trivia challenges created during your current
+                      billing period (from last payment to next billing) are
+                      counted, not lifetime total.
+                    </p>
                   </CardContent>
                 </Card>
               </section>

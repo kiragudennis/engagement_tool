@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Check, RotateCcw, Brain, Gift, ArrowRight, Crown } from "lucide-react";
+import { Check, RotateCcw, Brain, Gift, ArrowRight, Crown, Monitor, Printer, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PLANS, PRICING_FAQS, formatPrice } from "@/lib/config/plans";
 
@@ -261,6 +261,21 @@ export default function PricingPage() {
                 icon: Gift,
                 title: "Prize Draws",
                 desc: "Receipt-based entries. Top spenders win. Broadcast the draw live.",
+              },
+              {
+                icon: Monitor,
+                title: "Viewer Engagement",
+                desc: "Internal streams count viewer engagements. Set viewer prizes and reward loyal audience.",
+              },
+              {
+                icon: Printer,
+                title: "Sticker System",
+                desc: "Print rarity-tiered sticker codes for in-store customers. No API needed.",
+              },
+              {
+                icon: ShoppingBag,
+                title: "POS Integration",
+                desc: "Connect your POS for automatic code generation at checkout. API-based.",
               },
             ].map((item, i) => (
               <motion.div

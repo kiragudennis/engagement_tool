@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS spin_games (
     ALTER TABLE spin_games ADD COLUMN IF NOT EXISTS queue_enabled boolean default false;
     ALTER TABLE spin_games ADD COLUMN IF NOT EXISTS participant_limit integer;
     ALTER TABLE spin_games ADD COLUMN IF NOT EXISTS spin_limit_per_user integer;
+    ALTER TABLE spin_games ADD COLUMN IF NOT EXISTS stream_type text NOT NULL DEFAULT 'internal' CHECK (stream_type IN ('internal', 'external'));
 
 -- 2. Spin attempts
 CREATE TABLE IF NOT EXISTS spin_attempts (
@@ -449,8 +450,27 @@ BEGIN
     -- Trivia integration
     IF v_selected_prize->>'type' = 'trivia_ticket' AND v_game.linked_challenge_id IS NOT NULL THEN
         BEGIN
-            SELECT * INTO v_trivia_result
-            FROM add_trivia_participant_from_spin(v_game.linked_challenge_id, v_user_id, v_attempt_id);
+            -- Check if linked challenge has participant limit
+            DECLARE
+                v_challenge challenges%ROWTYPE;
+                v_current_participants INTEGER;
+            BEGIN
+                SELECT * INTO v_challenge FROM challenges WHERE id = v_game.linked_challenge_id;
+                IF v_challenge.max_participants IS NOT NULL THEN
+                    SELECT COUNT(*) INTO v_current_participants
+                    FROM challenge_participants
+                    WHERE challenge_id = v_game.linked_challenge_id;
+
+                    IF v_current_participants >= v_challenge.max_participants THEN
+                        RAISE WARNING 'Trivia challenge % has reached participant limit', v_game.linked_challenge_id;
+                        v_trivia_result := json_build_object('success', false, 'error', 'Challenge full');
+                    ELSE
+                        SELECT add_trivia_participant_from_spin(v_game.linked_challenge_id, v_user_id, v_attempt_id) INTO v_trivia_result;
+                    END IF;
+                ELSE
+                    SELECT add_trivia_participant_from_spin(v_game.linked_challenge_id, v_user_id, v_attempt_id) INTO v_trivia_result;
+                END IF;
+            END;
             
             IF v_trivia_result->>'success' = 'true' THEN
                 v_prize_display := v_prize_display || ' - Ticket #' || (v_trivia_result->>'ticket_number');

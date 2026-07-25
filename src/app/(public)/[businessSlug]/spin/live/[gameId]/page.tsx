@@ -24,6 +24,8 @@ import {
   Store,
   ChevronDown,
   ArrowLeft,
+  Monitor,
+  Wifi,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SpinGame } from "@/types/spinning-wheel";
@@ -354,6 +356,7 @@ export default function BusinessLiveGamePage() {
   });
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [streamType, setStreamType] = useState<"internal" | "external">("internal");
   const containerRef = useRef<HTMLDivElement>(null);
   const winnerAudioRef = useRef<HTMLAudioElement | null>(null);
   const dataFetchedRef = useRef(false);
@@ -646,38 +649,65 @@ export default function BusinessLiveGamePage() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {/* Game Selector - key addition for multi-game support */}
-              <GameSelector
-                games={allGames}
-                activeGameId={gameId as string}
-                businessSlug={businessSlug as string}
-                brandColor={brandColor}
-              />
-              <button
-                onClick={toggleFullscreen}
-                className="flex items-center gap-1 px-3 py-1 rounded-full bg-purple-500/20 hover:bg-purple-500/30 transition-colors"
-              >
-                {isFullscreen ? (
-                  <Minimize2 className="h-3 w-3 text-purple-400" />
-                ) : (
-                  <Maximize2 className="h-3 w-3 text-purple-400" />
-                )}
-                <span className="text-xs text-purple-300 hidden sm:inline">
-                  {isFullscreen ? "Exit" : "OBS"}
-                </span>
-              </button>
-              <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-purple-500/20">
-                <Users className="h-3 w-3 text-purple-400" />
-                <span className="text-sm text-white">{activeViewers}</span>
-              </div>
-              <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-purple-500/20">
-                <TrendingUp className="h-3 w-3 text-green-400" />
-                <span className="text-sm text-white">
-                  {participantStats.total_spins}
-                </span>
-              </div>
-            </div>
+<div className="flex items-center gap-2">
+               {/* Game Selector */}
+               <GameSelector
+                 games={allGames}
+                 activeGameId={gameId as string}
+                 businessSlug={businessSlug as string}
+                 brandColor={brandColor}
+               />
+               {/* Stream Type Toggle */}
+               <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/5 border border-white/10">
+                 <button
+                   onClick={() => setStreamType("internal")}
+                   className={cn(
+                     "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors",
+                     streamType === "internal"
+                       ? "bg-green-500/20 text-green-400"
+                       : "text-white/40 hover:text-white/60",
+                   )}
+                 >
+                   <Monitor className="h-3 w-3" />
+                   Internal
+                 </button>
+                 <button
+                   onClick={() => setStreamType("external")}
+                   className={cn(
+                     "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors",
+                     streamType === "external"
+                       ? "bg-yellow-500/20 text-yellow-400"
+                       : "text-white/40 hover:text-white/60",
+                   )}
+                 >
+                   <Wifi className="h-3 w-3" />
+                   External
+                 </button>
+               </div>
+               <button
+                 onClick={toggleFullscreen}
+                 className="flex items-center gap-1 px-3 py-1 rounded-full bg-purple-500/20 hover:bg-purple-500/30 transition-colors"
+               >
+                 {isFullscreen ? (
+                   <Minimize2 className="h-3 w-3 text-purple-400" />
+                 ) : (
+                   <Maximize2 className="h-3 w-3 text-purple-400" />
+                 )}
+                 <span className="text-xs text-purple-300 hidden sm:inline">
+                   {isFullscreen ? "Exit" : "OBS"}
+                 </span>
+               </button>
+               <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-purple-500/20">
+                 <Users className="h-3 w-3 text-purple-400" />
+                 <span className="text-sm text-white">{activeViewers}</span>
+               </div>
+               <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-purple-500/20">
+                 <TrendingUp className="h-3 w-3 text-green-400" />
+                 <span className="text-sm text-white">
+                   {participantStats.total_spins}
+                 </span>
+               </div>
+             </div>
           </div>
         </div>
       </div>

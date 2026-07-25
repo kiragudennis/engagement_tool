@@ -47,6 +47,19 @@ io.on("connection", (socket) => {
     socket.join(`queue:${gameId}`);
   });
 
+  socket.on("join:viewer", ({ gameId, gameType, streamType }: { gameId: string; gameType: string; streamType: string }) => {
+    if (streamType === "internal") {
+      socket.join(`viewer:${gameId}`);
+      socket.data.viewerGameId = gameId;
+      socket.data.viewerGameType = gameType;
+      socket.data.viewerStreamType = streamType;
+    }
+  });
+
+  socket.on("viewer:heartbeat", ({ gameId, watchedSeconds }: { gameId: string; watchedSeconds: number }) => {
+    io.to(`viewer:${gameId}`).emit("viewer:progress", { watchedSeconds });
+  });
+
   socket.on("admin:queue:called", ({ gameId, user_id }: { gameId: string; user_id: string }) => {
     io.to(`queue:${gameId}`).emit("queue:called", { user_id });
   });
@@ -116,6 +129,10 @@ export function broadcastToQueue(gameId: string, event: string, data: any) {
 
 export function broadcastToTriviaQueue(challengeId: string, event: string, data: any) {
   io.to(`trivia-queue:${challengeId}`).emit(event, data);
+}
+
+export function broadcastToViewers(gameId: string, event: string, data: any) {
+  io.to(`viewer:${gameId}`).emit(event, data);
 }
 
 const PORT = Number(process.env.SOCKET_PORT || 4000);

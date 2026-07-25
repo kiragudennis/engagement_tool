@@ -1,3 +1,4 @@
+-- src/db/challenges_advanced.sql
 -- ============================================
 -- ENGAGE PLATFORM: Challenges - Trivia Only
 -- ============================================
@@ -31,6 +32,7 @@ CREATE TABLE IF NOT EXISTS challenges (
     theme_color TEXT DEFAULT '#8B5CF6',
     show_leaderboard BOOLEAN DEFAULT TRUE,
     show_ticker BOOLEAN DEFAULT TRUE,
+    stream_type text NOT NULL DEFAULT 'internal' CHECK (stream_type IN ('internal', 'external'));
     
     participation_points INTEGER DEFAULT 0,
     

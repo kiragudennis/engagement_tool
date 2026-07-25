@@ -50,7 +50,7 @@ export async function checkAndSendEngagementNotifications() {
   let failed = 0;
 
   for (const biz of businesses) {
-    const limit = getPlanLimit(biz.plan);
+    const limit = await getPlanLimit(biz.plan);
     if (limit <= 0) continue;
 
     const used = biz.engagements_this_month || 0;
@@ -100,15 +100,16 @@ export async function checkAndSendEngagementNotifications() {
   return { sent, failed };
 }
 
-function getPlanLimit(plan: string): number {
-  const limits: Record<string, number> = {
-    trial: 100,
-    starter: 1000,
-    pro: 10000,
-    enterprise: 50000,
-    early_bronze: 500,
-    early_silver: 2000,
-    early_gold: 5000,
-  };
-  return limits[plan] || 100;
+async function getPlanLimit(plan: string): Promise<number> {
+  const { data, error } = await supabaseAdmin.rpc("get_plan_engagement_limit", { p_plan: plan });
+  if (error || !data) {
+    const fallback: Record<string, number> = {
+      trial: 100,
+      starter: 1000,
+      pro: 10000,
+      enterprise: 50000,
+    };
+    return fallback[plan] || 100;
+  }
+  return data as number;
 }

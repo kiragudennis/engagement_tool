@@ -12,6 +12,7 @@ const bulkCreateSchema = z.object({
     .enum(["spin", "trivia", "draw", "spin_draw", "trivia_draw", "all"])
     .default("spin"),
   label: z.string().optional(),
+  codeSubtype: z.enum(["S", "R", "P"]).default("P"),
 });
 
 export async function POST(req: NextRequest) {
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { slug, count, unlocks, label } = parsed.data;
+    const { slug, count, unlocks, label, codeSubtype } = parsed.data;
 
     const { data: business } = await supabaseAdmin
       .from("businesses")
@@ -52,15 +53,36 @@ export async function POST(req: NextRequest) {
     }
 
     const limits = getPlanLimits(business.plan);
-    if (!isUnlimited(limits.maxCodes)) {
+
+    const limitField =
+      codeSubtype === "S"
+        ? "maxStickerCodes"
+        : codeSubtype === "R"
+          ? "maxPosCodes"
+          : "maxCodes";
+    const maxLimit = (limits as any)[limitField];
+
+    const typeMap = { S: "sticker", R: "receipt", P: "public" };
+    const limitType = typeMap[codeSubtype];
+
+    if (!isUnlimited(maxLimit)) {
       const { count: existingCount } = await supabaseAdmin
         .from("access_codes")
         .select("*", { count: "exact", head: true })
-        .eq("business_id", business.id);
+        .eq("business_id", business.id)
+        .eq("type", limitType);
 
-      if ((existingCount || 0) + count > limits.maxCodes) {
+      if ((existingCount || 0) + count > maxLimit) {
+        const limitName =
+          codeSubtype === "S"
+            ? "sticker codes"
+            : codeSubtype === "R"
+              ? "POS codes"
+              : "access codes";
         return NextResponse.json(
-          { error: `Plan limit reached. You can only create ${limits.maxCodes} access codes.` },
+          {
+            error: `Plan limit reached. You can only create ${maxLimit} ${limitName}.`,
+          },
           { status: 403 },
         );
       }
@@ -90,7 +112,7 @@ export async function POST(req: NextRequest) {
         {
           p_business_id: business.id,
           p_code_type: planCodeType,
-          p_code_subtype: "P",
+          p_code_subtype: codeSubtype,
           p_unlocks: unlocks,
           p_source: "dashboard_bulk",
           p_created_by: user.id,

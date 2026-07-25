@@ -10,7 +10,7 @@ export const FAQS = [
   },
   {
     q: "What happens if I outgrow my package?",
-    a: "You can upgrade to a higher tier at any time by paying the difference. Already paid $997 for Bronze? Upgrade to Silver by paying the price difference.",
+    a: "You can upgrade to a higher tier at any time by paying the difference. Already paid $697 for Bronze? Upgrade to Silver by paying the price difference.",
   },
   {
     q: "Can I get a refund?",
@@ -18,7 +18,7 @@ export const FAQS = [
   },
   {
     q: "How does this compare to the monthly plans?",
-    a: "The Silver package gives you more than our Pro plan ($79/mo). At 3 years, you'd pay $2,370 on annual billing. With Silver, you pay $779 once and save $1,591.",
+    a: "The Silver package gives you more than our Pro plan ($79/mo). At 3 years, you'd pay $2,370 on annual billing. With Silver, you pay $1,797 once and save $573.",
   },
   {
     q: "What if Engage shuts down?",

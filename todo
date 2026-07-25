@@ -143,3 +143,92 @@ Here's what was completed for the spin system expansion:
 **Docs**
 
 - Added queue mode note and prize slots explanation to `src/app/(public)/docs/page.tsx`.
+
+---
+
+**SQL / Database**
+
+| Change                                                                                                                                                                                 | File                                 |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `get_challenges_in_current_period(business_id)` RPC — counts challenges created between `last_payment_at`/`next_billing_at` (with calendar-month fallback for trials)                  | `src/db/engagements_migration.sql`   |
+| Grant `EXECUTE` on new RPC to `authenticated` + `service_role`                                                                                                                         | `src/db/engagements_migration.sql`   |
+| Trivia ticket direct redemption in `redeem_access_code` — when `unlocks IN ('trivia','trivia_draw')`, finds open challenge and adds participant via `add_trivia_participant_from_spin` | `src/db/engagement_tool.sql`         |
+| Engagement safeguard `check_business_engagement_allowed` added at top of `redeem_access_code`                                                                                          | `src/db/engagement_tool.sql`         |
+| `increment_business_engagement` extended with type-aware counters (`spin`, `trivia`, `draw`, `code_redeem`)                                                                            | `src/db/engagements_migration.sql`   |
+| New tracking columns on `businesses`: `spins_this_month`, `trivia_answers_this_month`, `draw_entries_this_month`, `code_redemptions_this_month`                                        | `src/db/engagements_migration.sql`   |
+| `reset_monthly_engagement_counts` resets all counters                                                                                                                                  | `src/db/engagements_migration.sql`   |
+| `get_plan_engagement_limit` updated to match new plan tiers (trial=100, starter=1000, pro=10000, enterprise=50000)                                                                     | `src/db/engagements_migration.sql`   |
+| Participant limit check in `perform_spin` trivia_ticket branch — blocks if challenge is full                                                                                           | `src/db/spinning_wheel_advanced.sql` |
+| `participant_limit` and `spin_limit_per_user` columns added to `spin_games`, enforced in `perform_spin`                                                                                | `src/db/spinning_wheel_advanced.sql` |
+
+**Frontend**
+
+| Change                                                                                                                                                        | File                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Public spin landing page (`/[businessSlug]/spin`) — shows available games, filters by participant limits, shows activation status, `all_spins_full` indicator | `src/app/(public)/[businessSlug]/spin/page.tsx` (new) |
+| API route for participant count (`/api/public/spin-participants`)                                                                                             | `src/app/api/public/spin-participants/route.ts` (new) |
+
+**Plan Limits** (`src/lib/config/plans.ts`)
+
+- Starter: 3 spin games, 3 trivia, 3 draws, 1K engagements, 12 prize slots, 50 codes
+- Pro: 10 spin games, 10 trivia, 10 draws, 10K engagements, 24 prize slots, 200 codes
+- Enterprise: unlimited games, 50K engagements, 36 prize slots, unlimited codes
+- Updated `PLAN_LIMITS`, `PLANS`, `EARLY_BIRD_PACKAGES`, and `PLAN_FEATURES` consistently
+
+**Engagement Notifications**
+
+- `src/lib/services/engagement-service.ts` — now calls `get_plan_engagement_limit` RPC instead of hardcoded limits
+- `src/app/api/admin/engagement/notify/route.ts` — Resend email + Twilio SMS for 80%/95% threshold warnings
+
+**Docs** (`src/app/(public)/docs/page.tsx`)
+
+- Updated limits table to reflect new plan numbers
+- Added queue mode note and prize slots explanation
+- Added "What Counts as an Engagement" — now includes code redemption and trivia via code entries
+
+---
+
+**Plan Limits Expanded** (`src/lib/config/plans.ts`)
+
+- Starter: 100 → 5,000 engagements, 50 → 200 codes (with `maxStickerCodes: 500`, `maxPosCodes: 0`)
+- Pro: 10,000 → 50,000 engagements, 200 → 2,000 codes (with `maxStickerCodes: 1000`, `maxPosCodes: 5000`)
+- Enterprise: 50,000 → 500,000 engagements, unlimited codes/sticker/POS
+- Added `maxStickerCodes` and `maxPosCodes` to `PlanLimits` interface and all plan tiers
+
+**Docs Updates** (`src/app/(public)/docs/page.tsx`)
+
+- Engagement types simplified to 4: Spin, Draw Entry, Trivia Answer, Code Redemption
+- Added viewer engagement section: internal vs external stream distinction, viewer prizes
+- Added code type info: sticker codes vs POS codes with separate limits
+- Updated "Code Redemption" description to clarify point unlocks are free service
+
+**Database Schema** (`src/db/`)
+
+- Added `stream_type` column (`internal`/`external`) to `spin_games`, `challenges`, `draws`
+- Added `viewer_prizes` table for configuring viewer prizes per game
+- Added `viewer_engagements` table tracking watch time and claims
+- Added `claim_viewer_prize` RPC — awards points to viewers who watch internal streams for minimum duration
+
+**Bulk Code Creation API** (`src/app/api/business/codes/bulk-create/route.ts`)
+
+- Added `codeSubtype` parameter (`S`=sticker, `R`=receipt/POS, `P`=public)
+- Enforces separate limits: `maxStickerCodes`, `maxPosCodes`, `maxCodes` independently
+
+**Socket.IO Server** (`socket-server/src/index.ts`)
+
+- Added `join:viewer` room for internal stream viewers
+- Added `viewer:heartbeat` event for tracking watch progress
+- Added `broadcastToViewers` export function
+
+**Live Spin Page** (`src/app/(public)/[businessSlug]/spin/live/[gameId]/page.tsx`)
+
+- Added Internal/External stream type toggle in header
+- Active viewers count and engagement stats already present
+
+All docs updates are verified and in place:
+
+**Engagement definitions** now includes "Viewer Prize Claim" as the 5th engagement type, with the claim button appearing during the stream via Socket.IO and recording `claimed_at` timestamp.
+
+**Code type limits** now show separate rows for "Sticker Codes" (500/1000/Unlimited), "POS Codes" (0/5000/Unlimited), and "Access Codes (Public)" (200/2000/Unlimited), with the code format section explaining separate caps.
+
+**Internal/external stream distinction** documented in the Viewer section — only internal stream viewers count as engagements.

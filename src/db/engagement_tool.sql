@@ -478,6 +478,11 @@ DECLARE
     v_draw_ends_at TIMESTAMPTZ := NULL;
     v_draw_entered BOOLEAN := FALSE;
     v_redirect_url TEXT;
+    v_trivia RECORD;
+    v_trivia_ticket_count INTEGER;
+    v_trivia_limit INTEGER;
+    v_trivia_result JSON;
+    v_period_count INTEGER;
 BEGIN
     -- Find and validate code
     SELECT * INTO v_code
@@ -486,6 +491,14 @@ BEGIN
     
     IF NOT FOUND THEN
         RETURN json_build_object('success', false, 'error', 'Invalid or inactive code');
+    END IF;
+
+    -- Get business (need this for engagement check)
+    SELECT * INTO v_business FROM businesses WHERE id = v_code.business_id;
+
+    -- ─── ENGAGEMENT SAFEGUARD ────────────────────────
+    IF NOT check_business_engagement_allowed(v_business.id) THEN
+        RETURN json_build_object('success', false, 'error', 'This business has reached its monthly engagement limit. Try again next month or ask them to upgrade.');
     END IF;
     
     -- Time validity
@@ -640,14 +653,62 @@ BEGIN
             v_draw_ends_at := v_draw.entry_ends_at;
         END IF;
     END IF;
-    
+
+    -- ─── DIRECT TRIVIA TICKET REDEMPTION ─────────────────
+    -- When code unlocks trivia directly (not just via spin prize),
+    -- add the user as a trivia participant immediately
+    IF v_code.unlocks IN ('trivia', 'trivia_draw') THEN
+        -- Find an open trivia challenge for this business
+        SELECT c.id, c.name, c.max_participants INTO v_trivia
+        FROM challenges c
+        WHERE c.business_id = v_business.id
+          AND c.status = 'open'
+          AND (c.ends_at IS NULL OR c.ends_at >= NOW())
+        LIMIT 1;
+
+        IF FOUND THEN
+            -- Check if challenge has a participant limit
+            v_trivia_limit := v_trivia.max_participants;
+            SELECT COUNT(*) INTO v_trivia_ticket_count
+            FROM challenge_participants
+            WHERE challenge_id = v_trivia.id;
+
+            IF v_trivia_limit IS NULL OR v_trivia_ticket_count < v_trivia_limit THEN
+                -- Check if already participating
+                IF NOT EXISTS (
+                    SELECT 1 FROM challenge_participants
+                    WHERE challenge_id = v_trivia.id AND user_id = p_user_id
+                ) THEN
+                    PERFORM add_trivia_participant_from_spin(v_trivia.id, p_user_id, NULL);
+                    v_trivia_result := json_build_object('success', true, 'challenge_id', v_trivia.id);
+                END IF;
+            END IF;
+        END IF;
+    END IF;
+
+    -- ─── INCREMENT ENGAGEMENT ────────────────────────
+    PERFORM increment_business_engagement(v_business.id, 'code_redeem');
+
     -- ─── REDIRECT ───────────────────────────────────────
     -- points → spin page (they can use points to spin)
     -- spin → spin page
     -- spin_draw → spin page (draw entry already handled above)
-    -- draw → spin page (or could go to draw page)
-    v_redirect_url := '/' || v_business.slug || '/spin';
-    
+    -- draw → draw page
+    -- trivia → trivia page (if trivia was directly redeemed)
+    IF v_code.unlocks IN ('trivia', 'trivia_draw') AND v_trivia_result IS NOT NULL THEN
+        v_redirect_url := '/' || v_business.slug || '/trivia/' || (v_trivia_result->>'challenge_id');
+    ELSE
+        v_redirect_url := '/' || v_business.slug || '/spin';
+    END IF;
+
+    -- Check if any spin games have reached participant limits (for UI awareness)
+    SELECT COUNT(*) INTO v_period_count
+    FROM spin_games sg
+    WHERE sg.business_id = v_business.id
+      AND sg.is_active = true
+      AND sg.participant_limit IS NOT NULL
+      AND (SELECT COUNT(DISTINCT user_id) FROM spin_attempts WHERE game_id = sg.id) >= sg.participant_limit;
+
     RETURN json_build_object(
         'success', true,
         'business_id', v_business.id,
@@ -664,7 +725,10 @@ BEGIN
         'draw_entered', v_draw_entered,
         'draw_name', v_draw_name,
         'draw_prize', v_draw_prize,
-        'draw_ends_at', v_draw_ends_at
+        'draw_ends_at', v_draw_ends_at,
+        'trivia_entered', v_trivia_result IS NOT NULL,
+        'trivia_challenge_id', v_trivia_result->>'challenge_id',
+        'all_spins_full', v_period_count > 0
     );
 END;
 $$;

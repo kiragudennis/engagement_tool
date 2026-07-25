@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS draws (
     theme_color TEXT DEFAULT '#8B5CF6',
     show_entry_ticker BOOLEAN DEFAULT TRUE,
     show_leaderboard BOOLEAN DEFAULT TRUE,
+    stream_type text NOT NULL DEFAULT 'internal' CHECK (stream_type IN ('internal', 'external'));
     
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()

@@ -129,13 +129,20 @@ export async function activateBusinessSubscription(params: {
 
   const nextBilling = new Date();
   if (params.billingCycle === "lifetime" || params.plan?.startsWith("early_")) {
-    // Set far future date for lifetime plans
     nextBilling.setFullYear(nextBilling.getFullYear() + 100);
   } else {
     nextBilling.setMonth(
       nextBilling.getMonth() + (params.billingCycle === "annual" ? 12 : 1),
     );
   }
+
+  const { data: existingBusiness } = await supabaseAdmin
+    .from("businesses")
+    .select("plan")
+    .eq("id", params.businessId)
+    .single();
+
+  const oldPlan = existingBusiness?.plan;
 
   const updateData: any = {
     plan: params.plan,
@@ -146,7 +153,6 @@ export async function activateBusinessSubscription(params: {
     updated_at: new Date().toISOString(),
   };
 
-  // Only update these if provided
   if (params.paystackCustomerCode) {
     updateData.paystack_customer_code = params.paystackCustomerCode;
   }
@@ -161,6 +167,17 @@ export async function activateBusinessSubscription(params: {
     .from("businesses")
     .update(updateData)
     .eq("id", params.businessId);
+
+  if (!error && oldPlan && oldPlan !== params.plan) {
+    try {
+      await supabaseAdmin.rpc("apply_plan_carryover", {
+        p_business_id: params.businessId,
+        p_old_plan: oldPlan,
+      });
+    } catch (carryoverError) {
+      console.error("Failed to apply plan carryover:", carryoverError);
+    }
+  }
 
   return { data, error };
 }

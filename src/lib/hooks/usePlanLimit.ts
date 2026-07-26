@@ -39,6 +39,16 @@ export function usePlanLimit(business: any) {
     };
   };
 
+  const canCreatePublicCode = (currentCount: number) => {
+    if (!limits) return { allowed: false, reason: "No plan found" };
+    if (isUnlimited(limits.maxPublicCodes)) return { allowed: true };
+    if (currentCount < limits.maxPublicCodes) return { allowed: true };
+    return {
+      allowed: false,
+      reason: `You've reached your public code limit of ${limits.maxPublicCodes}. Upgrade to add more public codes.`,
+    };
+  };
+
   const canCreateTrivia = (currentCount: number) => {
     if (!limits) return { allowed: false, reason: "No plan found" };
     if (isUnlimited(limits.maxTriviaChallenges)) return { allowed: true };
@@ -74,6 +84,7 @@ export function usePlanLimit(business: any) {
     canCreateGame,
     canAddPrizeSlot,
     canCreateCode,
+    canCreatePublicCode,
     canCreateTrivia,
     canCreateTriviaInPeriod,
     canCreateDraw,

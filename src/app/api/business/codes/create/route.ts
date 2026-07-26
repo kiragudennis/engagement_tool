@@ -84,15 +84,51 @@ export async function POST(req: NextRequest) {
     }
 
     const limits = getPlanLimits(business.plan);
-    if (!isUnlimited(limits.maxCodes)) {
+
+    const limitField =
+      type === "public"
+        ? "maxPublicCodes"
+        : type === "sticker"
+          ? "maxStickerCodes"
+          : type === "qr"
+            ? "maxStickerCodes"
+            : "maxCodes";
+
+    const baseLimit = (limits as any)[limitField];
+
+    let effectiveLimit = baseLimit;
+    if (!isUnlimited(baseLimit)) {
+      const { data: dbLimit } = await supabaseAdmin.rpc(
+        "get_effective_plan_limit",
+        {
+          p_business_id: business.id,
+          p_limit_type: limitField,
+        },
+      );
+
+      if (dbLimit) {
+        effectiveLimit = dbLimit;
+      }
+    }
+
+    if (!isUnlimited(effectiveLimit)) {
       const { count: existingCount } = await supabaseAdmin
         .from("access_codes")
         .select("*", { count: "exact", head: true })
-        .eq("business_id", business.id);
+        .eq("business_id", business.id)
+        .eq("type", type === "sticker" || type === "qr" ? type : type === "public" ? "public" : type);
 
-      if ((existingCount || 0) >= limits.maxCodes) {
+      if ((existingCount || 0) >= effectiveLimit) {
+        const limitName =
+          type === "public"
+            ? "public codes"
+            : type === "sticker"
+              ? "sticker codes"
+              : type === "qr"
+                ? "QR codes"
+                : "access codes";
         return NextResponse.json(
-          { error: `Plan limit reached. You can only create ${limits.maxCodes} access codes.` },
+          { error: `Plan limit reached. You can only create ${effectiveLimit} ${limitName}.` },
           { status: 403 },
         );
       }

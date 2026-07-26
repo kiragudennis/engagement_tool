@@ -1,25 +1,49 @@
-// app/(admin)/admin/[businessSlug]/draws/[drawId]/control/page.tsx - Enhanced version
+// app/(admin)/admin/[businessSlug]/draws/[drawId]/control/page.tsx
 
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, Trophy, Users, Ticket, Play, Lock, Eye } from "lucide-react";
+import {
+  Loader2,
+  Trophy,
+  Users,
+  Ticket,
+  Play,
+  Lock,
+  Eye,
+  Gift,
+  Coins,
+  EyeOff,
+} from "lucide-react";
 
 type DrawControl = {
   id: string;
   name: string;
   status: "draft" | "open" | "closed" | "drawing" | "completed" | "cancelled";
+  business_id: string;
   winner_name?: string | null;
   winner_user_id?: string | null;
   total_entries?: number;
   total_participants?: number;
+};
+
+type ViewerPrizeConfig = {
+  id?: string;
+  prize_type: string;
+  prize_value: number;
+  max_claims_per_user: number;
+  max_total_claims: number;
+  is_active: boolean;
 };
 
 export default function DrawControlPage() {
@@ -30,7 +54,22 @@ export default function DrawControlPage() {
   const [loading, setLoading] = useState(true);
   const [selectingWinner, setSelectingWinner] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [viewerPrize, setViewerPrize] = useState<{
+    id?: string;
+    prize_type: string;
+    prize_value: number;
+    max_claims_per_user: number;
+    max_total_claims: number;
+    is_active: boolean;
+  }>({
+    prize_type: "points",
+    prize_value: 100,
+    max_claims_per_user: 1,
+    max_total_claims: 0,
+    is_active: true,
+  });
+  const [savingViewerPrize, setSavingViewerPrize] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!drawId) return;
@@ -42,7 +81,7 @@ export default function DrawControlPage() {
       ] = await Promise.all([
         supabase
           .from("draws")
-          .select("id, name, status, winner_id, winner_name")
+          .select("id, name, status, winner_id, winner_name, business_id")
           .eq("id", drawId)
           .single(),
         supabase
@@ -69,7 +108,6 @@ export default function DrawControlPage() {
         return;
       }
 
-      // Calculate totals
       const totalEntries =
         entries?.reduce((sum, e) => sum + (e.entry_count || 0), 0) || 0;
       const uniqueParticipants = entries
@@ -82,6 +120,28 @@ export default function DrawControlPage() {
         total_participants: uniqueParticipants,
       } as DrawControl);
       setParticipants(entries || []);
+
+      if (drawData?.business_id) {
+        const { data: vp } = await supabase
+          .from("viewer_prizes")
+          .select("*")
+          .eq("business_id", drawData.business_id)
+          .eq("game_type", "draw")
+          .eq("game_id", drawId)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        if (vp) {
+          setViewerPrize({
+            id: vp.id,
+            prize_type: vp.prize_type,
+            prize_value: vp.prize_value,
+            max_claims_per_user: vp.max_claims_per_user,
+            max_total_claims: vp.max_total_claims || 0,
+            is_active: vp.is_active,
+          });
+        }
+      }
     } catch (error) {
       console.error("Error loading draw control data:", error);
     } finally {
@@ -89,20 +149,14 @@ export default function DrawControlPage() {
     }
   }, [drawId, supabase]);
 
-  // Use polling instead of real-time to avoid resource issues
   useEffect(() => {
     loadData();
 
-    // Poll every 5 seconds
-    pollingRef.current = setInterval(() => {
+    const interval = setInterval(() => {
       loadData();
     }, 5000);
 
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-      }
-    };
+    return () => clearInterval(interval);
   }, [loadData]);
 
   const updateStatus = async (newStatus: string) => {
@@ -132,16 +186,14 @@ export default function DrawControlPage() {
 
     setSelectingWinner(true);
 
-    // Build weighted pool based on entry counts
     const weightedPool: typeof participants = [];
     participants.forEach((p) => {
-      const weight = Math.min(p.entry_count, 100); // Cap at 100 to prevent huge arrays
+      const weight = Math.min(p.entry_count, 100);
       for (let i = 0; i < weight; i++) {
         weightedPool.push(p);
       }
     });
 
-    // Simulate "shuffling" for drama (brief delay)
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     const winner =
@@ -166,6 +218,44 @@ export default function DrawControlPage() {
       await loadData();
     }
     setSelectingWinner(false);
+  };
+
+  const saveViewerPrize = async () => {
+    if (!draw?.business_id) return;
+
+    setSavingViewerPrize(true);
+    try {
+      const payload = {
+        business_id: draw.business_id,
+        game_type: "draw",
+        game_id: draw.id,
+        prize_type: viewerPrize.prize_type,
+        prize_value: viewerPrize.prize_value,
+        max_claims_per_user: viewerPrize.max_claims_per_user,
+        max_total_claims: viewerPrize.max_total_claims || null,
+        is_active: viewerPrize.is_active,
+      };
+
+      if (viewerPrize.id) {
+        const { error } = await supabase
+          .from("viewer_prizes")
+          .update(payload)
+          .eq("id", viewerPrize.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("viewer_prizes").insert(payload);
+
+        if (error) throw error;
+      }
+
+      toast.success("Viewer prize configuration saved");
+      await loadData();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to save viewer prize config");
+    } finally {
+      setSavingViewerPrize(false);
+    }
   };
 
   const getStatusIcon = (status: string) => {
@@ -207,7 +297,6 @@ export default function DrawControlPage() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Main Control Panel */}
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardHeader>
@@ -269,7 +358,6 @@ export default function DrawControlPage() {
             </CardContent>
           </Card>
 
-          {/* Winner Display */}
           {draw.winner_name && (
             <Card className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/30">
               <CardContent className="py-6 text-center">
@@ -281,7 +369,6 @@ export default function DrawControlPage() {
           )}
         </div>
 
-        {/* Stats Sidebar */}
         <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -339,6 +426,107 @@ export default function DrawControlPage() {
           </Card>
         </div>
       </div>
+
+      {/* Viewer Prize Configuration */}
+      <Card className="mt-6 border-white/10">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Gift className="h-5 w-5 text-orange-400" />
+            Viewer Prize Setup
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-white/70">
+                Reward viewers who watch the live draw stream
+              </p>
+              <p className="text-xs text-white/40">
+                A &quot;Claim Prize&quot; button appears smoothly for eligible
+                viewers
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-white/60">Enable</Label>
+              <Switch
+                checked={viewerPrize.is_active}
+                onCheckedChange={(checked) =>
+                  setViewerPrize((p) => ({ ...p, is_active: checked }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label className="text-white/60 text-xs">Prize Type</Label>
+              <select
+                value={viewerPrize.prize_type}
+                onChange={(e) =>
+                  setViewerPrize((p) => ({ ...p, prize_type: e.target.value }))
+                }
+                disabled={!viewerPrize.is_active}
+                className="w-full mt-1 rounded-lg border bg-background p-2 text-sm disabled:opacity-50"
+              >
+                <option value="points">Points</option>
+                <option value="discount">Discount %</option>
+                <option value="free_service">Free Service</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            <div>
+              <Label className="text-white/60 text-xs">
+                Prize Value (points / amount)
+              </Label>
+              <Input
+                type="number"
+                value={viewerPrize.prize_value}
+                onChange={(e) =>
+                  setViewerPrize((p) => ({
+                    ...p,
+                    prize_value: parseInt(e.target.value) || 0,
+                  }))
+                }
+                disabled={!viewerPrize.is_active}
+                className="mt-1 disabled:opacity-50"
+                min={1}
+              />
+            </div>
+            <div>
+              <Label className="text-white/60 text-xs">
+                Max Total Claims (0 = unlimited)
+              </Label>
+              <Input
+                type="number"
+                value={viewerPrize.max_total_claims}
+                onChange={(e) =>
+                  setViewerPrize((p) => ({
+                    ...p,
+                    max_total_claims: parseInt(e.target.value) || 0,
+                  }))
+                }
+                disabled={!viewerPrize.is_active}
+                className="mt-1 disabled:opacity-50"
+                min={0}
+                placeholder="First N customers win"
+              />
+            </div>
+          </div>
+
+          <Button
+            onClick={saveViewerPrize}
+            disabled={savingViewerPrize || !viewerPrize.is_active}
+            className="w-full gap-2"
+          >
+            {savingViewerPrize ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Gift className="h-4 w-4" />
+            )}
+            Save Viewer Prize Configuration
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

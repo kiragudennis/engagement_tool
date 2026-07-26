@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import { SpinGame } from "@/types/spinning-wheel";
 import Link from "next/link";
 import { useSocket } from "@/lib/socket/useSocket";
+import { ViewerPrizeClaimButton } from "@/components/viewer/ViewerPrizeClaimButton";
 
 // ─── Types ──────────────────────────────────────────────
 interface Participant {
@@ -874,6 +875,14 @@ export default function BusinessLiveGamePage() {
         preload="auto"
         className="hidden"
       />
+      {business && game && (
+        <ViewerPrizeClaimButton
+          businessId={business.id}
+          gameType="spin"
+          gameId={game.id}
+          brandColor={business.brand_color}
+        />
+      )}
     </div>
   );
 }

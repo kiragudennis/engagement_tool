@@ -59,29 +59,48 @@ export async function POST(req: NextRequest) {
         ? "maxStickerCodes"
         : codeSubtype === "R"
           ? "maxPosCodes"
-          : "maxCodes";
-    const maxLimit = (limits as any)[limitField];
+          : codeSubtype === "P"
+            ? "maxPublicCodes"
+            : "maxCodes";
+    const baseLimit = (limits as any)[limitField];
+
+    let effectiveLimit = baseLimit;
+    if (!isUnlimited(baseLimit)) {
+      const { data: dbLimit } = await supabaseAdmin.rpc(
+        "get_effective_plan_limit",
+        {
+          p_business_id: business.id,
+          p_limit_type: limitField,
+        },
+      );
+
+      if (dbLimit) {
+        effectiveLimit = dbLimit;
+      }
+    }
 
     const typeMap = { S: "sticker", R: "receipt", P: "public" };
     const limitType = typeMap[codeSubtype];
 
-    if (!isUnlimited(maxLimit)) {
+    if (!isUnlimited(effectiveLimit)) {
       const { count: existingCount } = await supabaseAdmin
         .from("access_codes")
         .select("*", { count: "exact", head: true })
         .eq("business_id", business.id)
         .eq("type", limitType);
 
-      if ((existingCount || 0) + count > maxLimit) {
+      if ((existingCount || 0) + count > effectiveLimit) {
         const limitName =
           codeSubtype === "S"
             ? "sticker codes"
             : codeSubtype === "R"
               ? "POS codes"
-              : "access codes";
+              : codeSubtype === "P"
+                ? "public codes"
+                : "access codes";
         return NextResponse.json(
           {
-            error: `Plan limit reached. You can only create ${maxLimit} ${limitName}.`,
+            error: `Plan limit reached. You can only create ${effectiveLimit} ${limitName}.`,
           },
           { status: 403 },
         );

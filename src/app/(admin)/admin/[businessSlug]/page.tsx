@@ -7,6 +7,15 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
 import {
@@ -22,36 +31,45 @@ import {
   RotateCcw,
   Zap,
   Brain,
+  Trophy,
+  TrendingUp,
+  Eye,
+  BarChart3,
+  Lock,
+  ArrowUpRight,
+  AlertTriangle,
+  Printer,
+  ShoppingBag,
+  Globe,
+  Coins,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
 import Link from "next/link";
 import { PlanLimitBanner } from "@/components/billing/PlanLimitBanner";
+import { getPlanLimits, isUnlimited } from "@/lib/config/plans";
 
 export default function BusinessAdminDashboard() {
   const { businessSlug } = useParams<{ businessSlug: string }>();
-  const { supabase, profile, business, setBusiness } = useAuth();
+  const { supabase, business, setBusiness } = useAuth();
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalSpins: 0,
-    spinsToday: 0,
-    activeCustomers: 0,
-    totalCustomers: 0,
-    activeCodes: 0,
-    prizesAwarded: 0,
-  });
   const [spinGame, setSpinGame] = useState<any>(null);
   const [recentSpins, setRecentSpins] = useState<any[]>([]);
-  const [topCustomers, setTopCustomers] = useState<any[]>([]);
+  const [publicCodeLabel, setPublicCodeLabel] = useState("");
+  const [publicCodeUnlocks, setPublicCodeUnlocks] = useState("spin");
+  const [generatingPublicCode, setGeneratingPublicCode] = useState(false);
+  const [generatedPublicCode, setGeneratedPublicCode] = useState<string | null>(
+    null,
+  );
 
   const loadDashboard = useCallback(async () => {
     if (!businessSlug) return;
 
     try {
-      // Load business
       const { data: biz } = await supabase
         .from("businesses")
         .select("*")
@@ -64,7 +82,6 @@ export default function BusinessAdminDashboard() {
       }
       setBusiness(biz);
 
-      // Load spin game
       const { data: game } = await supabase
         .from("spin_games")
         .select("*")
@@ -75,80 +92,59 @@ export default function BusinessAdminDashboard() {
 
       setSpinGame(game);
 
-      // Load stats
-      const today = new Date().toISOString().split("T")[0];
-
       if (game) {
-        const [
-          { count: totalSpins },
-          { data: todaySpins },
-          { data: recentSpinsData },
-        ] = await Promise.all([
-          supabase
-            .from("spin_attempts")
-            .select("*", { count: "exact", head: true })
-            .eq("game_id", game.id),
-          supabase
-            .from("spin_attempts")
-            .select("id")
-            .eq("game_id", game.id)
-            .gte("created_at", today),
-          supabase
-            .from("spin_attempts")
-            .select("*, users!user_id(full_name, email)")
-            .eq("game_id", game.id)
-            .order("created_at", { ascending: false })
-            .limit(10),
-        ]);
+        const { data: recentSpinsData } = await supabase
+          .from("spin_attempts")
+          .select("*, users!user_id(full_name, email)")
+          .eq("game_id", game.id)
+          .order("created_at", { ascending: false })
+          .limit(10);
 
-        setStats((prev) => ({
-          ...prev,
-          totalSpins: totalSpins || 0,
-          spinsToday: todaySpins?.length || 0,
-        }));
         setRecentSpins(recentSpinsData || []);
       }
-
-      // Customer stats
-      const [{ count: totalCustomers }, { count: activeCustomers }] =
-        await Promise.all([
-          supabase
-            .from("customer_business_activations")
-            .select("*", { count: "exact", head: true })
-            .eq("business_id", biz.id),
-          supabase
-            .from("customer_business_activations")
-            .select("*", { count: "exact", head: true })
-            .eq("business_id", biz.id)
-            .eq("is_active", true)
-            .gte("expires_at", new Date().toISOString()),
-        ]);
-
-      // Active codes
-      const { count: activeCodes } = await supabase
-        .from("access_codes")
-        .select("*", { count: "exact", head: true })
-        .eq("business_id", biz.id)
-        .eq("is_active", true);
-
-      setStats((prev) => ({
-        ...prev,
-        totalCustomers: totalCustomers || 0,
-        activeCustomers: activeCustomers || 0,
-        activeCodes: activeCodes || 0,
-      }));
     } catch (err) {
       console.error("Error loading dashboard:", err);
     } finally {
       setLoading(false);
     }
-  }, [businessSlug, supabase, router]);
+  }, [businessSlug, supabase, router, setBusiness]);
 
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
 
   const publicUrl = `engagespin.com/${businessSlug}/code-entry`;
+
+  const handleGeneratePublicCode = async () => {
+    if (!business) return;
+
+    setGeneratingPublicCode(true);
+    setGeneratedPublicCode(null);
+    try {
+      const res = await fetch("/api/business/codes/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug: businessSlug,
+          type: "public",
+          label: publicCodeLabel || undefined,
+          unlocks: publicCodeUnlocks,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate code");
+
+      setGeneratedPublicCode(data.code);
+      setPublicCodeLabel("");
+      toast.success(`Public code ${data.code} created!`);
+      loadDashboard();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to generate code");
+    } finally {
+      setGeneratingPublicCode(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -159,6 +155,93 @@ export default function BusinessAdminDashboard() {
   }
 
   if (!business) return null;
+
+  const limits = getPlanLimits(business.plan);
+  const totalCodes =
+    (business.sticker_codes_this_month || 0) +
+    (business.pos_codes_this_month || 0) +
+    (business.public_codes_this_month || 0);
+  const publicCodesLimit = isUnlimited(limits.maxPublicCodes)
+    ? null
+    : limits.maxPublicCodes;
+  const publicCodesUsed = business.public_codes_this_month || 0;
+  const publicCodesPercent =
+    publicCodesLimit && publicCodesLimit > 0
+      ? Math.min(100, (publicCodesUsed / publicCodesLimit) * 100)
+      : 0;
+
+  const statCards = [
+    {
+      label: "Engagements",
+      value: business.engagements_this_month || 0,
+      icon: Activity,
+      color: "text-purple-400",
+      limit: limits.maxEngagementsPerMonth,
+    },
+    {
+      label: "Spins",
+      value: business.spins_this_month || 0,
+      icon: Zap,
+      color: "text-yellow-400",
+      limit: limits.maxEngagementsPerMonth,
+    },
+    {
+      label: "Trivia",
+      value: business.trivia_answers_this_month || 0,
+      icon: Brain,
+      color: "text-blue-400",
+      limit: limits.maxEngagementsPerMonth,
+    },
+    {
+      label: "Draw Entries",
+      value: business.draw_entries_this_month || 0,
+      icon: Ticket,
+      color: "text-green-400",
+      limit: limits.maxEngagementsPerMonth,
+    },
+    {
+      label: "Code Redemptions",
+      value: business.code_redemptions_this_month || 0,
+      icon: QrCode,
+      color: "text-pink-400",
+      limit: limits.maxEngagementsPerMonth,
+    },
+    {
+      label: "Sticker Codes",
+      value: business.sticker_codes_this_month || 0,
+      icon: Printer,
+      color: "text-amber-400",
+      limit: limits.maxStickerCodes,
+    },
+    {
+      label: "POS Codes",
+      value: business.pos_codes_this_month || 0,
+      icon: ShoppingBag,
+      color: "text-cyan-400",
+      limit: limits.maxPosCodes,
+    },
+    {
+      label: "Public Codes",
+      value: publicCodesUsed,
+      icon: Globe,
+      color: "text-orange-400",
+      limit: publicCodesLimit,
+    },
+    {
+      label: "Viewers",
+      value: business.viewer_engagements_count || 0,
+      icon: Eye,
+      color: "text-indigo-400",
+      limit: limits.maxEngagementsPerMonth,
+    },
+    {
+      label: "Prizes Claimed",
+      value: business.viewer_prizes_claimed || 0,
+      icon: Trophy,
+      color: "text-red-400",
+      limit: null,
+    },
+  ];
 
   return (
     <div className="min-h-screen">
@@ -223,51 +306,15 @@ export default function BusinessAdminDashboard() {
 
       <div className="container mx-auto px-4 py-8">
         <PlanLimitBanner business={business} />
-        {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
-          {[
-            {
-              label: "Spins Today",
-              value: stats.spinsToday,
-              icon: Zap,
-              color: "text-yellow-400",
-            },
-            {
-              label: "Total Spins",
-              value: stats.totalSpins,
-              icon: RotateCcw,
-              color: "text-purple-400",
-            },
-            {
-              label: "Active Customers",
-              value: stats.activeCustomers,
-              icon: Users,
-              color: "text-green-400",
-            },
-            {
-              label: "Total Customers",
-              value: stats.totalCustomers,
-              icon: Users,
-              color: "text-blue-400",
-            },
-            {
-              label: "Active Codes",
-              value: stats.activeCodes,
-              icon: Ticket,
-              color: "text-pink-400",
-            },
-            {
-              label: "Prizes Won",
-              value: stats.totalSpins,
-              icon: Gift,
-              color: "text-orange-400",
-            },
-          ].map((stat, i) => (
+
+        {/* All Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-8">
+          {statCards.map((stat, i) => (
             <motion.div
               key={stat.label}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
+              transition={{ delay: i * 0.04 }}
             >
               <Card className="border-white/10">
                 <CardContent className="p-4 text-center">
@@ -277,12 +324,57 @@ export default function BusinessAdminDashboard() {
                   <p className="text-2xl font-bold">
                     {stat.value.toLocaleString()}
                   </p>
-                  <p className="text-xs">{stat.label}</p>
+                  <p className="text-xs text-white/60">{stat.label}</p>
+                  {stat.limit !== null && !isUnlimited(stat.limit) && (
+                    <p className="text-[10px] text-white/30 mt-0.5">
+                      / {stat.limit.toLocaleString()}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
           ))}
         </div>
+
+        {/* Public Code Usage Bar with Upgrade */}
+        {publicCodesLimit !== null && (
+          <Card className="border-white/10 mb-8">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-white/70">
+                  Public Codes Usage
+                </span>
+                <span className="text-xs text-white/40">
+                  {publicCodesUsed} / {publicCodesLimit}
+                </span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${publicCodesPercent}%`,
+                    backgroundColor:
+                      publicCodesPercent >= 90
+                        ? "#ef4444"
+                        : publicCodesPercent >= 70
+                          ? "#f59e0b"
+                          : "#8b5cf6",
+                  }}
+                />
+              </div>
+              {publicCodesPercent >= 70 && (
+                <div className="mt-3 flex justify-end">
+                  <Button asChild size="sm">
+                    <Link href={`/admin/${businessSlug}/billing?upgrade=pro`}>
+                      <ArrowUpRight className="h-4 w-4 mr-1" /> Upgrade for More
+                      Public Codes
+                    </Link>
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Main Tabs */}
         <Tabs defaultValue="overview" className="space-y-6">
@@ -295,7 +387,6 @@ export default function BusinessAdminDashboard() {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            {/* Public URL Card */}
             <Card className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 border-purple-500/30">
               <CardContent className="p-6">
                 <h3 className="font-semibold mb-2 flex items-center gap-2">
@@ -324,7 +415,6 @@ export default function BusinessAdminDashboard() {
               </CardContent>
             </Card>
 
-            {/* Quick Actions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <QuickActionCard
                 icon={RotateCcw}
@@ -353,7 +443,84 @@ export default function BusinessAdminDashboard() {
               />
             </div>
 
-            {/* Recent Spins */}
+            {/* Public Code Generator */}
+            <Card className="border-white/10">
+              <CardContent className="p-6">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <Globe className="h-5 w-5 text-orange-400" /> Generate Public
+                  Code
+                </h3>
+                <p className="text-white/40 text-xs mb-3">
+                  Create a public marketing code for social media. Requires
+                  customer to be active.
+                </p>
+                {generatedPublicCode ? (
+                  <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                    <p className="text-green-400 text-sm font-medium mb-1">
+                      Code Created!
+                    </p>
+                    <code className="text-sm font-mono text-green-300">
+                      {generatedPublicCode}
+                    </code>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2 text-white/60"
+                      onClick={() => setGeneratedPublicCode(null)}
+                    >
+                      Generate Another
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-white/60 text-xs">
+                        Label (optional)
+                      </Label>
+                      <Input
+                        value={publicCodeLabel}
+                        onChange={(e) => setPublicCodeLabel(e.target.value)}
+                        placeholder="e.g. Instagram promo"
+                        className="mt-1 bg-white/5 border-white/10 text-white"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-white/60 text-xs">Unlocks</Label>
+                      <Select
+                        value={publicCodeUnlocks}
+                        onValueChange={setPublicCodeUnlocks}
+                      >
+                        <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="points">Points Only</SelectItem>
+                          <SelectItem value="spin">Spin Access</SelectItem>
+                          <SelectItem value="spin_draw">
+                            Spin + Draws
+                          </SelectItem>
+                          <SelectItem value="draw">Draws Only</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      onClick={handleGeneratePublicCode}
+                      disabled={generatingPublicCode}
+                      className="w-full gap-2"
+                      style={{ backgroundColor: business.brand_color }}
+                    >
+                      {generatingPublicCode ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Globe className="h-4 w-4" />
+                      )}
+                      Generate Public Code
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card className="border-white/10">
               <CardHeader>
                 <CardTitle className="text-lg">Recent Spins</CardTitle>
@@ -399,7 +566,6 @@ export default function BusinessAdminDashboard() {
             </Card>
           </TabsContent>
 
-          {/* Other tabs placeholder */}
           <TabsContent value="spin">
             <Card className="border-white/10">
               <CardContent className="p-12 text-center">
@@ -447,8 +613,8 @@ export default function BusinessAdminDashboard() {
                 <Users className="h-12 w-12 mx-auto mb-4" />
                 <h3 className="font-semibold mb-2">Customer List</h3>
                 <p className="mb-4">
-                  {stats.totalCustomers} total customers •{" "}
-                  {stats.activeCustomers} active
+                  {business.viewer_engagements_count || 0} total customers •{" "}
+                  {business.engagements_this_month || 0} active
                 </p>
                 <Button
                   asChild
@@ -467,7 +633,6 @@ export default function BusinessAdminDashboard() {
   );
 }
 
-// Quick action card component
 function QuickActionCard({
   icon: Icon,
   title,

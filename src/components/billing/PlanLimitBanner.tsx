@@ -15,6 +15,7 @@ interface PlanLimitBannerProps {
     trial_ends_at: string | null;
     engagements_this_month?: number;
     spins_this_month?: number;
+    public_codes_this_month?: number;
   };
 }
 
@@ -23,6 +24,15 @@ export function PlanLimitBanner({ business }: PlanLimitBannerProps) {
   const used =
     business.engagements_this_month ?? business.spins_this_month ?? 0;
   const access = getBusinessAccessStatus(business);
+
+  const publicCodesLimit =
+    business.plan === "trial" ? 0 : limits.maxPublicCodes;
+  const publicCodesUsed = business.public_codes_this_month || 0;
+  const publicCodesPercent =
+    publicCodesLimit && publicCodesLimit > 0
+      ? (publicCodesUsed / publicCodesLimit) * 100
+      : 0;
+
   const usagePercent =
     limits.maxEngagementsPerMonth > 0
       ? (used / limits.maxEngagementsPerMonth) * 100
@@ -71,21 +81,62 @@ export function PlanLimitBanner({ business }: PlanLimitBannerProps) {
     );
   }
 
-  if (usagePercent >= 80) {
+  const showEngagementWarning = usagePercent >= 80;
+  const showPublicCodeWarning =
+    publicCodesLimit !== null && publicCodesLimit > 0 && publicCodesPercent >= 80;
+
+  if (showEngagementWarning || showPublicCodeWarning) {
     return (
-      <div className="mb-6 p-4 rounded-xl bg-white/5 border border-white/10">
-        <UsageMeter
-          label="Engagements this month"
-          used={used}
-          max={limits.maxEngagementsPerMonth}
-        />
-        {usagePercent >= 95 && (
-          <div className="mt-3 flex justify-end">
-            <Button asChild size="sm">
-              <Link href={`/admin/${business.slug}/billing?upgrade=pro`}>
-                Upgrade Plan
-              </Link>
-            </Button>
+      <div className="mb-6 p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
+        {showEngagementWarning && (
+          <div>
+            <UsageMeter
+              label="Engagements this month"
+              used={used}
+              max={limits.maxEngagementsPerMonth}
+            />
+            {usagePercent >= 95 && (
+              <div className="mt-3 flex justify-end">
+                <Button asChild size="sm">
+                  <Link href={`/admin/${business.slug}/billing?upgrade=pro`}>
+                    Upgrade Plan
+                  </Link>
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+        {showPublicCodeWarning && (
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm text-white/70">Public codes this month</span>
+              <span className="text-xs text-white/40">
+                {publicCodesUsed} / {publicCodesLimit}
+              </span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${Math.min(100, publicCodesPercent)}%`,
+                  backgroundColor:
+                    publicCodesPercent >= 90
+                      ? "#ef4444"
+                      : publicCodesPercent >= 70
+                        ? "#f59e0b"
+                        : "#8b5cf6",
+                }}
+              />
+            </div>
+            {publicCodesPercent >= 70 && (
+              <div className="mt-2 flex justify-end">
+                <Button asChild size="sm">
+                  <Link href={`/admin/${business.slug}/billing?upgrade=pro`}>
+                    Upgrade for More Public Codes
+                  </Link>
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>

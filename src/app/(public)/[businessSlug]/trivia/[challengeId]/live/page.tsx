@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { ViewerPrizeClaimButton } from "@/components/viewer/ViewerPrizeClaimButton";
 
 // ─── Types ──────────────────────────────────────────────
 interface QueueParticipant {
@@ -697,6 +698,14 @@ export default function TriviaLivePage() {
             </div>
           </Card>
         </div>
+        {business && challenge && (
+          <ViewerPrizeClaimButton
+            businessId={business.id}
+            gameType="trivia"
+            gameId={challenge.id}
+            brandColor={business.brand_color}
+          />
+        )}
       </div>
     </div>
   );

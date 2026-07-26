@@ -36,25 +36,28 @@ import Link from "next/link";
 // ─── Plan definitions (USD only) ───────────────────────
 const EARLY_BIRD_PLANS: Record<
   string,
-  { name: string; priceUsd: number; icon: any; color: string }
+  { name: string; priceUsd: number; icon: any; color: string; tier: number }
 > = {
   early_bronze: {
     name: "Bronze Lifetime",
-    priceUsd: 697, // ~3.4x annual (was $775)
+    priceUsd: 697,
     icon: Sparkles,
     color: "from-amber-500 to-orange-500",
+    tier: 1,
   },
   early_silver: {
     name: "Silver Lifetime",
-    priceUsd: 1797, // ~3.2x annual (was $1,938)
+    priceUsd: 1797,
     icon: Crown,
     color: "from-gray-400 to-gray-500",
+    tier: 2,
   },
   early_gold: {
     name: "Gold Lifetime",
-    priceUsd: 4997, // ~2.6x annual (was $3,876)
+    priceUsd: 4997,
     icon: Rocket,
     color: "from-yellow-400 to-yellow-600",
+    tier: 3,
   },
 };
 
@@ -65,25 +68,36 @@ const MONTHLY_PLANS: Record<
     monthlyUsd: number;
     annualTotal: number;
     annualSavings: number;
+    tier: number;
   }
 > = {
+  trial: {
+    name: "Trial",
+    monthlyUsd: 0,
+    annualTotal: 0,
+    annualSavings: 0,
+    tier: 0,
+  },
   starter: {
     name: "Starter",
     monthlyUsd: 29,
     annualTotal: 290,
     annualSavings: 58,
+    tier: 1,
   },
   pro: {
     name: "Pro",
     monthlyUsd: 79,
     annualTotal: 790,
     annualSavings: 158,
+    tier: 2,
   },
   enterprise: {
     name: "Enterprise",
     monthlyUsd: 194,
     annualTotal: 1940,
     annualSavings: 388,
+    tier: 3,
   },
 };
 
@@ -186,19 +200,28 @@ export default function AdminBillingPage() {
 
   // ─── Handle Payment ───────────────────────────────────
   const handlePay = async () => {
-    if (!business || !profile) return;
+    if (!business || !profile || !canSubscribe) return;
 
-    // Prevent subscribing if already on a plan
-    // if (!canSubscribe) {
-    //   toast.error("You already have an active subscription");
-    //   return;
-    // }
+    if (isDowngrade) {
+      toast.error(
+        "Downgrades are not allowed. Upgrade to a higher plan or wait for your plan to reset.",
+      );
+      return;
+    }
+
+    if (isPlanLocked) {
+      toast.error(
+        "Plan changes are locked until " +
+          new Date(business.plan_locked_until).toLocaleDateString() +
+          ". Contact support for early changes.",
+      );
+      return;
+    }
 
     setProcessing(true);
 
     try {
       if (paymentMethod === "paystack") {
-        // Both subscription and one-time go through the same endpoint
         const res = await fetch("/api/billing/paystack/initialize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -206,14 +229,13 @@ export default function AdminBillingPage() {
             businessId: business.id,
             plan: selectedPlan,
             billingCycle: isEarlyBird ? "lifetime" : billingCycle,
-            phoneNumber: "0712345678", // Placeholder for Paystack, not used
+            phoneNumber: "0712345678",
             email: profile.email,
             fullName: profile.full_name || profile.email,
             isEarlyBird,
           }),
         });
         const data = await res.json();
-        console.log("Paystack response:", data);
         if (!res.ok) throw new Error(data.error || "Checkout failed");
         if (data.authorizationUrl) {
           window.location.href = data.authorizationUrl;
@@ -252,13 +274,53 @@ export default function AdminBillingPage() {
   };
 
   // ─── Navigate to checkout ─────────────────────────────
+  const getCurrentPlanTier = (planId: string | undefined): number => {
+    if (!planId) return 0;
+    const monthlyPlan = MONTHLY_PLANS[planId];
+    if (monthlyPlan) return monthlyPlan.tier;
+
+    const earlyBirdPlan = EARLY_BIRD_PLANS[planId];
+    if (earlyBirdPlan) return 100 + earlyBirdPlan.tier;
+
+    return 0;
+  };
+
+  const currentPlanTier = getCurrentPlanTier(business?.plan);
+  const selectedPlanTier = getCurrentPlanTier(selectedPlan);
+
+  const isDowngrade =
+    selectedPlanTier > 0 && selectedPlanTier < currentPlanTier && !isSignupFlow;
+
+  const isPlanLocked =
+    !isSignupFlow &&
+    business?.plan_locked_until &&
+    new Date(business.plan_locked_until) > new Date();
+
+  const canChangePlan =
+    !isPlanLocked && (!isSubscribed || isSignupFlow || isDowngrade === false);
+
   const goToCheckout = (planId: string) => {
-    // Prevent checkout if already subscribed
-    // if (!canSubscribe && !isSignupFlow) {
-    //   toast.error("You already have an active subscription");
-    //   return;
-    // }
-    console.log("Plan", planId);
+    const targetTier = getCurrentPlanTier(planId);
+    if (
+      !isSignupFlow &&
+      targetTier > 0 &&
+      targetTier < currentPlanTier &&
+      !isPlanLocked
+    ) {
+      toast.error(
+        "Downgrades are not allowed. Upgrade to a higher plan or wait for your plan to reset.",
+      );
+      return;
+    }
+
+    if (isPlanLocked) {
+      toast.error(
+        "Plan changes are locked until " +
+          new Date(business.plan_locked_until).toLocaleDateString() +
+          ". Contact support for early changes.",
+      );
+      return;
+    }
 
     setSelectedPlan(planId);
     setStep("checkout");
@@ -494,7 +556,7 @@ export default function AdminBillingPage() {
 
               <Button
                 onClick={handlePay}
-                // disabled={processing || !canSubscribe}
+                disabled={processing || !canSubscribe}
                 className="w-full h-12 text-lg gap-2 bg-gradient-to-r from-purple-600 to-pink-600"
               >
                 {processing ? (
@@ -607,64 +669,47 @@ export default function AdminBillingPage() {
               </div>
             )}
             <div className="grid sm:grid-cols-3 gap-3 mb-4">
-              {[
-                {
-                  id: "early_bronze",
-                  name: "Bronze",
-                  price: 697,
-                  desc: "Lifetime",
-                  color: "border-amber-500/30 bg-amber-500/5",
-                },
-                {
-                  id: "early_silver",
-                  name: "Silver",
-                  price: 1797,
-                  desc: "Lifetime",
-                  color: "border-gray-400/30 bg-gray-400/5",
-                  popular: true,
-                },
-                {
-                  id: "early_gold",
-                  name: "Gold",
-                  price: 4997,
-                  desc: "Lifetime",
-                  color: "border-yellow-500/30 bg-yellow-500/5",
-                },
-              ].map((eb) => {
-                const isCurrentPlan = business?.plan === eb.id;
+              {Object.entries(EARLY_BIRD_PLANS).map(([id, eb]) => {
+                const isCurrentPlan = business?.plan === id;
+                const targetTier = getCurrentPlanTier(id);
+                const isDowngradeOption =
+                  business?.plan?.startsWith("early_") &&
+                  targetTier > 100 &&
+                  targetTier < currentPlanTier;
+                const isLocked = isPlanLocked || isDowngradeOption;
+
                 return (
                   <button
-                    key={eb.id}
-                    onClick={() => goToCheckout(eb.id)}
-                    // disabled={!canSubscribe}
+                    key={id}
+                    onClick={() => !isLocked && goToCheckout(id)}
+                    disabled={isLocked}
                     className={cn(
                       "p-4 rounded-xl border-2 text-center transition-all",
-                      canSubscribe && "hover:scale-105 cursor-pointer",
-                      !canSubscribe && "cursor-not-allowed opacity-60",
+                      !isLocked && "hover:scale-105 cursor-pointer",
+                      isLocked && "cursor-not-allowed opacity-60",
                       eb.color,
-                      eb.popular && "ring-1 ring-purple-500/50",
                       isCurrentPlan && "ring-2 ring-green-500/50",
                     )}
                   >
-                    {eb.popular && (
-                      <Badge className="bg-purple-500/20 text-purple-400 text-xs border-0 mb-1">
-                        Best Value
-                      </Badge>
-                    )}
                     {isCurrentPlan && (
                       <Badge className="bg-green-500/20 text-green-400 text-xs border-0 mb-1">
                         Current Plan
                       </Badge>
                     )}
+                    {isDowngradeOption && !isCurrentPlan && (
+                      <Badge className="bg-gray-500/20 text-gray-400 text-xs border-0 mb-1">
+                        <Lock className="h-3 w-3 mr-1" /> Downgrade Locked
+                      </Badge>
+                    )}
                     <p className="text-white font-bold">{eb.name}</p>
                     <p className="text-2xl font-bold text-white mt-1">
-                      {formatPrice(eb.price)}
+                      {formatPrice(eb.priceUsd)}
                     </p>
                     <p className="text-amber-400 text-xs mt-0.5 flex items-center justify-center gap-1">
                       <Infinity className="h-3 w-3" />
-                      {eb.desc}
+                      Lifetime
                     </p>
-                    {!canSubscribe && !isCurrentPlan && (
+                    {isDowngradeOption && !isCurrentPlan && (
                       <Lock className="h-4 w-4 text-gray-400 mx-auto mt-2" />
                     )}
                   </button>
@@ -710,18 +755,25 @@ export default function AdminBillingPage() {
             <div className="grid sm:grid-cols-3 gap-3 mb-6">
               {Object.entries(MONTHLY_PLANS).map(([id, plan]) => {
                 const isCurrentPlan = business?.plan === id;
+                const targetTier = getCurrentPlanTier(id);
+                const isDowngradeOption =
+                  !isSignupFlow &&
+                  targetTier > 0 &&
+                  targetTier < currentPlanTier;
+                const isLocked = isPlanLocked || isDowngradeOption;
+
                 return (
                   <button
                     key={id}
-                    onClick={() => goToCheckout(id)}
-                    // disabled={!canSubscribe}
+                    onClick={() => !isLocked && goToCheckout(id)}
+                    disabled={isLocked}
                     className={cn(
                       "p-4 rounded-xl border-2 text-left transition-all",
-                      canSubscribe && "cursor-pointer",
-                      !canSubscribe && "cursor-not-allowed opacity-60",
-                      selectedPlan === id && canSubscribe
+                      !isLocked && "cursor-pointer hover:border-white/20",
+                      isLocked && "cursor-not-allowed opacity-60",
+                      selectedPlan === id && canChangePlan
                         ? "border-purple-500 bg-purple-500/10"
-                        : "border-white/10 bg-white/5 hover:border-white/20",
+                        : "border-white/10 bg-white/5",
                       isCurrentPlan && "ring-2 ring-green-500/50",
                     )}
                   >
@@ -732,6 +784,9 @@ export default function AdminBillingPage() {
                           Current
                         </Badge>
                       )}
+                      {isDowngradeOption && !isCurrentPlan && (
+                        <Lock className="h-4 w-4 text-gray-400" />
+                      )}
                     </div>
                     <p className="text-white/60 text-sm mt-1">
                       $ {plan.monthlyUsd.toLocaleString()}/mo
@@ -740,6 +795,11 @@ export default function AdminBillingPage() {
                       or KES {plan.annualTotal.toLocaleString()}/mo billed
                       annually
                     </p>
+                    {isDowngradeOption && !isCurrentPlan && (
+                      <p className="text-white/30 text-[10px] mt-1">
+                        Downgrades locked until plan resets
+                      </p>
+                    )}
                   </button>
                 );
               })}

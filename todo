@@ -232,3 +232,62 @@ All docs updates are verified and in place:
 **Code type limits** now show separate rows for "Sticker Codes" (500/1000/Unlimited), "POS Codes" (0/5000/Unlimited), and "Access Codes (Public)" (200/2000/Unlimited), with the code format section explaining separate caps.
 
 **Internal/external stream distinction** documented in the Viewer section — only internal stream viewers count as engagements.
+
+All 8 todos are now complete. Here's a summary of what was implemented:
+
+**1. Admin Dashboard — All Stats + Upgrade Options**
+`src/app/(admin)/admin/[businessSpu]/page.tsx`
+
+- Displays 10 stat cards: Engagements, Spins, Trivia, Draw Entries, Code Redemptions, Sticker Codes, POS Codes, Public Codes, Viewers, Prizes Claimed
+- Each card shows current value against plan limit (e.g. `500 / 2,000`)
+- Public code usage bar with color-coded progress and an **Upgrade for More Public Codes** button when ≥70%
+- Inline public code generator card directly on the dashboard
+
+**2. Public Codes Cap**
+`src/lib/config/plans.ts` — added `maxPublicCodes`: trial=0, starter=50, pro=500, enterprise=unlimited
+`src/lib/hooks/usePlanLimit.ts` — added `canCreatePublicCode()`
+`src/app/api/business/codes/create/route.ts` and `bulk-create/route.ts` — enforce per-type caps before generating
+`admin/[businessSlug]/codes/page.tsx` — removed "Public" from the creation type selector
+
+**3. No-Downgrade Policy**
+`src/app/(admin)/admin/[businessSlug]/billing/page.tsx`
+
+- Added tier tracking to monthly and early-bird plans
+- `goToCheckout()` blocks any downgrade with a toast error
+- Monthly plan cards show a Lock + "Downgrade Locked" badge for lower tiers
+- Early-bird cards show the same lock when on a higher tier
+- Supports `plan_locked_until` for forced holds (e.g. 30-day lock after upgrade)
+
+**4. Viewer Prize Claim — Smooth Button**
+`src/components/viewer/ViewerPrizeClaimButton.tsx` — new component with framer-motion spring animation
+
+- Watches internal stream presence, tracks `watched_seconds` in `viewer_engagements`
+- Button fades in smoothly after `min_watch_seconds` is met
+- Added to all three public live pages: spin, draw, trivia
+
+**5. Viewer Prize — First N Customers Win**
+`src/db/engagements_migration.sql` — added `max_total_claims` and `total_claims` columns to `viewer_prizes`; updated `claim_viewer_prize` RPC to reject when limit is reached
+`src/app/api/business/viewer/claim/route.ts` — new authenticated API endpoint that calls the RPC and increments `viewer_prizes_claimed`
+`admin/[businessSlug]/draws/[drawId]/control/page.tsx` — full Viewer Prize Setup card (points, min watch time, max total claims, enable/disable)
+
+**6. PlanLimitBanner Updated**
+`src/components/billing/PlanLimitBanner.tsx` — now also warns about public code usage when ≥80% with an upgrade CTA
+
+**1. Upgrade Carry-Over System**
+
+- Added `plan_carryover` JSONB column to `businesses`
+- New SQL functions: `calculate_plan_carryover()`, `get_effective_plan_limit()`, `apply_plan_carryover()`
+- `src/lib/services/paystack.ts` — `activateBusinessSubscription` now calls `apply_plan_carryover` on every plan change
+- Code creation APIs (`create/route.ts`, `bulk-create/route.ts`) call `get_effective_plan_limit` so limits include carryover
+
+**2. Viewer Prize Simplification**
+
+- Dropped `viewer_engagements` table from migration
+- Rewrote `claim_viewer_prize` RPC to use direct claims against `viewer_prizes` (no watch-time tracking)
+- Added `viewer_prize_claims` table with unique constraint
+- Simplified `ViewerPrizeClaimButton.tsx` — removed watch timer, button appears instantly when an active prize exists
+- Updated admin draw control page to configure prize type, value, and max total claims (first-N wins)
+
+**3. Admin Dashboard Cleanup**
+
+- Removed unused `totalSpins`, `todaySpins`, `recentSpinsData` queries from `page.tsx`

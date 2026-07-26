@@ -32,6 +32,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatDistanceToNowStrict } from "date-fns";
 import Link from "next/link";
+import { ViewerPrizeClaimButton } from "@/components/viewer/ViewerPrizeClaimButton";
 
 // ─── Types ──────────────────────────────────────────────
 interface TickerEntry {
@@ -918,6 +919,14 @@ export default function BusinessDrawLivePage() {
           animation: shake 0.1s infinite;
         }
       `}</style>
+      {business && draw && (
+        <ViewerPrizeClaimButton
+          businessId={business.id}
+          gameType="draw"
+          gameId={draw.id}
+          brandColor={business.brand_color}
+        />
+      )}
     </div>
   );
 }

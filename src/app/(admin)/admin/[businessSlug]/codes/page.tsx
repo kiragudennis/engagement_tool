@@ -66,12 +66,6 @@ const CODE_TYPE_CONFIG: Record<
   string,
   { label: string; icon: any; color: string; description: string }
 > = {
-  public: {
-    label: "Public",
-    icon: Globe,
-    color: "bg-blue-500/20 text-blue-400",
-    description: "Share publicly, unlimited uses",
-  },
   single_use: {
     label: "Single Use",
     icon: Ticket,

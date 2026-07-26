@@ -21,6 +21,7 @@ export interface PlanLimits {
   maxPrizeSlots: number;
   maxTriviaQuestions: number;
   maxCodes: number;
+  maxPublicCodes: number;
   maxStickerCodes: number;
   maxPosCodes: number;
   maxAdminUsers: number;
@@ -71,6 +72,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     maxPrizeSlots: 8,
     maxTriviaQuestions: 20,
     maxCodes: 20,
+    maxPublicCodes: 0,
     maxStickerCodes: 20,
     maxPosCodes: 0,
     maxAdminUsers: 1,
@@ -87,6 +89,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     maxPrizeSlots: 12,
     maxTriviaQuestions: 50,
     maxCodes: 200,
+    maxPublicCodes: 50,
     maxStickerCodes: 500,
     maxPosCodes: 0,
     maxAdminUsers: 1,
@@ -103,6 +106,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     maxPrizeSlots: 24,
     maxTriviaQuestions: 200,
     maxCodes: 2000,
+    maxPublicCodes: 500,
     maxStickerCodes: 1000,
     maxPosCodes: 5000,
     maxAdminUsers: 5,
@@ -119,6 +123,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     maxPrizeSlots: 36,
     maxTriviaQuestions: UNLIMITED,
     maxCodes: UNLIMITED,
+    maxPublicCodes: UNLIMITED,
     maxStickerCodes: UNLIMITED,
     maxPosCodes: UNLIMITED,
     maxAdminUsers: 20,
@@ -135,6 +140,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     maxPrizeSlots: 12,
     maxTriviaQuestions: 50,
     maxCodes: 200,
+    maxPublicCodes: 50,
     maxStickerCodes: 500,
     maxPosCodes: 0,
     maxAdminUsers: 1,
@@ -151,6 +157,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     maxPrizeSlots: 24,
     maxTriviaQuestions: 200,
     maxCodes: 2000,
+    maxPublicCodes: 500,
     maxStickerCodes: 1000,
     maxPosCodes: 5000,
     maxAdminUsers: 5,
@@ -167,6 +174,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     maxPrizeSlots: 36,
     maxTriviaQuestions: UNLIMITED,
     maxCodes: UNLIMITED,
+    maxPublicCodes: UNLIMITED,
     maxStickerCodes: UNLIMITED,
     maxPosCodes: UNLIMITED,
     maxAdminUsers: 20,
@@ -207,10 +215,10 @@ export const PLANS: PlanDefinition[] = [
       { text: "500 sticker codes", included: true },
       { text: "200 public access codes", included: true },
       { text: "Viewer prizes (internal streams)", included: true },
+      { text: "Bulk code generation", included: true },
       { text: "Basic branding (logo + 1 color)", included: true },
       { text: "Customer CSV export", included: true },
       { text: "Live broadcast (OBS)", included: true },
-      { text: "QR code generation", included: true },
       { text: "Email support", included: true },
       { text: "Multiple admin users", included: false },
       { text: "Priority support", included: false },
@@ -394,10 +402,10 @@ export const EARLY_BIRD_PACKAGES = [
       { text: "Unlimited POS codes", included: true },
       { text: "Unlimited public access codes", included: true },
       { text: "Viewer prizes (internal streams)", included: true },
-      { text: "Bulk code generation", included: true },
       { text: "Full white-label branding", included: true },
       { text: "Customer CSV + API + Webhooks", included: true },
       { text: "Live broadcast (OBS)", included: true },
+      { text: "Bulk code generation", included: true },
       { text: "Advanced analytics + custom reports", included: true },
       { text: "Unlimited admin users", included: true },
       { text: "Dedicated account manager", included: true },

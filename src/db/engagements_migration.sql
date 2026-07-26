@@ -350,6 +350,8 @@ CREATE TABLE IF NOT EXISTS viewer_prizes (
     prize_value INTEGER DEFAULT 100,
     min_watch_seconds INTEGER NOT NULL DEFAULT 60,
     max_claims_per_user INTEGER DEFAULT 1,
+    max_total_claims INTEGER DEFAULT 0,
+    total_claims INTEGER DEFAULT 0,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -432,6 +434,13 @@ BEGIN
         RETURN json_build_object('success', false, 'error', 'Prize already claimed');
     END IF;
 
+    -- Enforce global claim limit (first N customers win)
+    IF v_prize.max_total_claims > 0 THEN
+        IF v_prize.total_claims >= v_prize.max_total_claims THEN
+            RETURN json_build_object('success', false, 'error', 'All prizes have been claimed');
+        END IF;
+    END IF;
+
     -- Award prize
     IF v_prize.prize_type = 'points' THEN
         INSERT INTO loyalty_points (user_id, business_id, points, points_earned)
@@ -453,8 +462,271 @@ BEGIN
         viewer_prize_id = v_prize.id
     WHERE id = v_viewer.id;
 
+    UPDATE viewer_prizes
+    SET total_claims = COALESCE(total_claims, 0) + 1,
+        updated_at = NOW()
+    WHERE id = v_prize.id;
+
+    RETURN json_build_object('success', true, 'prize_type', v_prize.prize_type, 'prize_value', v_prize.prize_value);
+  END;
+  $$;
+
+GRANT EXECUTE ON FUNCTION claim_viewer_prize(UUID, UUID, TEXT, UUID, TEXT) TO authenticated;
+
+-- ============================================
+-- Code and Viewer Tracking Columns
+-- ============================================
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS public_codes_this_month INTEGER DEFAULT 0;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS sticker_codes_this_month INTEGER DEFAULT 0;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS pos_codes_this_month INTEGER DEFAULT 0;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS viewer_engagements_count INTEGER DEFAULT 0;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS viewer_prizes_claimed INTEGER DEFAULT 0;
+
+-- ============================================
+-- UPGRADE CARRY-OVER SYSTEM
+-- ============================================
+
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS plan_carryover JSONB DEFAULT '{}'::jsonb;
+
+CREATE OR REPLACE FUNCTION calculate_plan_carryover(p_business_id UUID, p_old_plan TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql
+STABLE
+AS $$
+DECLARE
+  v_business businesses%ROWTYPE;
+  v_carryover JSONB;
+  v_old_max_sticker INTEGER := 0;
+  v_old_max_pos INTEGER := 0;
+  v_old_max_public INTEGER := 0;
+  v_old_max_eng INTEGER := 0;
+BEGIN
+  SELECT * INTO v_business FROM businesses WHERE id = p_business_id;
+  IF NOT FOUND THEN RETURN '{}'::jsonb; END IF;
+
+  IF v_business.plan_carryover ? 'applied_at' THEN
+    RETURN '{}'::jsonb;
+  END IF;
+
+  v_carryover := '{}'::jsonb;
+
+  CASE p_old_plan
+    WHEN 'trial' THEN
+      v_old_max_sticker := 20; v_old_max_pos := 0; v_old_max_public := 0; v_old_max_eng := 500;
+    WHEN 'starter' THEN
+      v_old_max_sticker := 500; v_old_max_pos := 0; v_old_max_public := 50; v_old_max_eng := 5000;
+    WHEN 'pro' THEN
+      v_old_max_sticker := 1000; v_old_max_pos := 5000; v_old_max_public := 500; v_old_max_eng := 50000;
+    WHEN 'enterprise' THEN
+      v_old_max_sticker := 999999; v_old_max_pos := 999999; v_old_max_public := 999999; v_old_max_eng := 500000;
+    WHEN 'early_bronze' THEN
+      v_old_max_sticker := 500; v_old_max_pos := 0; v_old_max_public := 50; v_old_max_eng := 5000;
+    WHEN 'early_silver' THEN
+      v_old_max_sticker := 1000; v_old_max_pos := 5000; v_old_max_public := 500; v_old_max_eng := 50000;
+    WHEN 'early_gold' THEN
+      v_old_max_sticker := 999999; v_old_max_pos := 999999; v_old_max_public := 999999; v_old_max_eng := 500000;
+  END CASE;
+
+  IF v_old_max_sticker < 999999 THEN
+    v_carryover := jsonb_set(v_carryover, '{sticker_codes}',
+      to_jsonb(LEAST(0, v_old_max_sticker - COALESCE(v_business.sticker_codes_this_month, 0))));
+  END IF;
+
+  IF v_old_max_pos < 999999 THEN
+    v_carryover := jsonb_set(v_carryover, '{pos_codes}',
+      to_jsonb(LEAST(0, v_old_max_pos - COALESCE(v_business.pos_codes_this_month, 0))));
+  END IF;
+
+  IF v_old_max_public < 999999 THEN
+    v_carryover := jsonb_set(v_carryover, '{public_codes}',
+      to_jsonb(LEAST(0, v_old_max_public - COALESCE(v_business.public_codes_this_month, 0))));
+  END IF;
+
+  IF v_old_max_eng < 999999 THEN
+    v_carryover := jsonb_set(v_carryover, '{engagements}',
+      to_jsonb(LEAST(0, v_old_max_eng - COALESCE(v_business.engagements_this_month, 0))));
+  END IF;
+
+  RETURN v_carryover;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION get_effective_plan_limit(
+  p_business_id UUID,
+  p_limit_type TEXT
+)
+RETURNS INTEGER
+LANGUAGE plpgsql
+STABLE
+AS $$
+DECLARE
+  v_business businesses%ROWTYPE;
+  v_carryover JSONB;
+  v_new_limit INTEGER;
+  v_carryover_val INTEGER;
+BEGIN
+  SELECT * INTO v_business FROM businesses WHERE id = p_business_id;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+
+  v_carryover := COALESCE(v_business.plan_carryover, '{}'::jsonb);
+
+  CASE p_limit_type
+    WHEN 'maxStickerCodes' THEN
+      v_new_limit := CASE v_business.plan WHEN 'trial' THEN 20 WHEN 'starter' THEN 500 WHEN 'pro' THEN 1000 WHEN 'enterprise' THEN 999999 WHEN 'early_bronze' THEN 500 WHEN 'early_silver' THEN 1000 WHEN 'early_gold' THEN 999999 ELSE 200 END;
+      IF v_new_limit >= 999999 THEN RETURN 999999; END IF;
+      v_carryover_val := COALESCE((v_carryover->>'sticker_codes')::INTEGER, 0);
+      RETURN GREATEST(v_new_limit + v_carryover_val, v_new_limit);
+
+    WHEN 'maxPosCodes' THEN
+      v_new_limit := CASE v_business.plan WHEN 'trial' THEN 0 WHEN 'starter' THEN 0 WHEN 'pro' THEN 5000 WHEN 'enterprise' THEN 999999 WHEN 'early_bronze' THEN 0 WHEN 'early_silver' THEN 5000 WHEN 'early_gold' THEN 999999 ELSE 0 END;
+      IF v_new_limit >= 999999 THEN RETURN 999999; END IF;
+      v_carryover_val := COALESCE((v_carryover->>'pos_codes')::INTEGER, 0);
+      RETURN GREATEST(v_new_limit + v_carryover_val, v_new_limit);
+
+    WHEN 'maxPublicCodes' THEN
+      v_new_limit := CASE v_business.plan WHEN 'trial' THEN 0 WHEN 'starter' THEN 50 WHEN 'pro' THEN 500 WHEN 'enterprise' THEN 999999 WHEN 'early_bronze' THEN 50 WHEN 'early_silver' THEN 500 WHEN 'early_gold' THEN 999999 ELSE 0 END;
+      IF v_new_limit >= 999999 THEN RETURN 999999; END IF;
+      v_carryover_val := COALESCE((v_carryover->>'public_codes')::INTEGER, 0);
+      RETURN GREATEST(v_new_limit + v_carryover_val, v_new_limit);
+
+    WHEN 'maxEngagementsPerMonth' THEN
+      v_new_limit := CASE v_business.plan WHEN 'trial' THEN 500 WHEN 'starter' THEN 5000 WHEN 'pro' THEN 50000 WHEN 'enterprise' THEN 500000 WHEN 'early_bronze' THEN 5000 WHEN 'early_silver' THEN 50000 WHEN 'early_gold' THEN 500000 ELSE 500 END;
+      IF v_new_limit >= 999999 THEN RETURN 999999; END IF;
+      v_carryover_val := COALESCE((v_carryover->>'engagements')::INTEGER, 0);
+      RETURN GREATEST(v_new_limit + v_carryover_val, v_new_limit);
+
+    WHEN 'maxCodes' THEN
+      v_new_limit := CASE v_business.plan WHEN 'trial' THEN 20 WHEN 'starter' THEN 200 WHEN 'pro' THEN 2000 WHEN 'enterprise' THEN 999999 WHEN 'early_bronze' THEN 200 WHEN 'early_silver' THEN 2000 WHEN 'early_gold' THEN 999999 ELSE 200 END;
+      IF v_new_limit >= 999999 THEN RETURN 999999; END IF;
+      v_carryover_val := COALESCE((v_carryover->>'public_codes')::INTEGER, 0);
+      RETURN GREATEST(v_new_limit + v_carryover_val, v_new_limit);
+
+    ELSE RETURN NULL;
+  END CASE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION apply_plan_carryover(p_business_id UUID, p_old_plan TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_carryover JSONB;
+BEGIN
+  v_carryover := calculate_plan_carryover(p_business_id, p_old_plan);
+
+  UPDATE businesses
+  SET plan_carryover = jsonb_set(v_carryover, '{applied_at}', to_jsonb(NOW()))
+  WHERE id = p_business_id;
+
+  RETURN v_carryover;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION calculate_plan_carryover(UUID, TEXT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION get_effective_plan_limit(UUID, TEXT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION apply_plan_carryover(UUID, TEXT) TO authenticated, service_role;
+
+-- ============================================
+-- VIEWER PRIZE SIMPLIFICATION
+-- ============================================
+
+DROP TABLE IF EXISTS viewer_engagements CASCADE;
+
+ALTER TABLE viewer_prizes DROP COLUMN IF EXISTS min_watch_seconds CASCADE;
+ALTER TABLE viewer_prizes DROP COLUMN IF EXISTS challenge_id CASCADE;
+
+DROP FUNCTION IF EXISTS claim_viewer_prize(p_business_id UUID, p_user_id UUID, p_game_type TEXT, p_game_id UUID, p_stream_type TEXT);
+
+CREATE OR REPLACE FUNCTION claim_viewer_prize(
+    p_business_id UUID,
+    p_user_id UUID,
+    p_game_type TEXT,
+    p_game_id UUID
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_prize viewer_prizes%ROWTYPE;
+    v_user_points INTEGER;
+BEGIN
+    SELECT * INTO v_prize
+    FROM viewer_prizes
+    WHERE business_id = p_business_id
+      AND game_type = p_game_type
+      AND game_id = p_game_id
+      AND is_active = TRUE
+    LIMIT 1;
+
+    IF NOT FOUND THEN
+        RETURN json_build_object('success', false, 'error', 'No viewer prize configured');
+    END IF;
+
+    IF v_prize.max_claims_per_user > 0 THEN
+        IF EXISTS (
+            SELECT 1 FROM viewer_prize_claims
+            WHERE viewer_prize_id = v_prize.id
+              AND user_id = p_user_id
+        ) THEN
+            RETURN json_build_object('success', false, 'error', 'Prize already claimed');
+        END IF;
+    END IF;
+
+    IF v_prize.max_total_claims > 0 AND v_prize.total_claims >= v_prize.max_total_claims THEN
+        RETURN json_build_object('success', false, 'error', 'All prizes have been claimed');
+    END IF;
+
+    IF v_prize.prize_type = 'points' THEN
+        INSERT INTO loyalty_points (user_id, business_id, points, points_earned)
+        VALUES (p_user_id, p_business_id, v_prize.prize_value, v_prize.prize_value)
+        ON CONFLICT (user_id, business_id)
+        DO UPDATE SET
+            points = loyalty_points.points + v_prize.prize_value,
+            points_earned = loyalty_points.points_earned + v_prize.prize_value,
+            updated_at = NOW();
+
+        INSERT INTO loyalty_transactions (user_id, business_id, points_change, current_points, transaction_type, description)
+        VALUES (p_user_id, p_business_id, v_prize.prize_value, v_prize.prize_value, 'viewer_prize',
+                'Viewer prize: ' || v_prize.prize_value || ' points for claiming');
+    END IF;
+
+    INSERT INTO viewer_prize_claims (viewer_prize_id, user_id, business_id, game_id)
+    VALUES (v_prize.id, p_user_id, p_business_id, p_game_id)
+    ON CONFLICT (viewer_prize_id, user_id, game_id) DO NOTHING;
+
+    UPDATE viewer_prizes
+    SET total_claims = COALESCE(total_claims, 0) + 1,
+        updated_at = NOW()
+    WHERE id = v_prize.id;
+
     RETURN json_build_object('success', true, 'prize_type', v_prize.prize_type, 'prize_value', v_prize.prize_value);
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION claim_viewer_prize(UUID, UUID, TEXT, UUID, TEXT) TO authenticated;
+CREATE TABLE IF NOT EXISTS viewer_prize_claims (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    viewer_prize_id UUID REFERENCES viewer_prizes(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+    game_id UUID,
+    claimed_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(viewer_prize_id, user_id, game_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_viewer_prize_claims_prize ON viewer_prize_claims(viewer_prize_id);
+CREATE INDEX IF NOT EXISTS idx_viewer_prize_claims_user ON viewer_prize_claims(user_id);
+CREATE INDEX IF NOT EXISTS idx_viewer_prize_claims_business ON viewer_prize_claims(business_id);
+
+ALTER TABLE viewer_prize_claims ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own claims" ON viewer_prize_claims
+    FOR SELECT USING (user_id = auth.uid());
+
+CREATE POLICY "Admins can view business claims" ON viewer_prize_claims
+    FOR SELECT USING (
+        business_id IN (SELECT business_id FROM business_admins WHERE user_id = auth.uid())
+    );
+
+GRANT EXECUTE ON FUNCTION claim_viewer_prize(UUID, UUID, TEXT, UUID) TO authenticated;

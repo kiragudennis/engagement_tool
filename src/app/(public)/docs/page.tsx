@@ -960,7 +960,7 @@ export default function DocsPage() {
                           to calculate points. Everything else is optional.
                         </p>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div className="p-3 rounded-lg bg-green-500/5 border border-green-500/20">
                             <h5 className="text-green-400 font-medium text-xs mb-2 flex items-center gap-1">
                               <Check className="h-3 w-3" /> Required

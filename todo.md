@@ -1,302 +1,190 @@
-Spinning strength functionality to be applied - Important in eliminating doubt of out of luck.
-Use a Real-time websocket server instead of relying fully on supabase for everything.
-Add trust pilot.
+# Engage Platform — Unified Task Document
 
--- Marketing
-(a). Early birds should be available to use immediately.
-(b). Customers should have only one account (ID or Licence linked to it, use it while collecting prices), Engage end shall enhance this.
-(c). Get a free subscription at the end of Engage stream when you win.
-(d). Only the business is allowed to create two or more accounts (Maybe you want to enjoy more than one subription).
-(e). Referral and recommendation (They get something small).
-(f). Connect your POS or your existing Ecommerce business.
-(g). Can see active vs total customers.
-(h). Win a spin and get free POS/E-commerce integration.
-
--- LATEST
-Here's what's now in place for the queue-based spin system:
-
-Database (src/db/spinning_wheel_advanced.sql)
-
-New tables: spin_queue_entries, spin_queue_settings
-New functions: join_spin_queue, call_next_spin, complete_queued_spin, skip_current_spinner, get_spin_queue, get_user_queue_position
-Socket.IO server (socket-server/src/index.ts)
-
-New room: queue:{gameId}
-Admin broadcasts: admin:queue:called, admin:queue:skipped, admin:queue:update → forwarded to the queue room
-Client hook (src/lib/socket/useSocket.ts)
-
-Wraps socket.io-client for React
-Public spin page (src/app/(public)/[businessSlug]/spin/[gameId]/page.tsx)
-
-Queue state: queueEnabled, inQueue, queuePosition, isMyTurn
-Actions: joinQueue(), leaveQueue(), checkQueueStatus()
-UI switches between Join Queue, waiting #N, and your turn → spin buttons
-Socket listens for queue:called, queue:skipped, queue:update
-Live broadcast page (src/app/(public)/[businessSlug]/spin/live/[gameId]/page.tsx)
-
-Socket listens for queue events and triggers the live wheel animation when someone is called
-Admin spin page (src/app/(admin)/admin/[businessSlug]/spin/page.tsx)
-
-Queue Management section at the bottom
-Select a game → enable/disable queue
-Call Next → advances queue and broadcasts via socket
-Skip Current → skips the current spinner
-Live queue list with ticket numbers and status
-
-**Admin page fixes**
-
-- `src/app/(admin)/admin/[businessSlug]/draws/page.tsx` — fixed broken imports (`FileText`, `Radio`), replaced hardcoded `/admin/marketing/...` links with `/admin/${businessSlug}/...`, added `businessId` scoping to draws/groups fetches, and removed duplicate imports at EOF.
-- `src/app/(admin)/admin/[businessSlug]/spin/page.tsx` — added `useParams`/`useRouter`, scoped `spin_games` queries by `business_id`, set `business_id` on new game inserts, added `useSocketRealtime` hook placeholder, and added full **Queue Management** section (select game, enable/disable queue, Call Next, Skip Current, live queue list).
-- `src/app/(admin)/admin/[businessSlug]/trivia/page.tsx` — added `useParams`/`useRouter`, scoped `challenges` queries by `business_id`, set `business_id` on new challenge upserts.
-- `src/lib/services/draws-service.ts` — added `businessId` parameter to `getDraws()` and `getDrawGroups()` for multi-tenant scoping.
-
-**Socket.IO server**
-
-- New `socket-server/` package with `src/index.ts` (ESM, NodeNext, `tsx` dev).
-- Rooms: `business:{id}`, `admin:{id}`, `spin:{gameId}`, `draw:{drawId}`, `trivia:{challengeId}`, `queue:{gameId}`, `trivia-queue:{challengeId}`.
-- Admin forwarding for queue events:
-  - `admin:queue:called` / `admin:queue:skipped` / `admin:queue:update`
-  - `admin:trivia:queue:called` / `admin:trivia:queue:skipped` / `admin:trivia:queue:update`
-- Broadcast helpers: `broadcastToBusiness`, `broadcastToAdmins`, `broadcastToSpin`, `broadcastToDraw`, `broadcastToTrivia`, `broadcastToQueue`, `broadcastToTriviaQueue`.
-
-**Client-side hooks**
-
-- `src/lib/socket/useSocket.ts` — React wrapper around `socket.io-client` with `on`, `emit`, and cleanup.
-
-**Public/spin queue integration**
-
-- Schema additions in `src/db/spinning_wheel_advanced.sql` — new tables `spin_queue_entries`, `spin_queue_settings`, and queue functions (`join_spin_queue`, `call_next_spin`, `complete_queued_spin`, `skip_current_spinner`, `get_spin_queue`, `get_user_queue_position`).
-- `src/app/(public)/[businessSlug]/spin/[gameId]/page.tsx` — queue state (`inQueue`, `queuePosition`, `isMyTurn`), UI branches for Join Queue / Waiting / Your Turn with spin buttons, socket listeners for `queue:called`, `queue:skipped`, `queue:update`, and periodic queue status polling.
-- `src/app/(public)/[businessSlug]/spin/live/[gameId]/page.tsx` — socket listeners wired to drive the live broadcast wheel when a queue event fires.
-
-**Public/trivia queue integration**
-
-- `src/app/(public)/[businessSlug]/trivia/[challengeId]/page.tsx` — socket listeners for `trivia:queue:called`, `trivia:queue:skipped`, `trivia:queue:update` to refresh `currentAnsweringUser` and queue state.
-- `src/app/(admin)/admin/[businessSlug]/trivia/[triviaId]/live-controls/page.tsx` — emits `admin:trivia:queue:update` on status changes, extensions, score adjustments, and announcements.
-
-**Removed**
-
-- Deleted `src/app/api/engage/spin/route.ts` per your request.
-
-Here's what was completed for the spin system expansion:
-
-**New prize types**
-
-- Added `free_service`, `free_drink`, `free_meal`, `vip_access`, and `other` to `PrizeSegment` type in `src/types/spinning-wheel.ts`
-- Updated `PRIZE_TYPES` in admin spin page with icons/placeholders for all new types
-- Updated `updatePrize` auto-label logic to handle the new types
-- Updated `perform_spin` in SQL to award and display the new prize types
-
-**Business-type-aware prize suggestions**
-
-- Added `BUSINESS_TYPE_PRIZE_SUGGESTIONS` map keyed by `retail`, `restaurant`, `service`, `event`, `other`
-- Admin prize type dropdown now shows a suggested section based on the business's `type` field, followed by all types
-
-**Spin/participant limits**
-
-- Added `participant_limit` and `spin_limit_per_user` columns to `spin_games` in `src/db/spinning_wheel_advanced.sql`
-- Added both fields to the admin spin form under Advanced tab
-- Wired them into `handleSave` and `SpinGame` type
-- Added runtime checks in `perform_spin` to enforce both limits before allowing a spin
-
-**Engagement tracking & upgrade nudges**
-
-- Created `src/lib/services/engagement-service.ts` with threshold-based notification logic
-- Created `src/app/api/admin/engagement/notify/route.ts` to send Resend emails and Twilio SMS when businesses hit 80%/95% of their plan limit
-- Added `engagement_notifications` table to `src/db/engagements_migration.sql` for logging
-- Plan limits already exist via `get_plan_engagement_limit` (starter=1000, pro=10000, enterprise=50000)
-
-**Plan limits & pricing alignment**
-
-- Raised plan limits in `src/lib/config/plans.ts`: Starter now gets 3 spin games, 3 trivia, 3 draws, 1,000 engagements/month, 12 prize slots, 50 codes; Pro gets 10/10/10, 10,000 engagements, 24 prize slots, 200 codes; Enterprise gets unlimited/50,000/36 prize slots/unlimited codes.
-- Updated `src/app/(public)/docs/page.tsx` limits table to match.
-- Updated pricing page feature text to reflect new numbers.
-
-**Prize types expansion**
-
-- Added `free_service`, `free_drink`, `free_meal`, `vip_access`, and `other` to `PrizeSegment` type and admin spin form.
-- Added business-type-aware prize suggestions (`BUSINESS_TYPE_PRIZE_SUGGESTIONS`) keyed by `retail`, `restaurant`, `service`, `event`, `other`.
-- Updated `perform_spin` SQL to award and display the new prize types.
-
-**Spin/participant limits**
-
-- Added `participant_limit` and `spin_limit_per_user` columns to `spin_games` in SQL.
-- Added both fields to admin spin form under Advanced tab.
-- Wired them into `handleSave` and `SpinGame` type.
-- Added runtime enforcement in `perform_spin` before allowing a spin.
-
-**Engagement tracking & upgrade nudges**
-
-- Created `src/lib/services/engagement-service.ts` with threshold-based notification logic.
-- Created `src/app/api/admin/engagement/notify/route.ts` to send Resend emails and Twilio SMS when businesses hit 80%/95% of their plan limit.
-- Added `engagement_notifications` table to `src/db/engagements_migration.sql`.
-
-**Admin enforcement**
-
-- Created `src/lib/hooks/usePlanLimit.ts` with `canCreateGame`, `canAddPrizeSlot`, `canCreateCode`, `canCreateTrivia`, `canCreateDraw`.
-- Wired spin game creation limit in admin spin page.
-- Wired prize slot limit in admin spin form.
-- Wired trivia creation limit in admin trivia page.
-- Wired draw creation limit in admin draws page.
-- Wired code creation/bulk creation limits in admin codes page and API routes (`/api/business/codes/create` and `/api/business/codes/bulk-create`).
-
-**Docs**
-
-- Added queue mode note and prize slots explanation to `src/app/(public)/docs/page.tsx`.
+This is the single source of truth for what is completed, what remains, and how each item is implemented or planned.
 
 ---
 
-**SQL / Database**
+## 1. Completed Work
 
-| Change                                                                                                                                                                                 | File                                 |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `get_challenges_in_current_period(business_id)` RPC — counts challenges created between `last_payment_at`/`next_billing_at` (with calendar-month fallback for trials)                  | `src/db/engagements_migration.sql`   |
-| Grant `EXECUTE` on new RPC to `authenticated` + `service_role`                                                                                                                         | `src/db/engagements_migration.sql`   |
-| Trivia ticket direct redemption in `redeem_access_code` — when `unlocks IN ('trivia','trivia_draw')`, finds open challenge and adds participant via `add_trivia_participant_from_spin` | `src/db/engagement_tool.sql`         |
-| Engagement safeguard `check_business_engagement_allowed` added at top of `redeem_access_code`                                                                                          | `src/db/engagement_tool.sql`         |
-| `increment_business_engagement` extended with type-aware counters (`spin`, `trivia`, `draw`, `code_redeem`)                                                                            | `src/db/engagements_migration.sql`   |
-| New tracking columns on `businesses`: `spins_this_month`, `trivia_answers_this_month`, `draw_entries_this_month`, `code_redemptions_this_month`                                        | `src/db/engagements_migration.sql`   |
-| `reset_monthly_engagement_counts` resets all counters                                                                                                                                  | `src/db/engagements_migration.sql`   |
-| `get_plan_engagement_limit` updated to match new plan tiers (trial=100, starter=1000, pro=10000, enterprise=50000)                                                                     | `src/db/engagements_migration.sql`   |
-| Participant limit check in `perform_spin` trivia_ticket branch — blocks if challenge is full                                                                                           | `src/db/spinning_wheel_advanced.sql` |
-| `participant_limit` and `spin_limit_per_user` columns added to `spin_games`, enforced in `perform_spin`                                                                                | `src/db/spinning_wheel_advanced.sql` |
+### Plan Limits, Billing & Carry-Over
+- Added `maxPublicCodes` to `PlanLimits` and all tiers: trial=0, starter=50, pro=500, enterprise=unlimited.
+- Added `canCreatePublicCode()` hook in `src/lib/hooks/usePlanLimit.ts`.
+- Enforced per-type caps in `src/app/api/business/codes/create/route.ts` and `bulk-create/route.ts`.
+- Implemented no-downgrade policy in `src/app/(admin)/admin/[businessSlug]/billing/page.tsx` using tier tracking on both monthly and early-bird plans. Downgrade attempts are blocked with a toast error.
+- Added `plan_carryover` JSONB column and SQL functions `calculate_plan_carryover()`, `get_effective_plan_limit()`, `apply_plan_carryover()` in `src/db/engagements_migration.sql`.
+- Wired carry-over into `activateBusinessSubscription()` in `src/lib/services/paystack.ts` so limits carry forward on plan changes.
 
-**Frontend**
+### Admin Dashboard
+- Rebuilt `src/app/(admin)/admin/[businessSlug]/page.tsx` to show 10 stat cards: Engagements, Spins, Trivia, Draw Entries, Code Redemptions, Sticker Codes, POS Codes, Public Codes, Viewers, Prizes Claimed.
+- Each card shows current value against plan limit.
+- Public-code usage bar with color-coded progress and upgrade CTA when ≥70%.
+- Added inline public-code generator on the dashboard (label + unlocks selector).
+- Removed unused `totalSpins`/`todaySpins` queries.
 
-| Change                                                                                                                                                        | File                                                  |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Public spin landing page (`/[businessSlug]/spin`) — shows available games, filters by participant limits, shows activation status, `all_spins_full` indicator | `src/app/(public)/[businessSlug]/spin/page.tsx` (new) |
-| API route for participant count (`/api/public/spin-participants`)                                                                                             | `src/app/api/public/spin-participants/route.ts` (new) |
+### Viewer Prize System
+- Created `src/components/viewer/ViewerPrizeClaimButton.tsx` with smooth framer-motion animation.
+- Added to live pages: spin, draw, trivia.
+- Simplified flow: `viewer_engagements` table dropped from schema. Claim now goes directly through `viewer_prize_claims`.
+- Updated `claim_viewer_prize` RPC to reject when `max_total_claims` is reached (first-N-wins).
+- New API endpoint at `src/app/api/business/viewer/claim/route.ts`.
+- Admin draw control page (`src/app/(admin)/admin/[businessSlug]/draws/[drawId]/control/page.tsx`) now has a Viewer Prize Setup card (prize type, value, max total claims, enable/disable).
 
-**Plan Limits** (`src/lib/config/plans.ts`)
+### Draws Fixes
+- Removed all `draw_groups` references from `src/app/(admin)/admin/[businessSlug]/draws/page.tsx` because the table does not exist in the database. Draws are Business-scoped only; customers enroll via redeem codes.
 
-- Starter: 3 spin games, 3 trivia, 3 draws, 1K engagements, 12 prize slots, 50 codes
-- Pro: 10 spin games, 10 trivia, 10 draws, 10K engagements, 24 prize slots, 200 codes
-- Enterprise: unlimited games, 50K engagements, 36 prize slots, unlimited codes
-- Updated `PLAN_LIMITS`, `PLANS`, `EARLY_BIRD_PACKAGES`, and `PLAN_FEATURES` consistently
-
-**Engagement Notifications**
-
-- `src/lib/services/engagement-service.ts` — now calls `get_plan_engagement_limit` RPC instead of hardcoded limits
-- `src/app/api/admin/engagement/notify/route.ts` — Resend email + Twilio SMS for 80%/95% threshold warnings
-
-**Docs** (`src/app/(public)/docs/page.tsx`)
-
-- Updated limits table to reflect new plan numbers
-- Added queue mode note and prize slots explanation
-- Added "What Counts as an Engagement" — now includes code redemption and trivia via code entries
+### Plan Limit Banner
+- `src/components/billing/PlanLimitBanner.tsx` now also warns about public-code usage when ≥80% with an upgrade CTA.
 
 ---
 
-**Plan Limits Expanded** (`src/lib/config/plans.ts`)
+## 2. Remaining MAJOR Items
 
-- Starter: 100 → 5,000 engagements, 50 → 200 codes (with `maxStickerCodes: 500`, `maxPosCodes: 0`)
-- Pro: 10,000 → 50,000 engagements, 200 → 2,000 codes (with `maxStickerCodes: 1000`, `maxPosCodes: 5000`)
-- Enterprise: 50,000 → 500,000 engagements, unlimited codes/sticker/POS
-- Added `maxStickerCodes` and `maxPosCodes` to `PlanLimits` interface and all plan tiers
+### 2.1 Spin Wheel — Strength Affects Rotation Duration
+**Context:** Currently `src/app/(public)/[businessSlug]/spin/[gameId]/page.tsx` hardcodes `duration = 5` seconds. Admin spin page has no strength/power input.
 
-**Docs Updates** (`src/app/(public)/docs/page.tsx`)
+**What needs to happen:**
+1. Add `strength` (or `spin_duration_seconds`, `power`) column to `spin_games` table. Range 1–10 or 1–100 mapped to duration (e.g. 2s–8s).
+2. Admin spin form: add a slider/number input for wheel strength under Advanced settings.
+3. Public spin page: replace hardcoded `duration = 5` with the game's configured strength, or let the UI pass a charge factor.
+4. Live broadcast page should also honor the strength-based duration.
 
-- Engagement types simplified to 4: Spin, Draw Entry, Trivia Answer, Code Redemption
-- Added viewer engagement section: internal vs external stream distinction, viewer prizes
-- Added code type info: sticker codes vs POS codes with separate limits
-- Updated "Code Redemption" description to clarify point unlocks are free service
+**Acceptance criteria**
+- Admin can set wheel strength per game.
+- Higher strength → longer spin animation.
+- Value is persisted in DB and loaded on the public page.
 
-**Database Schema** (`src/db/`)
+### 2.2 Real-Time Audio via WebRTC for Internal Streams (Spins, Trivia, Draws)
+**Context:** Socket.IO server exists (`socket-server/src/index.ts`) but audio transport is not implemented. Only HTML text/state events travel over sockets today.
 
-- Added `stream_type` column (`internal`/`external`) to `spin_games`, `challenges`, `draws`
-- Added `viewer_prizes` table for configuring viewer prizes per game
-- Added `viewer_engagements` table tracking watch time and claims
-- Added `claim_viewer_prize` RPC — awards points to viewers who watch internal streams for minimum duration
+**What needs to happen:**
+1. Add a lightweight signaling channel over existing Socket.IO rooms: `audio:offer`, `audio:answer`, `ice-candidate`.
+2. Rooms: `audio:spin:{gameId}`, `audio:trivia:{challengeId}`, `audio:draw:{drawId}`.
+3. Admin side broadcasts a live audio track via WebRTC (e.g. using `simple-peer` or native RTCPeerConnection).
+4. Viewer side receives the track and plays it in the live page.
+5. Only active during `stream_type = 'internal'`.
 
-**Bulk Code Creation API** (`src/app/api/business/codes/bulk-create/route.ts`)
+**Acceptance criteria**
+- Admin can start/stop audio from the control page.
+- Viewers on the internal live page hear the stream with <2s latency.
+- External streams continue to work without audio.
 
-- Added `codeSubtype` parameter (`S`=sticker, `R`=receipt/POS, `P`=public)
-- Enforces separate limits: `maxStickerCodes`, `maxPosCodes`, `maxCodes` independently
+### 2.3 Trivia — Photo / Image Questions
+**Context:** Trivia currently supports text questions only.
 
-**Socket.IO Server** (`socket-server/src/index.ts`)
+**What needs to happen:**
+1. Add `image_url` (TEXT/URL) to `challenge_questions` in SQL.
+2. Update `src/app/(admin)/admin/[businessSlug]/trivia/[triviaId]/page.tsx` question form to upload/paste an image URL.
+3. Update public trivia player and live viewer to render the image above the question text.
+4. Cache/bucket: use existing Supabase Storage or public URLs.
 
-- Added `join:viewer` room for internal stream viewers
-- Added `viewer:heartbeat` event for tracking watch progress
-- Added `broadcastToViewers` export function
+**Acceptance criteria**
+- Admin can attach an image to any question.
+- Players and live viewers see the image inline.
+- If image fails to load, text question still displays.
 
-**Live Spin Page** (`src/app/(public)/[businessSlug]/spin/live/[gameId]/page.tsx`)
+### 2.4 Customer Profile & Verification
+**Context:** `users` table exists but there is no customer-facing profile page or facial/ID verification.
 
-- Added Internal/External stream type toggle in header
-- Active viewers count and engagement stats already present
+**What needs to happen:**
+1. **Uniqueness:** Add unique indexes/constraints on `users.phone`, `users.email`, and a new `users.id_number` (or national ID). Prevent duplicate signups across all three.
+2. **Profile page:** New public page `src/app/(public)/account/**` showing:
+   - Active businesses
+   - Codes redeemed (history)
+   - Spins played
+   - Wins / losses
+   - Points balance
+3. **Verification:**
+   - Business admin enters customer details (name, phone, email, ID number) when collecting prize.
+   - System matches against `users` by phone/email/ID.
+   - If facial features don't match stored avatar → flag account (`users.status = 'flagged'`).
+   - Once entered, critical fields (`id_number`, `phone`, `email`) become immutable.
+4. **Prize collection flow:** Admin terminal/button to verify identity against account.
 
-All docs updates are verified and in place:
+**Acceptance criteria**
+- One customer = one account enforced by phone+email+ID uniqueness.
+- Admin can verify winner identity in the control panel.
+- Mismatch triggers account flag and support review.
+- Customer can view their own profile.
 
-**Engagement definitions** now includes "Viewer Prize Claim" as the 5th engagement type, with the claim button appearing during the stream via Socket.IO and recording `claimed_at` timestamp.
+---
 
-**Code type limits** now show separate rows for "Sticker Codes" (500/1000/Unlimited), "POS Codes" (0/5000/Unlimited), and "Access Codes (Public)" (200/2000/Unlimited), with the code format section explaining separate caps.
+## 3. Remaining MINOR Items
 
-**Internal/external stream distinction** documented in the Viewer section — only internal stream viewers count as engagements.
+### 3.1 Public Codes — Optional Customer Activation
+**Context:** Currently `redeem_access_code` checks `v_code.require_activation`. Public codes are created in the admin dashboard UI without a toggle for this behavior. Business default is auto-activation for 30 days.
 
-All 8 todos are now complete. Here's a summary of what was implemented:
+**What needs to happen:**
+1. Add `require_activation` (boolean) to the admin public-code creation card on the dashboard.
+2. Public codes without activation simply give points/unlocks without creating `customer_business_activations`.
+3. Public codes with activation act like normal activation codes.
 
-**1. Admin Dashboard — All Stats + Upgrade Options**
-`src/app/(admin)/admin/[businessSpu]/page.tsx`
+**Acceptance criteria**
+- Admin chooses “Require activation” or “No activation” when generating a public code.
+- Both flows are end-to-end tested.
 
-- Displays 10 stat cards: Engagements, Spins, Trivia, Draw Entries, Code Redemptions, Sticker Codes, POS Codes, Public Codes, Viewers, Prizes Claimed
-- Each card shows current value against plan limit (e.g. `500 / 2,000`)
-- Public code usage bar with color-coded progress and an **Upgrade for More Public Codes** button when ≥70%
-- Inline public code generator card directly on the dashboard
+### 3.2 Wired `max_spins_per_activation` & `points_per_redemption`
+**Context:** Both fields exist in `businesses` and the settings UI, but `redeem_access_code` and `perform_spin` do not read them.
 
-**2. Public Codes Cap**
-`src/lib/config/plans.ts` — added `maxPublicCodes`: trial=0, starter=50, pro=500, enterprise=unlimited
-`src/lib/hooks/usePlanLimit.ts` — added `canCreatePublicCode()`
-`src/app/api/business/codes/create/route.ts` and `bulk-create/route.ts` — enforce per-type caps before generating
-`admin/[businessSlug]/codes/page.tsx` — removed "Public" from the creation type selector
+**What needs to happen:**
+1. In `redeem_access_code` RPC: after successful activation, read `v_business.max_spins_per_activation`. If >0, limit spins for that activation period.
+2. In `redeem_access_code` RPC: award `points_per_redemption` loyalty points when a code is successfully redeemed (if `points_per_redemption > 0`).
+3. In `perform_spin` RPC: enforce `max_spins_per_activation` if set.
+4. Settings page: clarify labels so it is obvious these are business-wide defaults.
 
-**3. No-Downgrade Policy**
-`src/app/(admin)/admin/[businessSlug]/billing/page.tsx`
+**Acceptance criteria**
+- Redeeming a code grants `points_per_redemption` points.
+- Spinning more than `max_spins_per_activation` times within the activation period is blocked.
 
-- Added tier tracking to monthly and early-bird plans
-- `goToCheckout()` blocks any downgrade with a toast error
-- Monthly plan cards show a Lock + "Downgrade Locked" badge for lower tiers
-- Early-bird cards show the same lock when on a higher tier
-- Supports `plan_locked_until` for forced holds (e.g. 30-day lock after upgrade)
+### 3.3 Validate Code Unlock End-to-End
+**Context:** `unlocks` values already include `points`, `spin`, `draw`, `trivia`, `spin_draw`, `trivia_draw`. Admins need confidence each path works when the corresponding game exists and when it does not.
 
-**4. Viewer Prize Claim — Smooth Button**
-`src/components/viewer/ViewerPrizeClaimButton.tsx` — new component with framer-motion spring animation
+**What needs to happen:**
+1. Test matrix:
+   - Code `unlocks: 'spin'` → redirects to spin, awards spin points.
+   - Code `unlocks: 'trivia'` → redirects to trivia, adds participant.
+   - Code `unlocks: 'draw'` → enters user into active/open draw.
+   - Code `unlocks: 'points'` → awards loyalty points only.
+2. Add API-level guard in `redeem_access_code` for missing target game/draw/trivia (e.g. draw not open → fallback to points).
+3. Write integration tests for each path.
 
-- Watches internal stream presence, tracks `watched_seconds` in `viewer_engagements`
-- Button fades in smoothly after `min_watch_seconds` is met
-- Added to all three public live pages: spin, draw, trivia
+**Acceptance criteria**
+- Every unlock value is tested with a game present and absent.
+- Graceful fallback when the unlocked game is missing.
 
-**5. Viewer Prize — First N Customers Win**
-`src/db/engagements_migration.sql` — added `max_total_claims` and `total_claims` columns to `viewer_prizes`; updated `claim_viewer_prize` RPC to reject when limit is reached
-`src/app/api/business/viewer/claim/route.ts` — new authenticated API endpoint that calls the RPC and increments `viewer_prizes_claimed`
-`admin/[businessSlug]/draws/[drawId]/control/page.tsx` — full Viewer Prize Setup card (points, min watch time, max total claims, enable/disable)
+---
 
-**6. PlanLimitBanner Updated**
-`src/components/billing/PlanLimitBanner.tsx` — now also warns about public code usage when ≥80% with an upgrade CTA
+## 4. Recommended Implementation Order
 
-**1. Upgrade Carry-Over System**
+1. **3.2** `max_spins_per_activation` & `points_per_redemption` — small DB/RPC patch, quick win.
+2. **3.1** Public-code activation toggle — UI + RPC change, low risk.
+3. **3.3** Unlock validation — testing + guards, stabilizes existing flow.
+4. **2.1** Spin strength — single column + UI change.
+5. **2.3** Trivia photos — schema + two-page UI change.
+6. **2.2** WebRTC audio — new signaling flow, test in staging.
+7. **2.4** Customer profile & verification — largest item; do last.
 
-- Added `plan_carryover` JSONB column to `businesses`
-- New SQL functions: `calculate_plan_carryover()`, `get_effective_plan_limit()`, `apply_plan_carryover()`
-- `src/lib/services/paystack.ts` — `activateBusinessSubscription` now calls `apply_plan_carryover` on every plan change
-- Code creation APIs (`create/route.ts`, `bulk-create/route.ts`) call `get_effective_plan_limit` so limits include carryover
+---
 
-**2. Viewer Prize Simplification**
+## 5. Key Database Touchpoints
 
-- Dropped `viewer_engagements` table from migration
-- Rewrote `claim_viewer_prize` RPC to use direct claims against `viewer_prizes` (no watch-time tracking)
-- Added `viewer_prize_claims` table with unique constraint
-- Simplified `ViewerPrizeClaimButton.tsx` — removed watch timer, button appears instantly when an active prize exists
-- Updated admin draw control page to configure prize type, value, and max total claims (first-N wins)
+| File | Tables / Functions to touch |
+|------|-----------------------------|
+| `src/db/engagement_tool.sql` | `redeem_access_code` — enforce `max_spins_per_activation`, `points_per_redemption`, `require_activation` |
+| `src/db/spinning_wheel_advanced.sql` | `spin_games` — add `strength` / `spin_duration_seconds`; enforce in `perform_spin` |
+| `src/db/engagements_migration.sql` | Already contains carry-over + viewer prize changes |
+| New trivia migration | `challenge_questions` — add `image_url` |
+| New users migration | `users` — unique constraints on `phone`, `email`, `id_number`; add `status` values |
 
-**3. Admin Dashboard Cleanup**
+---
 
-- Removed unused `totalSpins`, `todaySpins`, `recentSpinsData` queries from `page.tsx`
+## 6. Key Code Touchpoints
 
-Fixed. The `draw_groups` table does not exist in any SQL migration, and `draw_group_id` is not present in the `draws` table either. Since draws are already scoped to a business via `business_id` and customer enrollment happens through redeem codes (the same flow used for spins and trivia), draw groups add unnecessary complexity.
-
-Changes made in `src/app/(admin)/admin/[businessSlug]/draws/page.tsx`:
-
-- Removed the `getDrawGroups(business.id)` call that caused the crash
-- Removed `groups`, `selectedGroup` state and filter tab UI
-- Removed `draw_group_id` from the `Draw` interface
-- Removed the "Draw Group (optional)" dropdown from `DrawForm`
+| Feature | Primary Files |
+|---------|---------------|
+| Spin strength | `src/app/(public)/[businessSlug]/spin/[gameId]/page.tsx`, `src/app/(admin)/admin/[businessSlug]/spin/page.tsx`, `src/db/spinning_wheel_advanced.sql` |
+| WebRTC audio | `socket-server/src/index.ts`, `src/app/(public)/[businessSlug]/spin/live/[gameId]/page.tsx`, `src/app/(public)/[businessSlug]/draw/[drawId]/live/page.tsx` |
+| Trivia photos | `src/app/(admin)/admin/[businessSlug]/trivia/[triviaId]/page.tsx`, `src/app/(public)/[businessSlug]/trivia/[challengeId]/page.tsx` |
+| Customer profile | New pages under `src/app/(public)/account/**`, `src/lib/supabase/admin` verification flow, admin prize-verification modal |
+| Public-code activation toggle | `src/app/(admin)/admin/[businessSlug]/page.tsx` (public code generator), `redeem_access_code` in DB |
+| max_spins/points wiring | `src/db/engagement_tool.sql` (`redeem_access_code`, `perform_spin`) |
+| Unlock validation | `src/app/api/customer/validate-code/route.ts`, `src/app/api/customer/code-lookup/route.ts` |

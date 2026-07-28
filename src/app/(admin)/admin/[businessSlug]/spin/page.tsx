@@ -489,7 +489,7 @@ export default function SpinningWheelAdmin() {
               New Game
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {selectedGame ? "Edit Spin Game" : "Create New Spin Game"}
@@ -950,7 +950,7 @@ function GameForm({
       slug: "",
       description: "",
       game_type: "standard",
-      eligible_tiers: [],
+      eligible_tiers: ["bronze", "silver", "gold", "platinum"],
       min_points_required: 0,
       requires_purchase_count: 0,
       new_customer_only: false,
@@ -1195,9 +1195,6 @@ function GameForm({
               }
               placeholder="weekend-wonder-wheel"
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              URL-friendly identifier
-            </p>
           </div>
         </div>
 
@@ -1212,67 +1209,74 @@ function GameForm({
           />
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
-          <div className="flex flex-col gap-2">
-            <Label>Game Type</Label>
-            <Select
-              value={formData.game_type}
-              onValueChange={(value) =>
-                setFormData({ ...formData, game_type: value })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {GAME_TYPES.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    <div className="flex items-center gap-2">
-                      {type.icon}
-                      {type.label}
-                    </div>
+        <div className="flex flex-wrap gap-4 sm:justify-evenly">
+          <div className="w-full sm:w-auto min-w-[140px] flex-1 sm:flex-none">
+            <div className="flex flex-col gap-2">
+              <Label>Game Type</Label>
+              <Select
+                value={formData.game_type}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, game_type: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {GAME_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      <div className="flex items-center gap-1 truncate">
+                        {/* {type.icon} */}
+                        {type.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="w-full sm:w-auto min-w-[140px] flex-1 sm:flex-none">
+            <div className="flex flex-col gap-2">
+              <Label>Eligible Tiers</Label>
+              <Select
+                value={formData.eligible_tiers.join(",")}
+                onValueChange={(value) =>
+                  setFormData({
+                    ...formData,
+                    eligible_tiers: value ? value.split(",") : [],
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All tiers" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bronze,silver,gold,platinum">
+                    All (Bronze+)
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  <SelectItem value="silver,gold,platinum">Silver+</SelectItem>
+                  <SelectItem value="gold,platinum">Gold+</SelectItem>
+                  <SelectItem value="platinum">Platinum only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="flex flex-col gap-2">
-            <Label>Eligible Tiers</Label>
-            <Select
-              value={formData.eligible_tiers.join(",")}
-              onValueChange={(value) =>
-                setFormData({
-                  ...formData,
-                  eligible_tiers: value ? value.split(",") : [],
-                })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All tiers" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all tiers">All tiers</SelectItem>
-                <SelectItem value="bronze,silver,gold,platinum">
-                  All (Bronze+)
-                </SelectItem>
-                <SelectItem value="silver,gold,platinum">Silver+</SelectItem>
-                <SelectItem value="gold,platinum">Gold+</SelectItem>
-                <SelectItem value="platinum">Platinum only</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label>Enable Queue</Label>
-            <Switch
-              checked={formData.queue_enabled}
-              onCheckedChange={(checked) =>
-                setFormData({ ...formData, queue_enabled: checked })
-              }
-            />
+
+          <div className="w-full sm:w-auto min-w-[120px] flex-1 sm:flex-none">
+            <div className="flex flex-col gap-2">
+              <Label>Enable Queue</Label>
+              <Switch
+                checked={formData.queue_enabled}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, queue_enabled: checked })
+                }
+              />
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           <div className="flex flex-col gap-2">
             <Label>Free Spins / Day</Label>
             <Input
@@ -1329,7 +1333,7 @@ function GameForm({
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div>
+          <div className="flex flex-col gap-2">
             <Label>Participant Limit</Label>
             <Input
               type="number"
@@ -1342,13 +1346,13 @@ function GameForm({
                     : null,
                 })
               }
-              placeholder="No limit"
+              placeholder="Unlimited"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Max number of participants (leave empty for unlimited)
+              Max number of participants
             </p>
           </div>
-          <div>
+          <div className="flex flex-col gap-2">
             <Label>Spin Limit Per User</Label>
             <Input
               type="number"
@@ -1361,10 +1365,10 @@ function GameForm({
                     : null,
                 })
               }
-              placeholder="No limit"
+              placeholder="Unlimited"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Max spins per user (leave empty for unlimited)
+              Max spins per user
             </p>
           </div>
         </div>
@@ -1402,15 +1406,16 @@ function GameForm({
               Probabilities sum to {totalProbability}%{" "}
               {!isProbabilityValid && "(must be 100%)"}
             </p>
-            {canAddPrizeSlot(formData.prize_config.length) && !canAddPrizeSlot(formData.prize_config.length).allowed && (
-              <p className="text-xs text-red-400 mt-1">
-                {canAddPrizeSlot(formData.prize_config.length).reason}
-              </p>
-            )}
+            {canAddPrizeSlot(formData.prize_config.length) &&
+              !canAddPrizeSlot(formData.prize_config.length).allowed && (
+                <p className="text-xs text-red-400 mt-1">
+                  {canAddPrizeSlot(formData.prize_config.length).reason}
+                </p>
+              )}
           </div>
-          <Button 
-            type="button" 
-            size="sm" 
+          <Button
+            type="button"
+            size="sm"
             onClick={addPrize}
             disabled={!canAddPrizeSlot(formData.prize_config.length).allowed}
           >
@@ -1423,14 +1428,21 @@ function GameForm({
           {formData.prize_config.map((prize: any, idx: number) => (
             <Card key={prize.id || idx} className="p-4">
               <div className="space-y-3">
-                <div className="flex gap-3 flex-wrap">
-                  <input
-                    type="color"
-                    value={prize.color}
-                    onChange={(e) => updatePrize(idx, "color", e.target.value)}
-                    className="w-10 h-10 rounded-lg cursor-pointer border"
-                  />
-                  <div className="flex-1 min-w-[120px]">
+                <div className="flex flex-wrap items-start gap-3">
+                  {/* Color Picker */}
+                  <div className="flex-shrink-0">
+                    <input
+                      type="color"
+                      value={prize.color}
+                      onChange={(e) =>
+                        updatePrize(idx, "color", e.target.value)
+                      }
+                      className="w-10 h-10 rounded-lg cursor-pointer border"
+                    />
+                  </div>
+
+                  {/* Prize Type Select */}
+                  <div className="flex-1 min-w-[160px] max-w-[280px]">
                     <Select
                       value={prize.type}
                       onValueChange={(value) => updatePrize(idx, "type", value)}
@@ -1488,8 +1500,9 @@ function GameForm({
                       </SelectContent>
                     </Select>
                   </div>
+
                   {/* Prize Value / Selection */}
-                  <div className="flex-1 min-w-[150px]">
+                  <div className="flex-1 min-w-[180px] max-w-[320px]">
                     {prize.type === "product" ? (
                       <div className="flex gap-2">
                         <Input
@@ -1507,7 +1520,7 @@ function GameForm({
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="h-9 px-2"
+                                className="h-9 px-2 flex-shrink-0"
                                 onClick={() => {
                                   navigator.clipboard.writeText(
                                     prize.product_id || "",
@@ -1539,7 +1552,7 @@ function GameForm({
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="h-9 px-2"
+                                className="h-9 px-2 flex-shrink-0"
                                 onClick={() => {
                                   navigator.clipboard.writeText(
                                     prize.bundle_id || "",
@@ -1568,7 +1581,9 @@ function GameForm({
                       />
                     )}
                   </div>
-                  <div className="w-24">
+
+                  {/* Probability */}
+                  <div className="w-28 flex-shrink-0">
                     <div className="flex items-center gap-1">
                       <Input
                         type="number"
@@ -1582,10 +1597,14 @@ function GameForm({
                         }
                         placeholder="%"
                         className="text-center"
+                        min="0"
+                        max="100"
                       />
-                      <span className="text-muted-foreground">%</span>
+                      <span className="text-muted-foreground text-sm">%</span>
                     </div>
                   </div>
+
+                  {/* Delete Button */}
                   <Button
                     type="button"
                     variant="ghost"
@@ -1596,13 +1615,17 @@ function GameForm({
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>
                 </div>
+
+                {/* Prize Preview */}
                 <div className="flex items-center gap-2 pt-2 border-t">
                   <div
-                    className="w-4 h-4 rounded-full"
+                    className="w-4 h-4 rounded-full flex-shrink-0"
                     style={{ backgroundColor: prize.color }}
                   />
-                  <span className="text-sm font-medium">{prize.label}</span>
-                  <Badge variant="outline" className="text-xs">
+                  <span className="text-sm font-medium truncate">
+                    {prize.label}
+                  </span>
+                  <Badge variant="outline" className="text-xs flex-shrink-0">
                     {prize.probability}% chance
                   </Badge>
                 </div>
@@ -1615,7 +1638,7 @@ function GameForm({
       {/* Advanced Tab */}
       <TabsContent value="advanced" className="space-y-6 pt-4">
         <div className="grid grid-cols-2 gap-4">
-          <div>
+          <div className="flex flex-col gap-2">
             <Label>Start Date (Optional)</Label>
             <Input
               type="datetime-local"
@@ -1625,7 +1648,7 @@ function GameForm({
               }
             />
           </div>
-          <div>
+          <div className="flex flex-col gap-2">
             <Label>End Date (Optional)</Label>
             <Input
               type="datetime-local"
@@ -1638,7 +1661,7 @@ function GameForm({
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div>
+          <div className="flex flex-col gap-2">
             <Label>Min Points Required</Label>
             <Input
               type="number"
@@ -1652,7 +1675,7 @@ function GameForm({
               placeholder="0 = no requirement"
             />
           </div>
-          <div>
+          <div className="flex flex-col gap-2">
             <Label>Min Purchases Required</Label>
             <Input
               type="number"

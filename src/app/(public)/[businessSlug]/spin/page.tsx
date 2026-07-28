@@ -138,7 +138,12 @@ export default function BusinessSpinLanding() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {games.map((game) => (
-              <GameCard key={game.id} game={game} />
+              <GameCard
+                key={game.id}
+                game={game}
+                businessSlug={businessSlug}
+                userActivated={userActivated}
+              />
             ))}
           </div>
         )}
@@ -147,10 +152,16 @@ export default function BusinessSpinLanding() {
   );
 }
 
-function GameCard({ game }: { game: SpinGame }) {
-  const [participantCount, setParticipantCount] = useState<number | null>(
-    null,
-  );
+function GameCard({
+  game,
+  businessSlug,
+  userActivated,
+}: {
+  game: SpinGame;
+  businessSlug?: string;
+  userActivated: boolean | null;
+}) {
+  const [participantCount, setParticipantCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -166,7 +177,7 @@ function GameCard({ game }: { game: SpinGame }) {
   }, [game.id]);
 
   const isFull =
-    game.participant_limit !== null &&
+    game.participant_limit != null &&
     participantCount !== null &&
     participantCount >= game.participant_limit;
 
@@ -177,13 +188,14 @@ function GameCard({ game }: { game: SpinGame }) {
           <div>
             <CardTitle className="text-white">{game.name}</CardTitle>
             {game.description && (
-              <p className="text-white/40 text-sm mt-1">
-                {game.description}
-              </p>
+              <p className="text-white/40 text-sm mt-1">{game.description}</p>
             )}
           </div>
           {game.is_single_prize && (
-            <Badge variant="secondary" className="bg-amber-500/20 text-amber-400">
+            <Badge
+              variant="secondary"
+              className="bg-amber-500/20 text-amber-400"
+            >
               <Sparkles className="h-3 w-3 mr-1" />
               Grand Prize
             </Badge>
@@ -245,7 +257,7 @@ function GameCard({ game }: { game: SpinGame }) {
               Game Full
             </span>
           ) : (
-              <Link href={`/${businessSlug}/spin/${game.id}`}>
+            <Link href={`/${businessSlug}/spin/${game.id}`}>
               <RotateCcw className="h-4 w-4 mr-2" />
               {userActivated === false ? "Activate Code First" : "Spin Now"}
             </Link>

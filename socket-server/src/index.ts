@@ -1,3 +1,4 @@
+// socket-server/src/index.ts
 import { Server } from "socket.io";
 
 const io = new Server({
@@ -47,42 +48,93 @@ io.on("connection", (socket) => {
     socket.join(`queue:${gameId}`);
   });
 
-  socket.on("join:viewer", ({ gameId, gameType, streamType }: { gameId: string; gameType: string; streamType: string }) => {
-    if (streamType === "internal") {
-      socket.join(`viewer:${gameId}`);
-      socket.data.viewerGameId = gameId;
-      socket.data.viewerGameType = gameType;
-      socket.data.viewerStreamType = streamType;
-    }
-  });
+  socket.on(
+    "join:viewer",
+    ({
+      gameId,
+      gameType,
+      streamType,
+    }: {
+      gameId: string;
+      gameType: string;
+      streamType: string;
+    }) => {
+      if (streamType === "internal") {
+        socket.join(`viewer:${gameId}`);
+        socket.data.viewerGameId = gameId;
+        socket.data.viewerGameType = gameType;
+        socket.data.viewerStreamType = streamType;
+      }
+    },
+  );
 
-  socket.on("viewer:heartbeat", ({ gameId, watchedSeconds }: { gameId: string; watchedSeconds: number }) => {
-    io.to(`viewer:${gameId}`).emit("viewer:progress", { watchedSeconds });
-  });
+  socket.on(
+    "viewer:heartbeat",
+    ({
+      gameId,
+      watchedSeconds,
+    }: {
+      gameId: string;
+      watchedSeconds: number;
+    }) => {
+      io.to(`viewer:${gameId}`).emit("viewer:progress", { watchedSeconds });
+    },
+  );
 
-  socket.on("admin:queue:called", ({ gameId, user_id }: { gameId: string; user_id: string }) => {
-    io.to(`queue:${gameId}`).emit("queue:called", { user_id });
-  });
+  socket.on(
+    "admin:queue:called",
+    ({ gameId, user_id }: { gameId: string; user_id: string }) => {
+      io.to(`queue:${gameId}`).emit("queue:called", { user_id });
+    },
+  );
 
-  socket.on("admin:queue:skipped", ({ gameId, user_id }: { gameId: string; user_id?: string }) => {
-    io.to(`queue:${gameId}`).emit("queue:skipped", { user_id });
-  });
+  socket.on(
+    "admin:queue:skipped",
+    ({ gameId, user_id }: { gameId: string; user_id?: string }) => {
+      io.to(`queue:${gameId}`).emit("queue:skipped", { user_id });
+    },
+  );
 
   socket.on("admin:queue:update", ({ gameId }: { gameId: string }) => {
     io.to(`queue:${gameId}`).emit("queue:update", {});
   });
 
-  socket.on("admin:trivia:queue:called", ({ challengeId, user_id, user_name, ticket_number }: { challengeId: string; user_id: string; user_name: string; ticket_number: number }) => {
-    io.to(`trivia-queue:${challengeId}`).emit("trivia:queue:called", { user_id, user_name, ticket_number });
-  });
+  socket.on(
+    "admin:trivia:queue:called",
+    ({
+      challengeId,
+      user_id,
+      user_name,
+      ticket_number,
+    }: {
+      challengeId: string;
+      user_id: string;
+      user_name: string;
+      ticket_number: number;
+    }) => {
+      io.to(`trivia-queue:${challengeId}`).emit("trivia:queue:called", {
+        user_id,
+        user_name,
+        ticket_number,
+      });
+    },
+  );
 
-  socket.on("admin:trivia:queue:skipped", ({ challengeId, user_id }: { challengeId: string; user_id?: string }) => {
-    io.to(`trivia-queue:${challengeId}`).emit("trivia:queue:skipped", { user_id });
-  });
+  socket.on(
+    "admin:trivia:queue:skipped",
+    ({ challengeId, user_id }: { challengeId: string; user_id?: string }) => {
+      io.to(`trivia-queue:${challengeId}`).emit("trivia:queue:skipped", {
+        user_id,
+      });
+    },
+  );
 
-  socket.on("admin:trivia:queue:update", ({ challengeId }: { challengeId: string }) => {
-    io.to(`trivia-queue:${challengeId}`).emit("trivia:queue:update", {});
-  });
+  socket.on(
+    "admin:trivia:queue:update",
+    ({ challengeId }: { challengeId: string }) => {
+      io.to(`trivia-queue:${challengeId}`).emit("trivia:queue:update", {});
+    },
+  );
 
   socket.on("leave:room", (room: string) => {
     socket.leave(room);
@@ -103,11 +155,19 @@ io.on("connection", (socket) => {
   });
 });
 
-export function broadcastToBusiness(businessId: string, event: string, data: any) {
+export function broadcastToBusiness(
+  businessId: string,
+  event: string,
+  data: any,
+) {
   io.to(`business:${businessId}`).emit(event, data);
 }
 
-export function broadcastToAdmins(businessId: string, event: string, data: any) {
+export function broadcastToAdmins(
+  businessId: string,
+  event: string,
+  data: any,
+) {
   io.to(`admin:${businessId}`).emit(event, data);
 }
 
@@ -119,7 +179,11 @@ export function broadcastToDraw(drawId: string, event: string, data: any) {
   io.to(`draw:${drawId}`).emit(event, data);
 }
 
-export function broadcastToTrivia(challengeId: string, event: string, data: any) {
+export function broadcastToTrivia(
+  challengeId: string,
+  event: string,
+  data: any,
+) {
   io.to(`trivia:${challengeId}`).emit(event, data);
 }
 
@@ -127,7 +191,11 @@ export function broadcastToQueue(gameId: string, event: string, data: any) {
   io.to(`queue:${gameId}`).emit(event, data);
 }
 
-export function broadcastToTriviaQueue(challengeId: string, event: string, data: any) {
+export function broadcastToTriviaQueue(
+  challengeId: string,
+  event: string,
+  data: any,
+) {
   io.to(`trivia-queue:${challengeId}`).emit(event, data);
 }
 

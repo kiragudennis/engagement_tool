@@ -250,6 +250,8 @@ DECLARE
     v_user_name TEXT;
     v_trivia_result JSON;
     v_is_active BOOLEAN;
+    v_current_participants INTEGER;
+    v_user_total_spins INTEGER;
 BEGIN
     -- Get current user
     v_user_id := auth.uid();
@@ -290,7 +292,6 @@ BEGIN
 
     -- Participant limit
     IF v_game.participant_limit IS NOT NULL THEN
-        DECLARE v_current_participants INTEGER;
         SELECT COUNT(DISTINCT user_id) INTO v_current_participants
         FROM spin_attempts
         WHERE game_id = p_game_id;
@@ -321,7 +322,6 @@ BEGIN
     
     -- Spin limit per user
     IF v_game.spin_limit_per_user IS NOT NULL THEN
-        DECLARE v_user_total_spins INTEGER;
         SELECT spins_used_total INTO v_user_total_spins
         FROM user_spin_allocations
         WHERE user_id = v_user_id AND game_id = p_game_id;

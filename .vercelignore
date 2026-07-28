@@ -1,0 +1,13 @@
+socket-server/
+socket-server/**/*
+*.log
+.DS_Store
+node_modules/
+.git/
+.github/
+.vscode/
+*.md
+coverage/
+.nyc_output/
+*.test.ts
+*.spec.ts

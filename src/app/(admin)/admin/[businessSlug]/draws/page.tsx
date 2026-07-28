@@ -73,7 +73,6 @@ interface Draw {
   show_entry_ticker: boolean;
   show_leaderboard: boolean;
   created_at: string;
-  draw_group_id: string | null;
 }
 
 export default function AdminDrawsPage() {
@@ -82,10 +81,8 @@ export default function AdminDrawsPage() {
   const router = useRouter();
   const [business, setBusiness] = useState<any>(null);
   const [draws, setDraws] = useState<Draw[]>([]);
-  const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [drawStats, setDrawStats] = useState<Record<string, any>>({});
 
   const drawsService = new DrawsService(supabase);
@@ -94,12 +91,8 @@ export default function AdminDrawsPage() {
   const fetchData = useCallback(async () => {
     if (!businessSlug || !business?.id) return;
     try {
-      const [drawsData, groupsData] = await Promise.all([
-        drawsService.getDraws({ businessId: business.id, groupId: selectedGroup || undefined }),
-        drawsService.getDrawGroups(business.id),
-      ]);
+      const drawsData = await drawsService.getDraws({ businessId: business.id });
       setDraws(drawsData);
-      setGroups(groupsData);
 
       const stats: Record<string, any> = {};
       for (const draw of drawsData) {
@@ -128,7 +121,7 @@ export default function AdminDrawsPage() {
     } finally {
       setLoading(false);
     }
-  }, [businessSlug, supabase, drawsService, selectedGroup, business?.id]);
+  }, [businessSlug, supabase, drawsService, business?.id]);
 
   useEffect(() => {
     const loadBusiness = async () => {
@@ -249,34 +242,11 @@ export default function AdminDrawsPage() {
               <DialogHeader>
                 <DialogTitle>Create New Draw</DialogTitle>
               </DialogHeader>
-              <DrawForm onSave={fetchData} groups={groups} />
+              <DrawForm onSave={fetchData} />
             </DialogContent>
           </Dialog>
         </div>
       </div>
-
-      {/* Group Filter Tabs */}
-      {groups.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-6">
-          <Badge
-            variant={selectedGroup === null ? "default" : "outline"}
-            className="cursor-pointer px-4 py-2"
-            onClick={() => setSelectedGroup(null)}
-          >
-            All Draws
-          </Badge>
-          {groups.map((group) => (
-            <Badge
-              key={group.id}
-              variant={selectedGroup === group.id ? "default" : "outline"}
-              className="cursor-pointer px-4 py-2"
-              onClick={() => setSelectedGroup(group.id)}
-            >
-              {group.name}
-            </Badge>
-          ))}
-        </div>
-      )}
 
       {/* Draws Grid/List */}
       {viewMode === "grid" ? (
@@ -556,7 +526,7 @@ function DrawListItem({ draw, stats, onUpdateStatus, onPerformDraw, businessSlug
 }
 
 // Draw Form Component
-function DrawForm({ onSave, initialDraw, groups }: any) {
+function DrawForm({ onSave, initialDraw }: any) {
   const { supabase } = useAuth();
   const [formData, setFormData] = useState(
     initialDraw || {
@@ -589,7 +559,6 @@ function DrawForm({ onSave, initialDraw, groups }: any) {
       consolation_points_amount: 50,
       auto_redraw_days: 7,
       max_redraws: 1,
-      draw_group_id: "",
     },
   );
 
@@ -635,23 +604,6 @@ function DrawForm({ onSave, initialDraw, groups }: any) {
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
           />
-        </div>
-        <div>
-          <Label>Draw Group (optional)</Label>
-          <select
-            className="w-full border rounded-lg p-2"
-            value={formData.draw_group_id}
-            onChange={(e) =>
-              setFormData({ ...formData, draw_group_id: e.target.value })
-            }
-          >
-            <option value="">No Group</option>
-            {groups?.map((group: any) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 

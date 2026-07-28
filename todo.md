@@ -291,3 +291,12 @@ All 8 todos are now complete. Here's a summary of what was implemented:
 **3. Admin Dashboard Cleanup**
 
 - Removed unused `totalSpins`, `todaySpins`, `recentSpinsData` queries from `page.tsx`
+
+Fixed. The `draw_groups` table does not exist in any SQL migration, and `draw_group_id` is not present in the `draws` table either. Since draws are already scoped to a business via `business_id` and customer enrollment happens through redeem codes (the same flow used for spins and trivia), draw groups add unnecessary complexity.
+
+Changes made in `src/app/(admin)/admin/[businessSlug]/draws/page.tsx`:
+
+- Removed the `getDrawGroups(business.id)` call that caused the crash
+- Removed `groups`, `selectedGroup` state and filter tab UI
+- Removed `draw_group_id` from the `Draw` interface
+- Removed the "Draw Group (optional)" dropdown from `DrawForm`

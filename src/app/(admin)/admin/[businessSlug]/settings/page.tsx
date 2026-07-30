@@ -86,6 +86,7 @@ export default function BusinessSettingsPage() {
     show_branding_on_live: true,
     require_email_for_prize: true,
     points_per_redemption: 10,
+    points_value: 0.001,
     points_multiplier: 0.5,
     api_key: "",
   });
@@ -146,6 +147,7 @@ export default function BusinessSettingsPage() {
       show_branding_on_live: biz.show_branding_on_live ?? true,
       require_email_for_prize: biz.require_email_for_prize ?? true,
       points_per_redemption: biz.points_per_redemption ?? 10,
+      points_value: biz.points_value ?? 0.001,
       points_multiplier: biz.points_multiplier ?? 0.5,
       api_key: apiKey?.api_key || "",
     });
@@ -190,6 +192,8 @@ export default function BusinessSettingsPage() {
           max_spins_per_activation: formData.max_spins_per_activation,
           show_branding_on_live: formData.show_branding_on_live,
           require_email_for_prize: formData.require_email_for_prize,
+          points_per_redemption: formData.points_per_redemption,
+          points_value: formData.points_value,
           updated_at: new Date().toISOString(),
         })
         .eq("id", business.id);
@@ -828,6 +832,28 @@ export default function BusinessSettingsPage() {
                     <p className="text-white/30 text-xs mt-1">
                       Loyalty points awarded to customers each time they redeem
                       a code. Set to 0 to disable.
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-white">
+                      Point Value (currency per point)
+                    </Label>
+                    <Input
+                      type="number"
+                      value={formData.points_value}
+                      onChange={(e) =>
+                        setFormData((p) => ({
+                          ...p,
+                          points_value: parseFloat(e.target.value) || 0.001,
+                        }))
+                      }
+                      className="mt-1 bg-white/5 border-white/10 text-white"
+                      min={0.0001}
+                      step={0.0001}
+                    />
+                    <p className="text-white/30 text-xs mt-1">
+                      Monetary value of 1 point (e.g., 0.001 = 100 points = 0.1
+                      USD/KES). Used for checkout redemption.
                     </p>
                   </div>
                   <div>

@@ -249,6 +249,46 @@ BEGIN
 END;
 $$;
 
+-- Get all businesses where customer has points (active AND inactive)
+CREATE OR REPLACE FUNCTION get_customer_all_points(p_user_id UUID)
+RETURNS TABLE (
+    business_id UUID,
+    business_name TEXT,
+    business_slug TEXT,
+    business_logo TEXT,
+    brand_color TEXT,
+    points INTEGER,
+    tier TEXT,
+    lifetime_points INTEGER,
+    last_earned_at TIMESTAMPTZ,
+    is_active BOOLEAN,
+    expires_at TIMESTAMPTZ,
+    points_per_redemption INTEGER,
+    points_value NUMERIC
+)
+LANGUAGE plpgsql
+STABLE
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        b.id, b.name, b.slug, b.logo_url, b.brand_color,
+        COALESCE(lp.points, 0),
+        COALESCE(lp.tier, 'bronze'),
+        COALESCE(lp.points_earned, 0),
+        lp.updated_at,
+        COALESCE(cba.is_active, FALSE),
+        cba.expires_at,
+        COALESCE(b.points_per_redemption, 10),
+        COALESCE(b.points_value, 0.001)
+    FROM loyalty_points lp
+    JOIN businesses b ON b.id = lp.business_id
+    LEFT JOIN customer_business_activations cba ON cba.user_id = p_user_id AND cba.business_id = b.id
+    WHERE lp.user_id = p_user_id AND COALESCE(lp.points, 0) > 0
+    ORDER BY COALESCE(lp.points, 0) DESC;
+END;
+$$;
+
 -- Auto-create loyalty on activation
 CREATE OR REPLACE FUNCTION create_loyalty_on_activation()
 RETURNS TRIGGER
@@ -300,3 +340,4 @@ GRANT EXECUTE ON FUNCTION create_business_loyalty_record(UUID, UUID) TO authenti
 GRANT EXECUTE ON FUNCTION award_engagement_points(UUID, UUID, INTEGER, TEXT, TEXT, JSONB) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_business_loyalty_summary(UUID, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_customer_points_summary(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_customer_all_points(UUID) TO authenticated;

@@ -29,13 +29,15 @@ import { z } from "zod";
 import GamingBackground from "@/components/GamingBackground";
 
 const loginSchema = z.object({
-  email: z.string().min(1, "Email is required").email("Valid email required"),
+  email: z.string().min(1, "Email is required"),
   password: z.string().min(1, "Password is required"),
 });
 
 const signupSchema = z.object({
   fullName: z.string().min(2, "Name is required"),
-  email: z.string().min(1, "Email is required").email("Valid email required"),
+  email: z.string().min(1, "Email is required"),
+  phone: z.string().min(1, "Phone is required"),
+  idNumber: z.string().min(1, "ID is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
@@ -182,6 +184,8 @@ function SignupFormContent() {
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [idNumber, setIdNumber] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -209,6 +213,8 @@ function SignupFormContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...parsed.data,
+          phone,
+          idNumber: idNumber || undefined,
           referralCode: referralCode || undefined,
         }),
       });
@@ -288,6 +294,58 @@ function SignupFormContent() {
         {errors.email && (
           <p className="text-red-500 dark:text-red-400 text-xs mt-1">
             {errors.email}
+          </p>
+        )}
+      </div>
+
+      <div>
+        <Label className="text-gray-700 dark:text-gray-300">
+          Phone Number (required)
+        </Label>
+        <div className="relative mt-1.5">
+          <Input
+            type="tel"
+            value={phone}
+            onChange={(e) => {
+              setPhone(e.target.value);
+              setErrors((p) => ({ ...p, phone: "" }));
+            }}
+            placeholder="+254 700 000000"
+            className={`pl-9 bg-white dark:bg-gray-900/50 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 ${
+              errors.phone ? "border-red-500 dark:border-red-500" : ""
+            }`}
+            disabled={loading}
+          />
+        </div>
+        {errors.phone && (
+          <p className="text-red-500 dark:text-red-400 text-xs mt-1">
+            {errors.phone}
+          </p>
+        )}
+      </div>
+
+      <div>
+        <Label className="text-gray-700 dark:text-gray-300">
+          National ID Number (required)
+        </Label>
+        <div className="relative mt-1.5">
+          <Input
+            type="text"
+            value={idNumber}
+            onChange={(e) => {
+              setIdNumber(e.target.value);
+              setErrors((p) => ({ ...p, idNumber: "" }));
+            }}
+            placeholder="Enter your ID number"
+            className={`pl-9 bg-white dark:bg-gray-900/50 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 ${
+              errors.idNumber ? "border-red-500 dark:border-red-500" : ""
+            }`}
+            disabled={loading}
+          />
+        </div>
+        {errors.idNumber && (
+          <p className="text-red-500 dark:text-red-400 text-xs mt-1">
+            {errors.idNumber}
           </p>
         )}
       </div>

@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
     
     -- Profile
     full_name TEXT,
-    phone TEXT,
+    phone TEXT NOT NULL UNIQUE,
     metadata JSONB DEFAULT '{}'::jsonb,
     
     -- Business context
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
 
     
     -- Account status (for 30-day activation)
-    status TEXT DEFAULT 'inactive' CHECK (status IN ('active', 'inactive', 'suspended', 'banned')),
+    status TEXT DEFAULT 'inactive' CHECK (status IN ('active', 'inactive', 'suspended', 'banned', 'flagged')),
     
     -- Referral
     referral_code TEXT UNIQUE,
@@ -32,16 +32,31 @@ CREATE TABLE IF NOT EXISTS users (
     email_verified BOOLEAN DEFAULT FALSE,
     last_login TIMESTAMPTZ,
     
+    -- Identity verification
+    id_number TEXT NOT NULL UNIQUE,
+    id_verified BOOLEAN DEFAULT FALSE,
+    id_verified_at TIMESTAMPTZ,
+    id_verified_by UUID REFERENCES businesses(id),
+    
+    -- Flagging
+    flagged_reason TEXT,
+    flagged_at TIMESTAMPTZ,
+    flagged_by UUID REFERENCES businesses(id),
+    
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Indexes
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 CREATE INDEX IF NOT EXISTS idx_users_status_active ON users(status) WHERE status = 'active';
 CREATE INDEX IF NOT EXISTS idx_users_home_business ON users(home_business_id);
 CREATE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code);
 CREATE INDEX IF NOT EXISTS idx_users_referred_by ON users(referred_by);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique ON users(phone);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_id_number_unique ON users(id_number);
+CREATE INDEX IF NOT EXISTS idx_users_flagged ON users(status) WHERE status = 'flagged';
 
 -- Add new columns for users
 -- Add new columns for users

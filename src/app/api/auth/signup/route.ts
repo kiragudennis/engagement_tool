@@ -7,8 +7,9 @@ import { checkBotId } from "botid/server";
 
 const signupSchema = z.object({
   fullName: z.string().min(2, "Name is required"),
-  email: z.string().email("Valid email required"),
-  phone: z.string().optional(),
+  email: z.string(),
+  phone: z.string(),
+  idNumber: z.string(),
   password: z.string().min(6, "Password must be at least 6 characters"),
   referralCode: z.string().optional(),
 });
@@ -42,7 +43,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { fullName, email, phone, password, referralCode } = parsed.data;
+    const { fullName, email, phone, idNumber, password, referralCode } =
+      parsed.data;
 
     // Check if user already exists
     const { data: existingUser, error: userExistsError } = await supabaseAdmin
@@ -90,7 +92,8 @@ export async function POST(req: NextRequest) {
         id: userId, // Important: Set the ID to match auth user
         email: email.toLowerCase(),
         full_name: fullName,
-        phone: phone || null,
+        phone: phone,
+        id_number: idNumber,
         status: "inactive",
         onboarding_completed: false,
         role: "customer", // Default role

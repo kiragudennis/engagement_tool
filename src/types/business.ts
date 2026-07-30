@@ -45,6 +45,7 @@ export interface Business {
   paystack_subscription_code: string;
   mpesa_phone: string | null;
   points_per_redemption: number;
+  points_value: number;
 
   // ENGAGEMENT
   engagements_this_month: number;

@@ -1,9 +1,11 @@
 // src/lib/services/notification-service.ts (UPDATED)
 import { SupabaseClient } from "@supabase/supabase-js";
+import twilio from "twilio";
 
 export interface Notification {
   id: string;
   user_id: string;
+  business_id?: string;
   type:
     | "draw_win"
     | "draw_runner_up"
@@ -15,15 +17,25 @@ export interface Notification {
     | "loyalty_points_earned"
     | "loyalty_points_expiring"
     | "loyalty_tier_upgrade"
-    | "order_confirmation"
-    | "order_shipped"
-    | "order_delivered"
-    | "payment_received"
-    | "payment_failed"
-    | "coupon_issued"
     | "system_alert"
     | "rank_improved"
     | "challenge_joined"
+    | "challenge_started"
+    | "challenge_ended"
+    | "trivia_correct"
+    | "trivia_wrong"
+    | "trivia_rank_improved"
+    | "spin_win"
+    | "spin_loss"
+    | "spin_prize_ready"
+    | "account_activated"
+    | "activation_expiring"
+    | "activation_expired"
+    | "id_verified"
+    | "account_flagged"
+    | "points_earned"
+    | "points_redeemed"
+    | "new_code_available"
     | "entry_confirmation"
     | "promotion";
   title: string;
@@ -118,6 +130,7 @@ export async function getUserNotifications(
   return (data || []).map((n: any) => ({
     id: n.id,
     user_id: n.user_id || userId,
+    business_id: n.business_id,
     type: n.type,
     title: n.title,
     message: n.message,
@@ -144,6 +157,7 @@ export class NotificationService {
     title: string,
     message: string,
     metadata?: any,
+    businessId?: string,
   ): Promise<Notification | null> {
     const { data, error } = await this.supabase.rpc("create_notification", {
       p_user_id: userId,
@@ -151,6 +165,7 @@ export class NotificationService {
       p_title: title,
       p_message: message,
       p_metadata: metadata || {},
+      p_business_id: businessId || null,
     });
 
     if (error) {
@@ -161,7 +176,7 @@ export class NotificationService {
   }
 
   /**
-   * Send email via email queue
+   * Send email via Resend
    */
   async sendEmail(
     to: string,
@@ -170,17 +185,97 @@ export class NotificationService {
     text?: string,
     metadata?: any,
   ): Promise<void> {
-    const { error } = await this.supabase.from("email_queue").insert({
-      to_email: to,
-      subject,
-      html_content: html,
-      text_content: text,
-      metadata: metadata || {},
-      status: "pending",
-      scheduled_for: new Date().toISOString(),
-    });
+    const { resend } = await import("@/lib/limit");
+      await resend.emails.send({
+        from: `Engage <${process.env.RESEND_FROM_EMAIL || "notifications@engagespin.com"}>`,
+        to,
+        subject,
+        html,
+        text,
+      } as any);
+  }
 
-    if (error) throw error;
+  /**
+   * Send SMS via Twilio
+   */
+  async sendSMS(
+    to: string,
+    body: string,
+    metadata?: any,
+  ): Promise<void> {
+    const twilioClient = twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN,
+    );
+    await twilioClient.messages.create({
+      body,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to,
+    });
+  }
+
+  /**
+   * Send Engage system notification (in-app + optional email + SMS)
+   */
+  async sendEngageNotification(
+    userId: string,
+    type: Notification["type"],
+    title: string,
+    message: string,
+    options: {
+      businessId?: string;
+      email?: string;
+      phone?: string;
+      emailHtml?: string;
+      emailText?: string;
+      smsBody?: string;
+      metadata?: any;
+    } = {},
+  ): Promise<{ inApp: boolean; email: boolean; sms: boolean }> {
+    const results = { inApp: false, email: false, sms: false };
+
+    // In-app notification
+    const inApp = await this.sendInAppNotification(
+      userId,
+      type,
+      title,
+      message,
+      options.metadata,
+      options.businessId,
+    );
+    results.inApp = !!inApp;
+
+    // Email
+    if (options.email && options.emailHtml) {
+      try {
+        await this.sendEmail(
+          options.email,
+          title,
+          options.emailHtml,
+          options.emailText,
+          { type, userId, businessId: options.businessId },
+        );
+        results.email = true;
+      } catch (error) {
+        console.error("Failed to send email:", error);
+      }
+    }
+
+    // SMS
+    if (options.phone && options.smsBody) {
+      try {
+        await this.sendSMS(options.phone, options.smsBody, {
+          type,
+          userId,
+          businessId: options.businessId,
+        });
+        results.sms = true;
+      } catch (error) {
+        console.error("Failed to send SMS:", error);
+      }
+    }
+
+    return results;
   }
 
   /**

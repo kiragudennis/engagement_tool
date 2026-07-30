@@ -56,6 +56,11 @@ ALTER TABLE businesses ADD COLUMN IF NOT EXISTS points_per_redemption INTEGER DE
 -- Comment on the column
 COMMENT ON COLUMN businesses.points_per_redemption IS 'Loyalty points awarded to customer each time they redeem a code';
 
+-- Add points_value column (monetary value per point, e.g., 0.001 means 1 point = 0.001 USD/KES)
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS points_value NUMERIC(10,4) DEFAULT 0.001;
+
+COMMENT ON COLUMN businesses.points_value IS 'Monetary value of a single point (e.g., 0.001 = 1 point = 0.001 USD/KES). Used for checkout redemption calculations.';
+
 -- Add the new constraint with updated values
 ALTER TABLE businesses ADD CONSTRAINT businesses_plan_check
     CHECK (plan IN ('trial', 'starter', 'pro', 'enterprise', 'early_bronze', 'early_silver', 'early_gold'));

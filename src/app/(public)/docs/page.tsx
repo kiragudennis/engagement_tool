@@ -26,6 +26,9 @@ import {
   CirclePause,
   Trophy,
   Coins,
+  AlertTriangle,
+  CreditCard,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -33,6 +36,9 @@ import Link from "next/link";
 const SECTIONS = [
   { id: "overview", label: "Overview", icon: Sparkles },
   { id: "business", label: "For Businesses", icon: Store },
+  { id: "verification", label: "Verification", icon: Shield },
+  { id: "customer-profile", label: "Customer Profile", icon: CreditCard },
+  { id: "notifications", label: "Notifications", icon: Bell },
   { id: "customer", label: "For Customers", icon: Users },
   { id: "codes", label: "How Codes Work", icon: Ticket },
   { id: "stickers", label: "Sticker System", icon: Printer },
@@ -281,6 +287,164 @@ export default function DocsPage() {
                 </div>
               </section>
 
+              {/* ─── VERIFICATION & SECURITY ───────────────── */}
+              <section id="verification">
+                <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                  <Shield className="h-6 w-6 text-purple-400" /> Verification &
+                  Security
+                </h2>
+                <div className="space-y-6">
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-6 space-y-4">
+                      <h3 className="text-white font-semibold text-lg">
+                        How Engage Protects Your Business
+                      </h3>
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        Engage uses a business-led verification model. We do not
+                        perform facial recognition or biometric checks. Instead,
+                        businesses verify customer identity at the point of
+                        prize collection using the ID/phone/email captured
+                        during signup.
+                      </p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
+                          <h4 className="text-purple-400 font-medium text-sm mb-2">
+                            At Signup
+                          </h4>
+                          <ul className="space-y-2 text-white/50 text-xs">
+                            <li className="flex items-start gap-2">
+                              <Check className="h-3 w-3 text-green-400 mt-0.5" />
+                              <span>
+                                Customers enter email, phone, and national ID
+                                number
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <Check className="h-3 w-3 text-green-400 mt-0.5" />
+                              <span>
+                                Email is verified before account becomes active
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <Check className="h-3 w-3 text-green-400 mt-0.5" />
+                              <span>
+                                Phone and ID number are locked once entered —
+                                cannot be changed
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <Check className="h-3 w-3 text-green-400 mt-0.5" />
+                              <span>
+                                Duplicate emails, phones, or ID numbers are
+                                blocked automatically
+                              </span>
+                            </li>
+                          </ul>
+                        </div>
+
+                        <div className="p-4 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                          <h4 className="text-blue-400 font-medium text-sm mb-2">
+                            At Prize Collection
+                          </h4>
+                          <ul className="space-y-2 text-white/50 text-xs">
+                            <li className="flex items-start gap-2">
+                              <Check className="h-3 w-3 text-green-400 mt-0.5" />
+                              <span>
+                                Admin checks customer's physical ID against
+                                account details
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <Check className="h-3 w-3 text-green-400 mt-0.5" />
+                              <span>
+                                Admin verifies phone matches the registered
+                                number (use Truecaller for name lookup)
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <Check className="h-3 w-3 text-green-400 mt-0.5" />
+                              <span>
+                                If details match → admin marks identity as
+                                verified
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <Check className="h-3 w-3 text-green-400 mt-0.5" />
+                              <span>
+                                If mismatch → admin flags account for other
+                                businesses to see
+                              </span>
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                        <h4 className="text-amber-400 font-medium text-sm mb-2 flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4" />
+                          Business Responsibilities
+                        </h4>
+                        <p className="text-white/50 text-xs leading-relaxed">
+                          Businesses have the right and responsibility to verify
+                          that the person collecting a prize matches the account
+                          holder. Engage provides the tools to look up customers
+                          and mark them as verified, but the final check is
+                          yours. If you suspect fraud, flag the account — other
+                          businesses will see the flag and can take caution.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-6 space-y-4">
+                      <h3 className="text-white font-semibold text-lg">
+                        Flagged Accounts
+                      </h3>
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        When a business flags an account, it becomes visible to
+                        all other businesses in the system. This is a shared
+                        safety mechanism that helps prevent fraud across the
+                        Engage network.
+                      </p>
+                      <div className="space-y-2">
+                        {[
+                          "Flagged accounts show a red warning badge in the admin panel",
+                          "Other businesses can see the flag reason and timestamp",
+                          "Flagged accounts cannot participate in new activations",
+                          "Admins can still view history but cannot verify or award prizes",
+                          "Support review is recommended for all flagged accounts",
+                        ].map((item, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center gap-2 text-white/50 text-sm"
+                          >
+                            <div className="h-1.5 w-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-6 space-y-4">
+                      <h3 className="text-white font-semibold text-lg">
+                        Using Truecaller for Quick Verification
+                      </h3>
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        We recommend installing the Truecaller mobile app at
+                        your business. When a customer provides a phone number,
+                        Truecaller displays the registered name instantly — a
+                        quick way to confirm the person in front of you matches
+                        their account.
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </section>
+
               {/* ─── FOR CUSTOMERS ────────────────────────── */}
               <section id="customer">
                 <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
@@ -307,6 +471,222 @@ export default function DocsPage() {
                     title="Come Back"
                     description="The more you engage, the more points you earn. Climb from Bronze to Platinum tier. Come back for new codes and new chances to win."
                   />
+                </div>
+              </section>
+
+              {/* ─── CUSTOMER PROFILE & POINTS ─────────────── */}
+              <section id="customer-profile">
+                <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                  <Users className="h-6 w-6 text-purple-400" /> Customer Profile
+                  & Points
+                </h2>
+                <div className="space-y-6">
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-6 space-y-4">
+                      <h3 className="text-white font-semibold text-lg">
+                        Your Engagement Summary
+                      </h3>
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        Your Engage account shows every business you have ever
+                        engaged with — not just active ones. On your profile,
+                        you will see:
+                      </p>
+                      <ul className="space-y-2 text-white/50 text-sm">
+                        <li className="flex items-start gap-2">
+                          <Check className="h-4 w-4 text-green-400 mt-0.5" />
+                          <span>
+                            <strong className="text-white">
+                              All businesses
+                            </strong>{" "}
+                            you have ever redeemed codes from
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Check className="h-4 w-4 text-green-400 mt-0.5" />
+                          <span>
+                            <strong className="text-white">
+                              Current points
+                            </strong>{" "}
+                            balance per business
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Check className="h-4 w-4 text-green-400 mt-0.5" />
+                          <span>
+                            <strong className="text-white">Points worth</strong>{" "}
+                            calculated using each business's point value
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <Check className="h-4 w-4 text-green-400 mt-0.5" />
+                          <span>
+                            <strong className="text-white">History</strong> of
+                            spins, draws, trivia participation, and codes
+                            redeemed
+                          </span>
+                        </li>
+                      </ul>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-6 space-y-4">
+                      <h3 className="text-white font-semibold text-lg">
+                        How to Redeem / Withdraw Points
+                      </h3>
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        Points are redeemed directly with the business during
+                        checkout. Here is how it works:
+                      </p>
+                      <ol className="space-y-3 text-white/50 text-sm list-decimal list-inside">
+                        <li>
+                          When you want to use your points, tell the cashier or
+                          business owner.
+                        </li>
+                        <li>
+                          The business looks up your account in their admin
+                          panel (or via their POS/e-commerce API).
+                        </li>
+                        <li>
+                          They verify your identity and deduct the points from
+                          your balance for that specific business.
+                        </li>
+                        <li>
+                          The points are applied as a discount toward your
+                          purchase.
+                        </li>
+                      </ol>
+                      <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
+                        <p className="text-purple-400 text-sm">
+                          <strong>Note:</strong> Points cannot be transferred
+                          between businesses. They are tied to the specific
+                          business where they were earned.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-6 space-y-4">
+                      <h3 className="text-white font-semibold text-lg">
+                        Point Value
+                      </h3>
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        Each business sets its own point value. This defines how
+                        much each point is worth in real currency. For example:
+                      </p>
+                      <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                        <p className="text-white text-sm font-mono">
+                          100 points = 0.1 USD/KES
+                        </p>
+                        <p className="text-white/40 text-xs mt-1">
+                          This means each point is worth 0.001 USD/KES. If you
+                          have 500 points, that is worth 0.50 USD/KES.
+                        </p>
+                      </div>
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        The point value is set by the business and can be found
+                        in your profile under each business's card. This value
+                        is used when points are redeemed at checkout.
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </section>
+
+              {/* ─── NOTIFICATIONS ────────────────────────── */}
+              <section id="notifications">
+                <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                  <Bell className="h-6 w-6 text-purple-400" /> Notifications
+                </h2>
+                <div className="space-y-6">
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-6 space-y-4">
+                      <h3 className="text-white font-semibold text-lg">
+                        How Notifications Work
+                      </h3>
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        Engage sends two types of notifications:
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
+                          <h4 className="text-purple-400 font-medium text-sm mb-2">
+                            In-App Notifications
+                          </h4>
+                          <p className="text-white/50 text-xs leading-relaxed">
+                            These appear in your Engage account notification
+                            center. They cover draw wins, spin results, points
+                            changes, account status updates, and engagement
+                            milestones.
+                          </p>
+                        </div>
+                        <div className="p-4 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                          <h4 className="text-blue-400 font-medium text-sm mb-2">
+                            External Notifications (Email / SMS)
+                          </h4>
+                          <p className="text-white/50 text-xs leading-relaxed">
+                            For important Engage events — such as prize wins or
+                            account security alerts — we may send an email or
+                            SMS using Resend and Twilio. These are rare and only
+                            for high-priority events.
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-6 space-y-4">
+                      <h3 className="text-white font-semibold text-lg">
+                        Business-Specific Notifications
+                      </h3>
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        Some notifications are tied to a specific business. For
+                        example, if you win a prize in a business's draw, that
+                        notification is tagged with that business's ID. This
+                        helps keep your notifications organized and relevant.
+                      </p>
+                      <div className="p-4 rounded-lg bg-green-500/5 border border-green-500/20">
+                        <p className="text-green-400 text-sm">
+                          <strong>Note:</strong> Businesses are responsible for
+                          their own marketing and customer communications
+                          outside of Engage. Your customer list is available in
+                          the business dashboard for export, and businesses can
+                          use their own tools for newsletters and promotions.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="p-6 space-y-4">
+                      <h3 className="text-white font-semibold text-lg">
+                        Notification Types
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {[
+                          { type: "Draws", examples: "draw_win, draw_reminder, draw_entry_confirmed" },
+                          { type: "Spins", examples: "spin_win, spin_prize_ready" },
+                          { type: "Trivia", examples: "trivia_correct, trivia_rank_improved" },
+                          { type: "Points", examples: "points_earned, points_redeemed, loyalty_tier_upgrade" },
+                          { type: "Account", examples: "account_activated, id_verified, account_flagged" },
+                          { type: "System", examples: "system_alert, new_code_available" },
+                        ].map((group, i) => (
+                          <div
+                            key={i}
+                            className="p-3 rounded-lg bg-white/5 border border-white/10"
+                          >
+                            <h4 className="text-white text-sm font-medium mb-1">
+                              {group.type}
+                            </h4>
+                            <p className="text-white/40 text-xs font-mono">
+                              {group.examples}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </section>
 
@@ -1002,16 +1382,94 @@ export default function DocsPage() {
                             </ul>
                           </div>
                         </div>
+                        <p className="text-white/50 text-sm mt-4">
+                          Points are automatically calculated based on your
+                          configured multiplier (e.g., 2.0 × KES 250 = 500
+                          points). You can override this with{" "}
+                          <code className="text-purple-400">
+                            pointsOverride
+                          </code>{" "}
+                          if needed.
+                        </p>
                       </CardContent>
                     </Card>
 
-                    <p className="text-white/50 text-sm">
-                      Points are automatically calculated based on your
-                      configured multiplier (e.g., 2.0 × KES 250 = 500 points).
-                      You can override this with{" "}
-                      <code className="text-purple-400">pointsOverride</code> if
-                      needed.
-                    </p>
+                    <Card className="bg-white/5 border-white/10">
+                      <CardContent className="p-6 space-y-4">
+                        <h3 className="text-white font-semibold text-lg flex items-center gap-2">
+                          <CreditCard className="h-5 w-5 text-purple-400" />
+                          Points Redemption at Checkout
+                        </h3>
+                        <p className="text-white/50 text-sm leading-relaxed">
+                          Engage also provides APIs for POS and e-commerce
+                          systems to look up customers and deduct points at
+                          checkout. This lets customers pay with their Engage
+                          points directly in your store or website.
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="p-4 rounded-lg bg-green-500/5 border border-green-500/20">
+                            <h4 className="text-green-400 font-medium text-sm mb-2">
+                              Look Up Customer
+                            </h4>
+                            <p className="text-white/50 text-xs mb-2">
+                              Find a customer by phone, email, or ID number.
+                              Returns their points balance and engagement
+                              summary.
+                            </p>
+                            <code className="text-green-400 text-xs">
+                              POST /api/business/customers/lookup
+                            </code>
+                          </div>
+                          <div className="p-4 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                            <h4 className="text-blue-400 font-medium text-sm mb-2">
+                              Deduct Points
+                            </h4>
+                            <p className="text-white/50 text-xs mb-2">
+                              Deduct points from a customer's balance for a
+                              purchase. Creates a transaction record for audit.
+                            </p>
+                            <code className="text-blue-400 text-xs">
+                              POST /api/business/customers/points/deduct
+                            </code>
+                          </div>
+                        </div>
+
+                        <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
+                          <h4 className="text-purple-400 font-medium text-sm mb-2">
+                            How It Works
+                          </h4>
+                          <ol className="space-y-2 text-white/50 text-xs list-decimal list-inside">
+                            <li>
+                              Customer checks out and says they want to pay with
+                              points
+                            </li>
+                            <li>
+                              Your POS/e-commerce system calls{" "}
+                              <code className="text-purple-400">
+                                /api/business/customers/lookup
+                              </code>{" "}
+                              with their phone/email/ID
+                            </li>
+                            <li>
+                              System returns their current points balance and
+                              point value
+                            </li>
+                            <li>
+                              If they have enough points, call{" "}
+                              <code className="text-purple-400">
+                                /api/business/customers/points/deduct
+                              </code>{" "}
+                              with the amount to deduct
+                            </li>
+                            <li>
+                              Points are deducted and a transaction record is
+                              created
+                            </li>
+                          </ol>
+                        </div>
+                      </CardContent>
+                    </Card>
 
                     <Link href="/docs/api">
                       <Button
@@ -1311,7 +1769,7 @@ export default function DocsPage() {
                           Live Draw Broadcast (3 stages):
                         </strong>
                       </p>
-                      <div className="grid grid-cols-3 gap-3 mt-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
                         {[
                           {
                             stage: "1. Entry Collection",
@@ -1351,7 +1809,7 @@ export default function DocsPage() {
 
                 {/* Offline & Online Modes */}
                 <Card className="bg-white/5 border-white/10">
-                  <CardContent className="p-6">
+                  <CardContent>
                     <div className="flex items-center gap-2 mb-4">
                       <Radio className="h-5 w-5 text-green-400" />
                       <h3 className="text-white font-bold text-lg">
@@ -1359,7 +1817,7 @@ export default function DocsPage() {
                       </h3>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid sm:grid-cols-2 gap-3 sm:gap-6">
                       <div>
                         <h4 className="text-white font-medium text-sm mb-2">
                           🏪 Offline (In-Store)
@@ -1525,10 +1983,11 @@ export default function DocsPage() {
                           capacity across all active games.
                         </p>
                         <p className="text-purple-400/60 text-xs mt-2">
-                          <strong>Queue mode:</strong> For high-traffic venues,
-                          enable queue mode on your spin game to call customers
-                          one-by-one by name. This prevents overcrowding and
-                          creates a live show experience.
+                          <strong className="text-white">Queue mode:</strong>{" "}
+                          For high-traffic venues, enable queue mode on your
+                          spin game to call customers one-by-one by name. This
+                          prevents overcrowding and creates a live show
+                          experience.
                         </p>
                       </div>
                     </div>
@@ -1541,7 +2000,7 @@ export default function DocsPage() {
                       What Counts as an Engagement?
                     </h3>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid sm:grid-cols-3 gap-4">
                       {[
                         {
                           action: "Spin",
@@ -1679,6 +2138,10 @@ export default function DocsPage() {
                     {
                       q: "What if I run out of stickers?",
                       a: "Generate and print more anytime from your dashboard. Keep extras ready for busy periods.",
+                    },
+                    {
+                      q: "How does customer verification work?",
+                      a: "Engage captures email, phone, and ID number at signup. When collecting prizes, businesses verify identity against these details. If there's a mismatch, you can flag the account — other businesses will be alerted.",
                     },
                   ].map((faq, i) => (
                     <Card key={i} className="bg-white/5 border-white/10">

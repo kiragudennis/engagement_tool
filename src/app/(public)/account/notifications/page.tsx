@@ -1,4 +1,4 @@
-// app/account/notifications/page.tsx
+// app/(public)/account/notifications/page.tsx
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bell, Gift, Clock, Ticket, Megaphone } from "lucide-react";
+import { Bell, Gift, Clock, Ticket, Megaphone, Check, XCircle, TrendingUp, UserCheck, AlertTriangle, UserX, Coins, Trophy, Brain, RotateCcw, Shield } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -47,10 +47,48 @@ export default function NotificationsPage() {
     switch (type) {
       case "draw_win":
         return <Gift className="h-5 w-5 text-yellow-500" />;
+      case "draw_runner_up":
+        return <Trophy className="h-5 w-5 text-amber-500" />;
       case "draw_reminder":
         return <Clock className="h-5 w-5 text-blue-500" />;
-      case "entry_confirmation":
+      case "draw_entry_confirmed":
         return <Ticket className="h-5 w-5 text-green-500" />;
+      case "draw_consolation":
+        return <Gift className="h-5 w-5 text-purple-500" />;
+      case "draw_redraw":
+        return <RotateCcw className="h-5 w-5 text-orange-500" />;
+      case "challenge_joined":
+      case "challenge_started":
+        return <Brain className="h-5 w-5 text-blue-500" />;
+      case "challenge_ended":
+        return <Trophy className="h-5 w-5 text-yellow-500" />;
+      case "trivia_correct":
+        return <Check className="h-5 w-5 text-green-500" />;
+      case "trivia_wrong":
+        return <XCircle className="h-5 w-5 text-red-500" />;
+      case "trivia_rank_improved":
+        return <TrendingUp className="h-5 w-5 text-green-500" />;
+      case "spin_win":
+        return <Gift className="h-5 w-5 text-yellow-500" />;
+      case "spin_loss":
+        return <XCircle className="h-5 w-5 text-red-500" />;
+      case "spin_prize_ready":
+        return <Ticket className="h-5 w-5 text-purple-500" />;
+      case "account_activated":
+        return <UserCheck className="h-5 w-5 text-green-500" />;
+      case "activation_expiring":
+      case "activation_expired":
+        return <AlertTriangle className="h-5 w-5 text-orange-500" />;
+      case "id_verified":
+        return <Shield className="h-5 w-5 text-green-500" />;
+      case "account_flagged":
+        return <UserX className="h-5 w-5 text-red-500" />;
+      case "points_earned":
+        return <Coins className="h-5 w-5 text-yellow-500" />;
+      case "points_redeemed":
+        return <Gift className="h-5 w-5 text-purple-500" />;
+      case "new_code_available":
+        return <Ticket className="h-5 w-5 text-blue-500" />;
       case "promotion":
         return <Megaphone className="h-5 w-5 text-purple-500" />;
       default:

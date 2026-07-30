@@ -1,10 +1,12 @@
 -- Enable required extensions (if not already enabled)
+-- src/db/notifications.sql
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create notifications table
 CREATE TABLE IF NOT EXISTS notifications (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id uuid REFERENCES users(id) ON DELETE CASCADE,
+    business_id uuid REFERENCES businesses(id) ON DELETE CASCADE,
     type text NOT NULL,
     title text NOT NULL,
     message text NOT NULL,
@@ -19,12 +21,6 @@ CREATE TABLE IF NOT EXISTS notifications (
         'loyalty_points_earned',
         'loyalty_points_expiring',
         'loyalty_tier_upgrade',
-        'order_confirmation',
-        'order_shipped',
-        'order_delivered',
-        'payment_received',
-        'payment_failed',
-        'coupon_issued',
         'system_alert'
     ))
 );
@@ -33,28 +29,40 @@ CREATE TABLE IF NOT EXISTS notifications (
 ALTER TABLE notifications DROP CONSTRAINT IF EXISTS valid_notification_type;
 
 ALTER TABLE notifications ADD CONSTRAINT valid_notification_type CHECK (type IN (
-    -- Existing loyalty types
+    -- Loyalty
     'loyalty_partial_redeem',
     'loyalty_points_earned',
     'loyalty_points_expiring',
     'loyalty_tier_upgrade',
-    -- Existing order types
-    'order_confirmation',
-    'order_shipped',
-    'order_delivered',
-    'payment_received',
-    'payment_failed',
-    'coupon_issued',
-    'system_alert',
-    -- New draw-related types
-    'draw_win',              -- User won a draw
-    'draw_runner_up',        -- User was a runner-up
-    'draw_reminder',         -- Reminder about upcoming draw
-    'draw_entry_confirmed',  -- Entry confirmation
-    'draw_consolation',      -- Consolation points awarded
-    'draw_redraw'           -- Draw was redrawn due to unclaimed prize
-     -- New challenge type
-    'challenge_joined'      -- User joined a challenge
+    -- Draws
+    'draw_win',
+    'draw_runner_up',
+    'draw_reminder',
+    'draw_entry_confirmed',
+    'draw_consolation',
+    'draw_redraw',
+    -- Trivia / Challenges
+    'challenge_joined',
+    'challenge_started',
+    'challenge_ended',
+    'trivia_correct',
+    'trivia_wrong',
+    'trivia_rank_improved',
+    -- Spins
+    'spin_win',
+    'spin_loss',
+    'spin_prize_ready',
+    -- Account
+    'account_activated',
+    'activation_expiring',
+    'activation_expired',
+    'id_verified',
+    'account_flagged',
+    -- Engagement
+    'points_earned',
+    'points_redeemed',
+    'new_code_available',
+    'system_alert'
 ));
 
 -- Update the create_notification function to include new types
@@ -63,7 +71,8 @@ CREATE OR REPLACE FUNCTION create_notification(
     p_type text,
     p_title text,
     p_message text,
-    p_metadata jsonb DEFAULT '{}'::jsonb
+    p_metadata jsonb DEFAULT '{}'::jsonb,
+    p_business_id uuid DEFAULT NULL
 )
 RETURNS uuid
 LANGUAGE plpgsql
@@ -79,12 +88,6 @@ BEGIN
         'loyalty_points_earned',
         'loyalty_points_expiring',
         'loyalty_tier_upgrade',
-        'order_confirmation',
-        'order_shipped',
-        'order_delivered',
-        'payment_received',
-        'payment_failed',
-        'coupon_issued',
         'system_alert',
         'draw_win',
         'draw_runner_up',
@@ -92,13 +95,29 @@ BEGIN
         'draw_entry_confirmed',
         'draw_consolation',
         'draw_redraw',
-        'challenge_joined'
+        'challenge_joined',
+        'challenge_started',
+        'challenge_ended',
+        'trivia_correct',
+        'trivia_wrong',
+        'trivia_rank_improved',
+        'spin_win',
+        'spin_loss',
+        'spin_prize_ready',
+        'account_activated',
+        'activation_expiring',
+        'activation_expired',
+        'id_verified',
+        'account_flagged',
+        'points_earned',
+        'points_redeemed',
+        'new_code_available'
     ) THEN
         RAISE EXCEPTION 'Invalid notification type: %', p_type;
     END IF;
     
-    INSERT INTO notifications (user_id, type, title, message, metadata)
-    VALUES (p_user_id, p_type, p_title, p_message, p_metadata)
+    INSERT INTO notifications (user_id, business_id, type, title, message, metadata)
+    VALUES (p_user_id, p_business_id, p_type, p_title, p_message, p_metadata)
     RETURNING id INTO v_notification_id;
     
     RETURN v_notification_id;
@@ -111,7 +130,8 @@ CREATE OR REPLACE FUNCTION batch_create_notifications(
     p_type text,
     p_title text,
     p_message text,
-    p_metadata jsonb DEFAULT '{}'::jsonb
+    p_metadata jsonb DEFAULT '{}'::jsonb,
+    p_business_id uuid DEFAULT NULL
 )
 RETURNS integer
 LANGUAGE plpgsql
@@ -128,19 +148,30 @@ BEGIN
         'loyalty_points_earned',
         'loyalty_points_expiring',
         'loyalty_tier_upgrade',
-        'order_confirmation',
-        'order_shipped',
-        'order_delivered',
-        'payment_received',
-        'payment_failed',
-        'coupon_issued',
         'system_alert',
         'draw_win',
         'draw_runner_up',
         'draw_reminder',
         'draw_entry_confirmed',
         'draw_consolation',
-        'draw_redraw'
+        'draw_redraw',
+        'challenge_joined',
+        'challenge_started',
+        'challenge_ended',
+        'trivia_correct',
+        'trivia_wrong',
+        'trivia_rank_improved',
+        'spin_win',
+        'spin_loss',
+        'spin_prize_ready',
+        'account_activated',
+        'activation_expiring',
+        'activation_expired',
+        'id_verified',
+        'account_flagged',
+        'points_earned',
+        'points_redeemed',
+        'new_code_available'
     ) THEN
         RAISE EXCEPTION 'Invalid notification type: %', p_type;
     END IF;
@@ -148,7 +179,7 @@ BEGIN
     v_count := 0;
     FOREACH v_user_id IN ARRAY p_user_ids
     LOOP
-        PERFORM create_notification(v_user_id, p_type, p_title, p_message, p_metadata);
+        PERFORM create_notification(v_user_id, p_type, p_title, p_message, p_metadata, p_business_id);
         v_count := v_count + 1;
     END LOOP;
     
@@ -162,11 +193,13 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_i
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
 CREATE INDEX IF NOT EXISTS idx_notifications_read_at ON notifications(read_at) WHERE read = true;
+CREATE INDEX IF NOT EXISTS idx_notifications_business_id ON notifications(business_id) WHERE business_id IS NOT NULL;
 
 -- Add comments for documentation
-COMMENT ON TABLE notifications IS 'User notifications for loyalty, orders, and system events';
+COMMENT ON TABLE notifications IS 'User notifications for loyalty, orders, system events, and business-specific communications';
 COMMENT ON COLUMN notifications.id IS 'Unique identifier for the notification';
 COMMENT ON COLUMN notifications.user_id IS 'User who receives the notification';
+COMMENT ON COLUMN notifications.business_id IS 'Business associated with this notification (nullable for system-wide notifications)';
 COMMENT ON COLUMN notifications.type IS 'Type of notification: loyalty_partial_redeem, loyalty_points_earned, loyalty_points_expiring, loyalty_tier_upgrade, order_confirmation, order_shipped, order_delivered, payment_received, payment_failed, coupon_issued, system_alert';
 COMMENT ON COLUMN notifications.title IS 'Short title of the notification';
 COMMENT ON COLUMN notifications.message IS 'Detailed message content';
@@ -288,6 +321,17 @@ CREATE POLICY "Users can view own notifications" ON notifications
     FOR SELECT
     USING (auth.uid() = user_id);
 
+-- Policy for SELECT: Business admins can view notifications for their business
+CREATE POLICY "Business admins can view business notifications" ON notifications
+    FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM business_admins
+            WHERE business_admins.user_id = auth.uid()
+            AND business_admins.business_id = notifications.business_id
+        )
+    );
+
 -- Policy for INSERT: System can insert notifications (or trigger functions)
 -- Note: In production, you might want to restrict this to service role only
 CREATE POLICY "System can insert notifications" ON notifications
@@ -332,7 +376,8 @@ RETURNS TABLE(
     read boolean,
     metadata jsonb,
     created_at timestamptz,
-    read_at timestamptz
+    read_at timestamptz,
+    business_id uuid
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -357,7 +402,8 @@ BEGIN
         n.read,
         n.metadata,
         n.created_at,
-        n.read_at
+        n.read_at,
+        n.business_id
     FROM notifications n
     WHERE n.user_id = p_user_id
       AND (p_include_read OR n.read = false)
@@ -368,13 +414,13 @@ END;
 $$;
 
 -- Grant necessary permissions (adjust based on your security needs)
-GRANT EXECUTE ON FUNCTION create_notification(uuid, text, text, text, jsonb) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION create_notification(uuid, text, text, text, jsonb, uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION mark_notification_read(uuid, uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION mark_all_notifications_read(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_unread_notification_count(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_user_notifications(uuid, integer, integer, boolean) TO authenticated;
 GRANT EXECUTE ON FUNCTION clean_old_notifications(integer) TO service_role;
-GRANT EXECUTE ON FUNCTION batch_create_notifications(uuid[], text, text, text, jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION batch_create_notifications(uuid[], text, text, text, jsonb, uuid) TO service_role;
 
 -- Optional: Create a trigger to automatically clean old notifications
 -- This creates a materialized view for unread counts (useful for performance with many users)

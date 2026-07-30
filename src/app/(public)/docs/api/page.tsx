@@ -121,6 +121,131 @@ const ENDPOINTS = [
       "Use this to pre-validate codes before printing or sending to customers",
     ],
   },
+  {
+    method: "POST",
+    path: "/api/business/customers/lookup",
+    label: "Look Up Customer",
+    description:
+      "Find a customer by phone, email, or ID number. Useful for POS and e-commerce checkout to verify the customer and retrieve their points balance.",
+    auth: "API Key (X-API-Key header)",
+    plan: "Pro & Enterprise",
+    request: `{
+  "phone": "+254700000000",   // OR
+  "email": "customer@email.com", // OR
+  "id_number": "12345678"
+}`,
+    response: `{
+  "success": true,
+  "users": [
+    {
+      "id": "uuid",
+      "email": "customer@email.com",
+      "full_name": "Jane Doe",
+      "phone": "+254700000000",
+      "id_number": "12345678",
+      "status": "active",
+      "id_verified": true,
+      "summary": {
+        "businesses": [
+          {
+            "business_id": "uuid",
+            "business_name": "Brew & Bean",
+            "points": 500,
+            "tier": "silver",
+            "spins_used": 3,
+            "is_active": true
+          }
+        ],
+        "recent_spins": [...]
+      }
+    }
+  ]
+}`,
+    notes: [
+      "Requires X-API-Key header with your business API key",
+      "Returns up to 5 matching users",
+      "Includes engagement summary for each user",
+      "Use this to verify customer identity at checkout",
+    ],
+  },
+  {
+    method: "POST",
+    path: "/api/business/customers/points/deduct",
+    label: "Deduct Customer Points",
+    description:
+      "Deduct points from a customer's balance for a purchase. This is how POS and e-commerce checkout works — the customer pays with points, and the business deducts them server-side.",
+    auth: "API Key (X-API-Key header)",
+    plan: "Pro & Enterprise",
+    request: `{
+  "user_id": "uuid",           // Required: Customer user ID
+  "points": 100,               // Required: Points to deduct
+  "reference_id": "ORD-12345", // Optional: Your order/receipt ID
+  "description": "Coffee purchase" // Optional: Transaction description
+}`,
+    response: `{
+  "success": true,
+  "transaction": {
+    "id": "uuid",
+    "user_id": "uuid",
+    "points_change": -100,
+    "current_points": 400,
+    "transaction_type": "pos_deduction",
+    "description": "Coffee purchase",
+    "created_at": "2026-07-30T10:00:00Z"
+  }
+}`,
+    notes: [
+      "Requires X-API-Key header with your business API key",
+      "Fails if customer has insufficient points",
+      "Creates a loyalty_transaction record for audit",
+      "Points are deducted from the customer's balance for THIS business only",
+      "Use this in your POS or e-commerce checkout flow",
+    ],
+  },
+  {
+    method: "POST",
+    path: "/api/notifications/send",
+    label: "Send Notification",
+    description:
+      "Send an in-app notification to a user, optionally with email (Resend) and SMS (Twilio). Used by Engage for important system events. Businesses handle their own marketing outside Engage.",
+    auth: "Admin Session or Business API Key",
+    plan: "All Plans",
+    request: `{
+  "user_id": "uuid",
+  "type": "system_alert",
+  "title": "Important Update",
+  "message": "Your account has been verified.",
+  "business_id": "uuid",       // Optional
+  "email": "user@email.com",   // Optional
+  "phone": "+254700000000",    // Optional
+  "email_html": "<p>HTML content</p>", // Optional
+  "sms_body": "SMS text",      // Optional
+  "metadata": {}               // Optional
+}`,
+    response: `{
+  "success": true,
+  "results": {
+    "inApp": true,
+    "email": true,
+    "sms": false
+  },
+  "notification": {
+    "user_id": "uuid",
+    "business_id": "uuid",
+    "type": "system_alert",
+    "title": "Important Update",
+    "message": "Your account has been verified."
+  }
+}`,
+    notes: [
+      "In-app notification is always created",
+      "Email requires Resend configuration",
+      "SMS requires Twilio configuration",
+      "Business admins can only send for their own business",
+      "Admins can send for any business",
+      "Most marketing notifications are handled by businesses outside Engage",
+    ],
+  },
 ];
 
 export default function ApiDocsPage() {

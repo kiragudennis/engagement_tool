@@ -19,6 +19,9 @@ import {
   Crown,
   History,
   LogOut,
+  Brain,
+  Ticket,
+  Coins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
@@ -27,55 +30,81 @@ import Link from "next/link";
 export default function CustomerAccountPage() {
   const { supabase, profile, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [activeBusinesses, setActiveBusinesses] = useState<any[]>([]);
-  const [pointsSummary, setPointsSummary] = useState<any[]>([]);
+  const [allBusinesses, setAllBusinesses] = useState<any[]>([]);
   const [spinHistory, setSpinHistory] = useState<any[]>([]);
+  const [drawEntries, setDrawEntries] = useState<any[]>([]);
+  const [triviaHistory, setTriviaHistory] = useState<any[]>([]);
+  const [redeemedCodes, setRedeemedCodes] = useState<any[]>([]);
   const [totalPoints, setTotalPoints] = useState(0);
-  const [redemptionOptions, setRedemptionOptions] = useState<any[]>([]);
+  const [lifetimePoints, setLifetimePoints] = useState(0);
+  const [pointsConfig, setPointsConfig] = useState<{ pointsPerKsh: number } | null>(null);
 
   const loadData = useCallback(async () => {
     if (!profile?.id) return;
 
     try {
-      // Active businesses
-      const { data: businesses } = await supabase.rpc(
-        "get_user_active_businesses",
-        {
-          p_user_id: profile.id,
-        },
-      );
-      setActiveBusinesses(businesses || []);
+      const [businessesRes, spinsRes, drawsRes, triviaRes, codesRes, cfgRes] =
+        await Promise.all([
+          supabase.rpc("get_customer_all_points", {
+            p_user_id: profile.id,
+          }),
+          supabase
+            .from("spin_attempts")
+            .select(
+              "*, spin_games!inner(name, business_id, businesses!inner(name, slug))",
+            )
+            .eq("user_id", profile.id)
+            .order("created_at", { ascending: false })
+            .limit(20),
+          supabase
+            .from("draw_entries")
+            .select(
+              "*, draws!inner(name, business_id, businesses!inner(name, slug))",
+            )
+            .eq("user_id", profile.id)
+            .order("created_at", { ascending: false })
+            .limit(20),
+          supabase
+            .from("challenge_participants")
+            .select(
+              "*, challenges!inner(name, business_id, businesses!inner(name, slug))",
+            )
+            .eq("user_id", profile.id)
+            .order("joined_at", { ascending: false })
+            .limit(20),
+          supabase
+            .from("access_code_usage")
+            .select(
+              "*, access_codes!inner(code, business_id, businesses!inner(name, slug))",
+            )
+            .eq("user_id", profile.id)
+            .order("used_at", { ascending: false })
+            .limit(20),
+          supabase
+            .from("points_config")
+            .select("points_per_ksh")
+            .eq("id", 1)
+            .maybeSingle(),
+        ]);
 
-      // Points
-      const { data: points } = await supabase.rpc(
-        "get_customer_points_summary",
-        {
-          p_user_id: profile.id,
-        },
-      );
-      setPointsSummary(points || []);
+      const biz = businessesRes.data || [];
+      setAllBusinesses(biz);
       setTotalPoints(
-        points?.reduce((s: number, p: any) => s + (p.points || 0), 0) || 0,
+        biz.reduce((s: number, b: any) => s + (b.points || 0), 0) || 0,
+      );
+      setLifetimePoints(
+        biz.reduce((s: number, b: any) => s + (b.lifetime_points || 0), 0) || 0,
+      );
+      setPointsConfig(
+        cfgRes.data
+          ? { pointsPerKsh: cfgRes.data.points_per_ksh || 10 }
+          : { pointsPerKsh: 10 },
       );
 
-      // Spin history
-      const { data: spins } = await supabase
-        .from("spin_attempts")
-        .select(
-          "*, spin_games!inner(name, business_id, businesses!inner(name, slug))",
-        )
-        .eq("user_id", profile.id)
-        .order("created_at", { ascending: false })
-        .limit(20);
-      setSpinHistory(spins || []);
-
-      // Redemption options
-      const { data: options } = await supabase
-        .from("points_redemption_options")
-        .select("*")
-        .eq("is_active", true)
-        .order("points_required", { ascending: true });
-      setRedemptionOptions(options || []);
+      setSpinHistory(spinsRes.data || []);
+      setDrawEntries(drawsRes.data || []);
+      setTriviaHistory(triviaRes.data || []);
+      setRedeemedCodes(codesRes.data || []);
     } catch (err) {
       console.error("Error loading account:", err);
     } finally {
@@ -94,6 +123,9 @@ export default function CustomerAccountPage() {
       </div>
     );
   }
+
+  const activeCount = allBusinesses.filter((b) => b.is_active).length;
+  const pointsPerKsh = pointsConfig?.pointsPerKsh || 10;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-950 to-slate-950">
@@ -136,9 +168,9 @@ export default function CustomerAccountPage() {
               <CardContent className="p-4 text-center">
                 <Store className="h-5 w-5 text-purple-400 mx-auto mb-1" />
                 <p className="text-2xl font-bold text-white">
-                  {activeBusinesses.length}
+                  {allBusinesses.length}
                 </p>
-                <p className="text-xs text-white/40">Active Businesses</p>
+                <p className="text-xs text-white/40">Businesses</p>
               </CardContent>
             </Card>
             <Card className="bg-white/5 border-white/10">
@@ -154,12 +186,7 @@ export default function CustomerAccountPage() {
               <CardContent className="p-4 text-center">
                 <Crown className="h-5 w-5 text-amber-400 mx-auto mb-1" />
                 <p className="text-2xl font-bold text-white">
-                  {pointsSummary
-                    .reduce(
-                      (s: number, p: any) => s + (p.lifetime_points || 0),
-                      0,
-                    )
-                    .toLocaleString()}
+                  {lifetimePoints.toLocaleString()}
                 </p>
                 <p className="text-xs text-white/40">Lifetime Points</p>
               </CardContent>
@@ -175,9 +202,21 @@ export default function CustomerAccountPage() {
               <Store className="h-4 w-4 mr-2" />
               My Businesses
             </TabsTrigger>
-            <TabsTrigger value="history">
-              <History className="h-4 w-4 mr-2" />
-              History
+            <TabsTrigger value="spins">
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Spins
+            </TabsTrigger>
+            <TabsTrigger value="draws">
+              <Trophy className="h-4 w-4 mr-2" />
+              Draws
+            </TabsTrigger>
+            <TabsTrigger value="trivia">
+              <Brain className="h-4 w-4 mr-2" />
+              Trivia
+            </TabsTrigger>
+            <TabsTrigger value="codes">
+              <Ticket className="h-4 w-4 mr-2" />
+              Codes
             </TabsTrigger>
             <TabsTrigger value="rewards">
               <Gift className="h-4 w-4 mr-2" />
@@ -187,15 +226,15 @@ export default function CustomerAccountPage() {
 
           {/* My Businesses */}
           <TabsContent value="businesses" className="space-y-4">
-            {activeBusinesses.length === 0 ? (
+            {allBusinesses.length === 0 ? (
               <Card className="bg-white/5 border-white/10">
                 <CardContent className="p-12 text-center">
                   <Store className="h-12 w-12 text-white/10 mx-auto mb-4" />
                   <h3 className="text-white font-semibold mb-2">
-                    No Active Businesses
+                    No Businesses Yet
                   </h3>
                   <p className="text-white/40 mb-4">
-                    Ask a business for a code to get started!
+                    Redeem codes from businesses to start earning points!
                   </p>
                   <Button asChild>
                     <Link href="/spin">Enter a Code</Link>
@@ -203,7 +242,7 @@ export default function CustomerAccountPage() {
                 </CardContent>
               </Card>
             ) : (
-              activeBusinesses.map((biz, i) => (
+              allBusinesses.map((biz, i) => (
                 <motion.div
                   key={biz.business_id}
                   initial={{ opacity: 0, y: 10 }}
@@ -235,9 +274,9 @@ export default function CustomerAccountPage() {
                                     : "bg-red-500/20 text-red-400",
                                 )}
                               >
-                                {biz.is_active ? "Active" : "Expired"}
+                                {biz.is_active ? "Active" : "Inactive"}
                               </Badge>
-                              {biz.expires_at && biz.is_active && (
+                              {biz.is_active && biz.expires_at && (
                                 <span className="text-white/40 text-xs">
                                   Expires{" "}
                                   {formatDistanceToNow(
@@ -249,25 +288,22 @@ export default function CustomerAccountPage() {
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-4">
                           <div className="text-right">
                             <p className="text-white font-bold">
-                              {biz.spins_used} spins
+                              {biz.points || 0} pts
                             </p>
-                            {pointsSummary.find(
-                              (p: any) => p.business_slug === biz.business_slug,
-                            )?.points > 0 && (
-                              <p className="text-yellow-400 text-xs">
-                                ⭐{" "}
-                                {
-                                  pointsSummary.find(
-                                    (p: any) =>
-                                      p.business_slug === biz.business_slug,
-                                  )?.points
-                                }{" "}
-                                pts
-                              </p>
-                            )}
+                            <p className="text-yellow-400 text-xs">
+                              ⭐ Worth{" "}
+                              {(biz.points_value != null
+                                ? (biz.points || 0) * biz.points_value
+                                : ((biz.points || 0) / (biz.points_per_redemption || 10))
+                              ).toFixed(2)}
+                            </p>
+                            <p className="text-white/40 text-xs">
+                              {biz.tier?.toUpperCase() || "BRONZE"} •{" "}
+                              {biz.lifetime_points || 0} lifetime
+                            </p>
                           </div>
                           <Button
                             asChild
@@ -287,8 +323,8 @@ export default function CustomerAccountPage() {
             )}
           </TabsContent>
 
-          {/* History */}
-          <TabsContent value="history">
+          {/* Spins */}
+          <TabsContent value="spins">
             <Card className="bg-white/5 border-white/10">
               <CardHeader>
                 <CardTitle className="text-white">Recent Spins</CardTitle>
@@ -336,61 +372,239 @@ export default function CustomerAccountPage() {
             </Card>
           </TabsContent>
 
+          {/* Draws */}
+          <TabsContent value="draws">
+            <Card className="bg-white/5 border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white">Draw Entries</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {drawEntries.length === 0 ? (
+                  <p className="text-white/40 text-center py-8">
+                    No draw entries yet. Redeem codes that unlock draws to participate!
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {drawEntries.slice(0, 15).map((entry, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between p-3 rounded-lg bg-white/5"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: "#EC4899" }}
+                          />
+                          <div>
+                            <p className="text-white text-sm">
+                              {entry.draws?.name || "Unknown Draw"}
+                            </p>
+                            <p className="text-white/40 text-xs">
+                              {entry.entry_count} entry{entry.entry_count !== 1 ? "ies" : ""} • {entry.draws?.businesses?.name || "Unknown Business"}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-white/30 text-xs">
+                          {formatDistanceToNow(new Date(entry.created_at), {
+                            addSuffix: true,
+                          })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Trivia */}
+          <TabsContent value="trivia">
+            <Card className="bg-white/5 border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white">Trivia Participation</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {triviaHistory.length === 0 ? (
+                  <p className="text-white/40 text-center py-8">
+                    No trivia yet. Join trivia challenges at businesses!
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {triviaHistory.slice(0, 15).map((entry, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between p-3 rounded-lg bg-white/5"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: "#10B981" }}
+                          />
+                          <div>
+                            <p className="text-white text-sm">
+                              {entry.challenges?.name || "Unknown Trivia"}
+                            </p>
+                            <p className="text-white/40 text-xs">
+                              Score: {entry.current_score || 0} • Rank: #{entry.current_rank || "N/A"} • {entry.challenges?.businesses?.name || "Unknown Business"}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-white/30 text-xs">
+                          {formatDistanceToNow(new Date(entry.joined_at), {
+                            addSuffix: true,
+                          })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Codes */}
+          <TabsContent value="codes">
+            <Card className="bg-white/5 border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white">Codes Redeemed</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {redeemedCodes.length === 0 ? (
+                  <p className="text-white/40 text-center py-8">
+                    No codes redeemed yet.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {redeemedCodes.slice(0, 15).map((code, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between p-3 rounded-lg bg-white/5"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: "#F59E0B" }}
+                          />
+                          <div>
+                            <p className="text-white text-sm font-mono">
+                              {code.access_codes?.code || "UNKNOWN"}
+                            </p>
+                            <p className="text-white/40 text-xs">
+                              {code.access_codes?.businesses?.name || "Unknown Business"}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-white/30 text-xs">
+                          {formatDistanceToNow(new Date(code.used_at), {
+                            addSuffix: true,
+                          })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* Rewards */}
-          <TabsContent value="rewards" className="space-y-6">
-            <Card className="bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border-yellow-500/20">
-              <CardContent className="p-6 text-center">
-                <Trophy className="h-12 w-12 text-yellow-400 mx-auto mb-2" />
-                <p className="text-3xl font-bold text-white">
-                  {totalPoints.toLocaleString()}
-                </p>
-                <p className="text-yellow-300/80">Points Available</p>
-                <p className="text-white/40 text-sm mt-2">
-                  Earn points by spinning and playing trivia at any business
+          <TabsContent value="rewards">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border-yellow-500/20">
+                <CardContent className="p-6 text-center">
+                  <Trophy className="h-12 w-12 text-yellow-400 mx-auto mb-2" />
+                  <p className="text-3xl font-bold text-white">
+                    {totalPoints.toLocaleString()}
+                  </p>
+                  <p className="text-yellow-300/80">Total Points</p>
+                  <p className="text-white/40 text-sm mt-2">
+                    Worth{" "}
+                    {allBusinesses.length > 0
+                      ? allBusinesses
+                          .reduce(
+                            (s, b) =>
+                              s +
+                              (b.points_value != null
+                                ? (b.points || 0) * b.points_value
+                                : (b.points || 0) / (b.points_per_redemption || 10)),
+                            0,
+                          )
+                          .toFixed(2)
+                      : "0.00"}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white/5 border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <Coins className="h-5 w-5 text-purple-400" />
+                    Points Worth Per Business
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {allBusinesses.length === 0 ? (
+                    <p className="text-white/40 text-center py-4 text-sm">
+                      No points yet
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {allBusinesses.map((biz) => (
+                        <div
+                          key={biz.business_id}
+                          className="flex items-center justify-between p-3 rounded-lg bg-white/5"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+                              style={{
+                                backgroundColor: biz.brand_color || "#8B5CF6",
+                              }}
+                            >
+                              {biz.business_name?.[0] || "?"}
+                            </div>
+                            <div>
+                              <p className="text-white text-sm font-medium">
+                                {biz.business_name}
+                              </p>
+                              <p className="text-white/40 text-xs">
+                                {biz.points || 0} pts
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-yellow-400 text-sm font-medium">
+                              {biz.points_value != null
+                                ? (biz.points || 0) * biz.points_value
+                                : (biz.points || 0) / (biz.points_per_redemption || 10)}
+                            </p>
+                            <p className="text-white/30 text-xs">
+                              {biz.is_active ? "Active" : "Inactive"}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="mt-6 bg-white/5 border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white">
+                  How to Redeem Points
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-white/50 text-sm leading-relaxed">
+                  Points are redeemed at the business during checkout. Tell the
+                  cashier you want to pay with points. They will verify your
+                  account and deduct points from your balance for that business.
+                  Your points never expire as long as you keep engaging.
                 </p>
               </CardContent>
             </Card>
-
-            <div className="grid md:grid-cols-2 gap-4">
-              {redemptionOptions.map((option, i) => (
-                <Card
-                  key={i}
-                  className={cn(
-                    "bg-white/5 border-white/10",
-                    totalPoints < option.points_required && "opacity-50",
-                  )}
-                >
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="text-white font-semibold">
-                          {option.name}
-                        </h3>
-                        <p className="text-white/50 text-sm mt-1">
-                          {option.description}
-                        </p>
-                      </div>
-                      <Badge className="bg-yellow-500/20 text-yellow-400">
-                        {option.points_required} pts
-                      </Badge>
-                    </div>
-                    <Button
-                      className="w-full"
-                      disabled={totalPoints < option.points_required}
-                      variant={
-                        totalPoints >= option.points_required
-                          ? "default"
-                          : "outline"
-                      }
-                    >
-                      {totalPoints >= option.points_required
-                        ? "Redeem"
-                        : `Need ${option.points_required - totalPoints} more points`}
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
           </TabsContent>
         </Tabs>
       </div>

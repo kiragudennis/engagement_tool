@@ -63,6 +63,20 @@ const DESTINATION_CONFIG: Record<
     color: "from-green-500 to-emerald-500",
     bgGlow: "bg-green-500/10",
   },
+  points: {
+    icon: Coins,
+    label: "Loyalty Points",
+    description: "Loyalty points have been added to your account!",
+    color: "from-yellow-400 to-amber-500",
+    bgGlow: "bg-yellow-500/10",
+  },
+  all: {
+    icon: Gift,
+    label: "Spin, Trivia & Draw",
+    description: "Spin the wheel, join trivia, and enter the prize draw!",
+    color: "from-purple-500 to-blue-500",
+    bgGlow: "bg-purple-500/10",
+  },
 };
 
 export default function BusinessCodeEntryPage() {

@@ -616,7 +616,7 @@ BEGIN
     
     -- ─── AUTO-ENTER DRAWS ───────────────────────────────
     -- Only if code unlocks draws
-    IF v_code.unlocks IN ('draw', 'spin_draw') THEN
+    IF v_code.unlocks IN ('draw', 'spin_draw', 'all') THEN
         -- Try linked draw first, then any open draw
         SELECT d.id, d.name, d.prize_name, d.entry_ends_at INTO v_draw
         FROM draws d
@@ -662,7 +662,7 @@ BEGIN
     -- ─── DIRECT TRIVIA TICKET REDEMPTION ─────────────────
     -- When code unlocks trivia directly (not just via spin prize),
     -- add the user as a trivia participant immediately
-    IF v_code.unlocks IN ('trivia', 'trivia_draw') THEN
+    IF v_code.unlocks IN ('trivia', 'trivia_draw', 'all') THEN
         -- Find an open trivia challenge for this business
         SELECT c.id, c.name, c.max_participants INTO v_trivia
         FROM challenges c
@@ -695,13 +695,16 @@ BEGIN
     PERFORM increment_business_engagement(v_business.id, 'code_redeem');
 
     -- ─── REDIRECT ───────────────────────────────────────
-    -- points → spin page (they can use points to spin)
+    -- points → business page (loyalty points only)
     -- spin → spin page
     -- spin_draw → spin page (draw entry already handled above)
     -- draw → draw page
     -- trivia → trivia page (if trivia was directly redeemed)
-    IF v_code.unlocks IN ('trivia', 'trivia_draw') AND v_trivia_result IS NOT NULL THEN
+    -- all → trivia page if trivia found, else spin page
+    IF v_code.unlocks IN ('trivia', 'trivia_draw', 'all') AND v_trivia_result IS NOT NULL THEN
         v_redirect_url := '/' || v_business.slug || '/trivia/' || (v_trivia_result->>'challenge_id');
+    ELSIF v_code.unlocks = 'points' THEN
+        v_redirect_url := '/' || v_business.slug || '/code-entry?redeemed=true';
     ELSE
         v_redirect_url := '/' || v_business.slug || '/spin';
     END IF;
@@ -728,10 +731,12 @@ BEGIN
         'code_tier', v_code.tier,
         'is_activated', v_is_activated,
         'draw_entered', v_draw_entered,
+        'draw_available', v_draw_entered,
         'draw_name', v_draw_name,
         'draw_prize', v_draw_prize,
         'draw_ends_at', v_draw_ends_at,
         'trivia_entered', v_trivia_result IS NOT NULL,
+        'trivia_available', v_trivia_result IS NOT NULL,
         'trivia_challenge_id', v_trivia_result->>'challenge_id',
         'all_spins_full', v_period_count > 0
     );
@@ -1050,8 +1055,9 @@ CREATE OR REPLACE FUNCTION generate_business_code(
     p_unlocks TEXT DEFAULT 'points',
     p_batch_id UUID DEFAULT NULL,
     p_batch_label TEXT DEFAULT NULL,
-    p_metadata JSONB DEFAULT '{}'::jsonb
-)
+    p_metadata JSONB DEFAULT '{}'::jsonb,
+    p_require_activation BOOLEAN DEFAULT TRUE
+ )
 RETURNS JSON
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -1113,7 +1119,8 @@ BEGIN
         type, label, tier, unlocks, 
         max_uses, max_uses_per_user, 
         point_value, is_active, description,
-        batch_id, batch_label, metadata
+        batch_id, batch_label, metadata,
+        require_activation
     ) VALUES (
         p_business_id, v_code, v_prefix, p_code_type, v_sequence,
         CASE p_code_subtype 
@@ -1131,7 +1138,8 @@ BEGIN
             'cashier', p_cashier_name,
             'source', p_source,
             'tier', p_tier
-        ) || p_metadata
+        ) || p_metadata,
+        p_require_activation
     )
     RETURNING id INTO v_code_id;
     

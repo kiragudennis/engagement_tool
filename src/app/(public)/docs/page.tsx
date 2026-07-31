@@ -627,8 +627,8 @@ export default function DocsPage() {
                           <p className="text-white/50 text-xs leading-relaxed">
                             For important Engage events — such as prize wins or
                             account security alerts — we may send an email or
-                            SMS using Resend and Twilio. These are rare and only
-                            for high-priority events.
+                            SMS. These are rare and only for high-priority
+                            events.
                           </p>
                         </div>
                       </div>
@@ -665,12 +665,33 @@ export default function DocsPage() {
                       </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {[
-                          { type: "Draws", examples: "draw_win, draw_reminder, draw_entry_confirmed" },
-                          { type: "Spins", examples: "spin_win, spin_prize_ready" },
-                          { type: "Trivia", examples: "trivia_correct, trivia_rank_improved" },
-                          { type: "Points", examples: "points_earned, points_redeemed, loyalty_tier_upgrade" },
-                          { type: "Account", examples: "account_activated, id_verified, account_flagged" },
-                          { type: "System", examples: "system_alert, new_code_available" },
+                          {
+                            type: "Draws",
+                            examples:
+                              "draw_win, draw_reminder, draw_entry_confirmed",
+                          },
+                          {
+                            type: "Spins",
+                            examples: "spin_win, spin_prize_ready",
+                          },
+                          {
+                            type: "Trivia",
+                            examples: "trivia_correct, trivia_rank_improved",
+                          },
+                          {
+                            type: "Points",
+                            examples:
+                              "points_earned, points_redeemed, loyalty_tier_upgrade",
+                          },
+                          {
+                            type: "Account",
+                            examples:
+                              "account_activated, id_verified, account_flagged",
+                          },
+                          {
+                            type: "System",
+                            examples: "system_alert, new_code_available",
+                          },
                         ].map((group, i) => (
                           <div
                             key={i}
@@ -735,7 +756,7 @@ export default function DocsPage() {
                             type: "Public Marketing Codes",
                             pattern: "{PREFIX}-{PLAN}P-{SEQ}-{RAND}",
                             example: "BREW-PP-00015-C7D1",
-                            desc: "Shared on social media. Requires prior activation. Awards default points. Does NOT extend activation.",
+                            desc: "Shared on social media. Optionally requires prior activation (configurable). Awards default points. Does NOT extend activation.",
                             tiers: "Business default points",
                             badge: "P",
                             color: "amber",
@@ -857,18 +878,54 @@ export default function DocsPage() {
                             Redeem public marketing codes
                           </li>
                         </ul>
-                        <p className="mt-3">
-                          Public marketing codes{" "}
-                          <strong className="text-white">require</strong> the
-                          customer to already be active. This prevents random
-                          people from using codes shared on social media without
-                          ever having visited your business.
+                        <p>
+                          Public marketing codes can be configured to &nbsp;
+                          <strong className="text-white">
+                            require activation
+                          </strong>
+                          &nbsp; or &nbsp;
+                          <strong className="text-white">
+                            not require activation
+                          </strong>
+                          &nbsp; from the dashboard. When activation is
+                          required, the customer must already be an active user
+                          of your business &nbsp;
+                          <strong className="text-white">
+                            (30-day window)
+                          </strong>
+                          . This prevents random people from using codes shared
+                          on social media without ever having visited your
+                          business. When activation is not required, any
+                          customer can redeem the code to earn points
+                          immediately.
                         </p>
                         <p>
-                          Each new sticker or receipt code{" "}
-                          <strong className="text-white">extends</strong>
+                          Each new sticker or receipt code &nbsp;
+                          <strong className="text-white">extends</strong>&nbsp;
                           the activation by another 30 days (default). Loyal
                           customers stay active as long as they keep engaging.
+                        </p>
+                        <p>
+                          <strong className="text-white">Spin limits:</strong>
+                          &nbsp; Set a maximum number of spins per user for this
+                          game. This limit applies to <strong>
+                            all spins
+                          </strong>{" "}
+                          (free spins and points-paid spins) combined. When set
+                          to <strong>0</strong>, users can spin unlimited times
+                          during the game's active period.
+                        </p>
+                        <p>
+                          <strong className="text-white">
+                            Points per redemption:
+                          </strong>
+                          &nbsp; Every successful code redemption grants loyalty
+                          points. If the code has a specific point value, that
+                          is used; otherwise the business default &nbsp;
+                          <code className="text-purple-400 text-xs">
+                            points per redemption
+                          </code>
+                          &nbsp; setting is applied.
                         </p>
                       </div>
                     </CardContent>
@@ -985,7 +1042,11 @@ export default function DocsPage() {
                           Each rarity tier can be configured with different{" "}
                           <strong className="text-white">unlock levels</strong>{" "}
                           that control what a customer can do after redeeming
-                          that code:
+                          that code. Codes with{" "}
+                          <code className="text-purple-400 text-xs">
+                            unlocks: "all"
+                          </code>{" "}
+                          unlock every experience at once.
                         </p>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
@@ -1017,6 +1078,20 @@ export default function DocsPage() {
                               desc: "Customer is entered into draws but can't spin. Useful for special promotional stickers.",
                               example:
                                 "Event stickers: 'You've been entered into our grand prize draw!'",
+                            },
+                            {
+                              level: "Trivia Access",
+                              icon: Brain,
+                              desc: "Customer is added directly to a trivia challenge queue. Great for building community through live knowledge battles.",
+                              example:
+                                "Event code: 'You are entered into tonight's trivia challenge!'",
+                            },
+                            {
+                              level: "Everything (All)",
+                              icon: Gift,
+                              desc: "Customer unlocks spins, trivia participation, and draw entries all at once. The ultimate reward.",
+                              example:
+                                "VIP code: 'Jackpot! Spins, trivia, and draws - you get everything!'",
                             },
                           ].map((item, i) => (
                             <div key={i} className="p-3 rounded-lg bg-white/5">
@@ -1319,6 +1394,17 @@ export default function DocsPage() {
                                 "unlocks": "draw"
                               </code>{" "}
                               — build excitement for upcoming events
+                            </li>
+                            <li>
+                              •{" "}
+                              <strong className="text-purple-300">
+                                VIP / All-access:
+                              </strong>{" "}
+                              Send{" "}
+                              <code className="text-purple-400">
+                                "unlocks": "all"
+                              </code>{" "}
+                              — give spins, trivia, and draws in one code
                             </li>
                           </ul>
                         </div>
@@ -2020,7 +2106,7 @@ export default function DocsPage() {
                         {
                           action: "Code Redemption",
                           count: "1 engagement per redemption",
-                          desc: "Codes unlocking spin, trivia, or draw",
+                          desc: "Codes unlocking spin, trivia, draw, or points",
                         },
                         {
                           action: "Viewer Prize Claim",

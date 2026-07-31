@@ -20,6 +20,7 @@ const createCodeSchema = z.object({
   max_uses_per_user: z.number().min(1).default(1),
   valid_from: z.string().optional(),
   valid_until: z.string().optional(),
+  require_activation: z.boolean().optional().default(true),
 });
 
 export async function POST(req: NextRequest) {
@@ -54,10 +55,11 @@ export async function POST(req: NextRequest) {
       tier,
       point_value,
       max_uses,
-      max_uses_per_user,
-      valid_from,
-      valid_until,
-    } = parsed.data;
+    max_uses_per_user,
+    valid_from,
+    valid_until,
+    require_activation,
+  } = parsed.data;
 
     // Get business
     const { data: business } = await supabaseAdmin
@@ -152,10 +154,11 @@ export async function POST(req: NextRequest) {
         p_code_subtype: codeSubtype,
         p_tier: tier || "standard",
         p_points_earned: point_value || null,
-        p_unlocks: unlocks,
-        p_source: "dashboard",
-        p_created_by: user.id,
-      },
+         p_unlocks: unlocks,
+         p_source: "dashboard",
+         p_created_by: user.id,
+         p_require_activation: require_activation,
+       },
     );
 
     if (codeError || !result) {

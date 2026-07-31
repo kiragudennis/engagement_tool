@@ -53,11 +53,11 @@ export async function GET(req: NextRequest) {
       business_slug: business.slug,
       business_logo: business.logo_url,
       business_color: business.brand_color,
-      redirect_url: `/${business.slug}/${codeData.unlocks === "trivia" ? "trivia" : "spin"}`,
+      redirect_url: `/${business.slug}/${codeData.unlocks === "trivia" || codeData.unlocks === "all" ? "trivia" : "spin"}`,
     };
 
     // If code unlocks a draw, get draw details
-    if (codeData.unlocks === "draw" || codeData.unlocks === "both") {
+    if (codeData.unlocks === "draw" || codeData.unlocks === "both" || codeData.unlocks === "all") {
       const { data: draw } = await supabaseAdmin
         .from("draws")
         .select("name, prize_name, entry_ends_at")
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
     }
 
     // If code unlocks trivia, get trivia details
-    if (codeData.unlocks === "trivia" || codeData.unlocks === "both") {
+    if (codeData.unlocks === "trivia" || codeData.unlocks === "both" || codeData.unlocks === "all") {
       const { data: challenge } = await supabaseAdmin
         .from("challenges")
         .select("name, starts_at")

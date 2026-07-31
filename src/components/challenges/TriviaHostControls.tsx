@@ -70,6 +70,7 @@ interface TriviaQuestion {
   question_type: string;
   accepted_answers: string[];
   case_sensitive: boolean;
+  image_url?: string;
 }
 
 interface TriviaSelection {
@@ -134,6 +135,7 @@ export function TriviaHostControls({
     question_type: "multiple_choice",
     accepted_answers: [] as string[],
     case_sensitive: false,
+    image_url: "",
   });
 
   // Host messages
@@ -400,6 +402,7 @@ export function TriviaHostControls({
       question_type: "multiple_choice",
       accepted_answers: [],
       case_sensitive: false,
+      image_url: "",
     });
   };
 
@@ -543,6 +546,16 @@ export function TriviaHostControls({
                     <h3 className="text-xl font-bold">
                       {currentQuestion.question}
                     </h3>
+                    {currentQuestion.image_url && (
+                      <img
+                        src={currentQuestion.image_url}
+                        alt="Question"
+                        className="mt-4 max-h-64 w-full object-contain rounded-lg"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    )}
                   </div>
 
                   {/* Answer Options Preview */}
@@ -797,9 +810,10 @@ export function TriviaHostControls({
                               category: q.category || "",
                               explanation: q.explanation || "",
                               question_type: q.question_type || "",
-                              accepted_answers: q.accepted_answers || [],
-                              case_sensitive: q.case_sensitive,
-                            });
+                               accepted_answers: q.accepted_answers || [],
+                               case_sensitive: q.case_sensitive,
+                               image_url: q.image_url || "",
+                             });
                             setShowQuestionEditor(true);
                           }}
                         >
@@ -1088,10 +1102,34 @@ export function TriviaHostControls({
                 onChange={(e) =>
                   setNewQuestion({ ...newQuestion, question: e.target.value })
                 }
-                placeholder="Enter your trivia question..."
-                rows={3}
-              />
-            </div>
+                 placeholder="Enter your trivia question..."
+                 rows={3}
+               />
+             </div>
+
+             <div>
+               <Label>Image URL (optional)</Label>
+               <Input
+                 value={newQuestion.image_url || ""}
+                 onChange={(e) =>
+                   setNewQuestion({
+                     ...newQuestion,
+                     image_url: e.target.value,
+                   })
+                 }
+                 placeholder="https://example.com/image.jpg"
+               />
+               {newQuestion.image_url && (
+                 <img
+                   src={newQuestion.image_url}
+                   alt="Question preview"
+                   className="mt-2 max-h-48 w-full object-contain rounded-lg"
+                   onError={(e) => {
+                     (e.target as HTMLImageElement).style.display = "none";
+                   }}
+                 />
+               )}
+             </div>
 
             <div className="grid grid-cols-3 gap-4">
               <div>

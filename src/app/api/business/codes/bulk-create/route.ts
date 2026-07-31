@@ -13,6 +13,7 @@ const bulkCreateSchema = z.object({
     .default("spin"),
   label: z.string().optional(),
   codeSubtype: z.enum(["S", "R", "P"]).default("P"),
+  require_activation: z.boolean().optional().default(true),
 });
 
 export async function POST(req: NextRequest) {
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { slug, count, unlocks, label, codeSubtype } = parsed.data;
+    const { slug, count, unlocks, label, codeSubtype, require_activation } = parsed.data;
 
     const { data: business } = await supabaseAdmin
       .from("businesses")
@@ -132,10 +133,11 @@ export async function POST(req: NextRequest) {
           p_business_id: business.id,
           p_code_type: planCodeType,
           p_code_subtype: codeSubtype,
-          p_unlocks: unlocks,
-          p_source: "dashboard_bulk",
-          p_created_by: user.id,
-        },
+         p_unlocks: unlocks,
+         p_source: "dashboard_bulk",
+         p_created_by: user.id,
+         p_require_activation: require_activation,
+       },
       );
 
       if (!codeError && result) {

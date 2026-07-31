@@ -448,9 +448,20 @@ export default function TriviaLivePage() {
                     </div>
                   )}
 
-                  <h2 className="text-2xl font-bold text-white text-center mb-6">
-                    {currentQuestion.question}
-                  </h2>
+                   <h2 className="text-2xl font-bold text-white text-center mb-6">
+                     {currentQuestion.question}
+                   </h2>
+
+                   {currentQuestion.image_url && (
+                     <img
+                       src={currentQuestion.image_url}
+                       alt="Question"
+                       className="mx-auto mb-6 max-h-64 w-full max-w-md object-contain rounded-lg"
+                       onError={(e) => {
+                         (e.target as HTMLImageElement).style.display = "none";
+                       }}
+                     />
+                   )}
 
                   {/* Options */}
                   {currentQuestion.options && (

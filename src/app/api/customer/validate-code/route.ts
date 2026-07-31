@@ -67,10 +67,10 @@ export async function GET(req: NextRequest) {
       business_color: business?.brand_color,
       unlocks: codeData.unlocks,
       code: codeData.code,
-      redirect_url: `/${business?.slug}/spin`,
+      redirect_url: `/${business?.slug}/${codeData.unlocks === "trivia" || codeData.unlocks === "all" ? "trivia" : "spin"}`,
     };
 
-    if (codeData.unlocks === "draw" || codeData.unlocks === "both") {
+    if (codeData.unlocks === "draw" || codeData.unlocks === "both" || codeData.unlocks === "all") {
       const { data: draw } = await supabaseAdmin
         .from("draws")
         .select("id, name, prize_name, entry_ends_at")
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    if (codeData.unlocks === "trivia") {
+    if (codeData.unlocks === "trivia" || codeData.unlocks === "all") {
       const { data: challenge } = await supabaseAdmin
         .from("challenges")
         .select("id, name, starts_at")

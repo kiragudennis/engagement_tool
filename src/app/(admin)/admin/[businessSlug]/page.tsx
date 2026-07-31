@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -61,6 +62,8 @@ export default function BusinessAdminDashboard() {
   const [recentSpins, setRecentSpins] = useState<any[]>([]);
   const [publicCodeLabel, setPublicCodeLabel] = useState("");
   const [publicCodeUnlocks, setPublicCodeUnlocks] = useState("spin");
+  const [publicCodeRequireActivation, setPublicCodeRequireActivation] =
+    useState(true);
   const [generatingPublicCode, setGeneratingPublicCode] = useState(false);
   const [generatedPublicCode, setGeneratedPublicCode] = useState<string | null>(
     null,
@@ -127,9 +130,10 @@ export default function BusinessAdminDashboard() {
         body: JSON.stringify({
           slug: businessSlug,
           type: "public",
-          label: publicCodeLabel || undefined,
-          unlocks: publicCodeUnlocks,
-        }),
+           label: publicCodeLabel || undefined,
+           unlocks: publicCodeUnlocks,
+           require_activation: publicCodeRequireActivation,
+         }),
       });
 
       const data = await res.json();
@@ -450,10 +454,12 @@ export default function BusinessAdminDashboard() {
                   <Globe className="h-5 w-5 text-orange-400" /> Generate Public
                   Code
                 </h3>
-                <p className="text-white/40 text-xs mb-3">
-                  Create a public marketing code for social media. Requires
-                  customer to be active.
-                </p>
+                 <p className="text-white/40 text-xs mb-3">
+                   Create a public marketing code for social media.{" "}
+                   {publicCodeRequireActivation
+                     ? "Requires customer to be active."
+                     : "No activation required."}
+                 </p>
                 {generatedPublicCode ? (
                   <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
                     <p className="text-green-400 text-sm font-medium mb-1">
@@ -502,6 +508,21 @@ export default function BusinessAdminDashboard() {
                           <SelectItem value="draw">Draws Only</SelectItem>
                         </SelectContent>
                       </Select>
+                     <div className="flex items-center justify-between">
+                       <div>
+                         <Label className="text-white/60 text-xs">
+                           Require Activation
+                         </Label>
+                         <p className="text-white/30 text-xs mt-1">
+                           When enabled, customers must be an active user of this
+                           business to redeem the code
+                         </p>
+                       </div>
+                       <Switch
+                         checked={publicCodeRequireActivation}
+                         onCheckedChange={setPublicCodeRequireActivation}
+                       />
+                     </div>
                     </div>
                     <Button
                       onClick={handleGeneratePublicCode}

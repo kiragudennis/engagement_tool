@@ -207,7 +207,7 @@ const ENDPOINTS = [
     path: "/api/notifications/send",
     label: "Send Notification",
     description:
-      "Send an in-app notification to a user, optionally with email (Resend) and SMS (Twilio). Used by Engage for important system events. Businesses handle their own marketing outside Engage.",
+      "Send an in-app notification to a user, optionally with email and SMS. Used by Engage for important system events. Businesses handle their own marketing outside Engage.",
     auth: "Admin Session or Business API Key",
     plan: "All Plans",
     request: `{
@@ -239,8 +239,8 @@ const ENDPOINTS = [
 }`,
     notes: [
       "In-app notification is always created",
-      "Email requires Resend configuration",
-      "SMS requires Twilio configuration",
+      "Email requires third party configuration",
+      "SMS requires third party configuration",
       "Business admins can only send for their own business",
       "Admins can send for any business",
       "Most marketing notifications are handled by businesses outside Engage",

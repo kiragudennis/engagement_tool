@@ -252,6 +252,8 @@ DECLARE
     v_is_active BOOLEAN;
     v_current_participants INTEGER;
     v_user_total_spins INTEGER;
+    v_spins_used INTEGER;
+    v_max_spins_per_activation INTEGER;
 BEGIN
     -- Get current user
     v_user_id := auth.uid();
@@ -276,13 +278,20 @@ BEGIN
     v_business_id := v_game.business_id;
     
     -- Check customer is active with this business
-    SELECT is_active INTO v_is_active
-    FROM customer_business_activations
-    WHERE user_id = v_user_id AND business_id = v_business_id
-      AND is_active = TRUE AND expires_at > NOW();
+    SELECT cba.spins_used, b.max_spins_per_activation
+    INTO v_spins_used, v_max_spins_per_activation
+    FROM customer_business_activations cba
+    JOIN businesses b ON b.id = cba.business_id
+    WHERE cba.user_id = v_user_id AND cba.business_id = v_business_id
+      AND cba.is_active = TRUE AND cba.expires_at > NOW();
     
-    IF NOT v_is_active THEN
+    IF NOT FOUND THEN
         RAISE EXCEPTION 'You need an active code from this business to spin. Ask them for a code!';
+    END IF;
+
+    -- Check max_spins_per_activation limit
+    IF v_max_spins_per_activation IS NOT NULL AND v_spins_used >= v_max_spins_per_activation THEN
+        RAISE EXCEPTION 'You have used all % spins for this activation.', v_max_spins_per_activation;
     END IF;
 
     -- Plan engagement limit

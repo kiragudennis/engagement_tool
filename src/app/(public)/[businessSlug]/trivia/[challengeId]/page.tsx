@@ -44,6 +44,7 @@ interface TriviaQuestion {
   question_type: string;
   accepted_answers?: string[];
   explanation?: string;
+  image_url?: string;
 }
 
 interface TriviaSelection {
@@ -774,9 +775,20 @@ export default function BusinessTriviaPage() {
                     </div>
                   )}
 
-                  <h2 className="text-xl font-bold text-white mb-6">
-                    {currentQuestion.question}
-                  </h2>
+                   <h2 className="text-xl font-bold text-white mb-6">
+                     {currentQuestion.question}
+                   </h2>
+
+                   {currentQuestion.image_url && (
+                     <img
+                       src={currentQuestion.image_url}
+                       alt="Question"
+                       className="mb-6 max-h-64 w-full object-contain rounded-lg"
+                       onError={(e) => {
+                         (e.target as HTMLImageElement).style.display = "none";
+                       }}
+                     />
+                   )}
 
                   {/* Multiple Choice / True-False */}
                   {(currentQuestion.question_type === "multiple_choice" ||

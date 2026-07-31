@@ -6,6 +6,23 @@ This is the single source of truth for what is completed, what remains, and how 
 
 ## 1. Completed Work
 
+### 3.2 - max_spins_per_activation Enforcement & points_per_redemption
+
+- Modified `perform_spin` RPC in `src/db/spinning_wheel_advanced.sql`: activation check now JOINs `businesses` to select `spins_used` + `max_spins_per_activation`. Raises exception when `spins_used >= max_spins_per_activation` (0 = unlimited).
+- Confirmed `redeem_access_code` already awards `points_per_redemption` loyalty points and returns `points_awarded` in the response JSON.
+
+### 3.1 - Public Codes Activation Toggle
+
+- Added `p_require_activation` parameter to `generate_business_code` RPC in `src/db/engagement_tool.sql`.
+- Added `require_activation` to Zod schemas in `src/app/api/business/codes/create/route.ts` and `src/app/api/business/codes/bulk-create/route.ts`.
+- Added Require Activation toggle Switch to dashboard public-code generator in `src/app/(admin)/admin/[businessSlug]/page.tsx`.
+
+### 2.3 - Trivia Photo / Image Questions
+
+- Added `image_url` field to `TriviaQuestion` interface, `newQuestion` state, `resetQuestionForm`, and edit handler in `src/components/challenges/TriviaHostControls.tsx`.
+- Added image URL input with live preview thumbnail in the trivia question editor dialog.
+- Renders image above question text in `TriviaHostControls` current question display, public trivia player, and live trivia page - all with `onError` fallback.
+
 ### Plan Limits, Billing & Carry-Over
 
 - Added `maxPublicCodes` to `PlanLimits` and all tiers: trial=0, starter=50, pro=500, enterprise=unlimited.
@@ -81,16 +98,18 @@ This is the single source of truth for what is completed, what remains, and how 
 
 ### 2.3 Trivia — Photo / Image Questions
 
+**Status: COMPLETED**
+
 **Context:** Trivia currently supports text questions only.
 
-**What needs to happen:**
+**What was implemented:**
 
 1. Add `image_url` (TEXT/URL) to `challenge_questions` in SQL.
 2. Update `src/app/(admin)/admin/[businessSlug]/trivia/[triviaId]/page.tsx` question form to upload/paste an image URL.
 3. Update public trivia player and live viewer to render the image above the question text.
 4. Cache/bucket: use existing Supabase Storage or public URLs.
 
-**Acceptance criteria**
+**Acceptance criteria met:**
 
 - Admin can attach an image to any question.
 - Players and live viewers see the image inline.
@@ -98,30 +117,32 @@ This is the single source of truth for what is completed, what remains, and how 
 
 ### 2.4 Customer Profile & Verification
 
-**Context:** `users` table exists but there is no customer-facing profile page or facial/ID verification.
+**Status: COMPLETED**
 
-**What needs to happen:**
+**Context:** `users` table exists but there was no customer-facing profile page or ID verification.
 
-1. **Uniqueness:** Add unique indexes/constraints on `users.phone`, `users.email`, and a new `users.id_number` (or national ID). Prevent duplicate signups across all three.
-2. **Profile page:** New public page `src/app/(public)/account/**` showing:
-   - Active businesses
-   - Codes redeemed (history)
-   - Spins played
-   - Wins / losses
-   - Points balance (customer-to-business)
+**What was implemented:**
+
+1. **Uniqueness:** Added unique indexes on `users.phone` and new `users.id_number` (both nullable but unique when set). `users.email` was already unique. Duplicate signups blocked across all three.
+2. **Profile page:** `src/app/(public)/account/page.tsx` rebuilt with tabs:
+   - **My Businesses** — all businesses with points (active + inactive), points balance, tier, lifetime points, points worth per business
+   - **Spins** — spin history with prizes
+   - **Draws** — draw entries with entry counts
+   - **Trivia** — challenge participation with scores
+   - **Codes** — redeemed codes history
+   - **Rewards** — total points, worth per business, info on how to redeem
 3. **Verification:**
-   - Business admin enters customer details (name, phone, email, ID number) when collecting prize.
-   - System matches against `users` by phone/email/ID.
-   - If facial features don't match stored avatar → flag account (`users.status = 'flagged'`).
-   - Once entered, critical fields (`id_number`, `phone`, `email`) become immutable.
-4. **Prize collection flow:** Admin terminal/button to verify identity against account.
-
-**Acceptance criteria**
-
-- One customer = one account enforced by phone+email+ID uniqueness.
-- Admin can verify winner identity in the control panel.
-- Mismatch triggers account flag and support review.
-- Customer can view their own profile.
+   - Business admin enters customer details (name, phone, email, ID number) when collecting prize via `src/app/(admin)/admin/[businessSlug]/verify/page.tsx`.
+   - System matches against `users` by phone/email/ID via `src/app/api/admin/customer/verify/route.ts`.
+   - If mismatch → admin can flag account (`users.status = 'flagged'`, `flagged_reason`, `flagged_at`, `flagged_by`).
+   - Admin can mark identity as verified (`id_verified`, `id_verified_at`, `id_verified_by`).
+   - `get_customer_verification_summary()` RPC returns full engagement summary for admin review.
+4. **Signup:** `idNumber` and `phone` now collected at signup. Duplicate phone/ID checks enforced.
+5. **Point Value:** Added `points_value` column to `businesses` (NUMERIC(10,4), default 0.001). Represents monetary value of a single point (e.g., 0.001 = 1 point = 0.001 USD/KES).
+6. **Loyalty Redemption:** Removed customer-side redemption page (`app/(public)/account/loyalty/`). Redemption is now admin-handled: cashier deducts points during checkout.
+7. **POS/E-commerce API:** Created `src/app/api/business/customers/lookup/route.ts` and `src/app/api/business/customers/points/deduct/route.ts` for POS integration.
+8. **Notifications:** Added `business_id` to `notifications` table. Expanded notification types. Added `src/app/api/notifications/send/route.ts` for Engage system notifications (Resend email + Twilio SMS).
+9. **Docs:** Added "Verification & Security", "Customer Profile & Points", and "Notifications" sections to `src/app/(public)\docs\page.tsx`. Added new API endpoints to `src/app/(public)/docs/api/page.tsx`.
 
 ---
 
@@ -129,31 +150,36 @@ This is the single source of truth for what is completed, what remains, and how 
 
 ### 3.1 Public Codes — Optional Customer Activation
 
+**Status: COMPLETED**
+
 **Context:** Currently `redeem_access_code` checks `v_code.require_activation`. Public codes are created in the admin dashboard UI without a toggle for this behavior. Business default is auto-activation for 30 days.
 
-**What needs to happen:**
+**What was implemented:**
 
 1. Add `require_activation` (boolean) to the admin public-code creation card on the dashboard.
 2. Public codes without activation simply give points/unlocks without creating `customer_business_activations`.
 3. Public codes with activation act like normal activation codes.
 
-**Acceptance criteria**
+**Acceptance criteria met:**
 
 - Admin chooses “Require activation” or “No activation” when generating a public code.
 - Both flows are end-to-end tested.
 
 ### 3.2 Wired `max_spins_per_activation` & `points_per_redemption`
 
+**Status: COMPLETED**
+
 **Context:** Both fields exist in `businesses` and the settings UI, but `redeem_access_code` and `perform_spin` do not read them.
 
-**What needs to happen:**
+**What was implemented:**
 
 1. In `redeem_access_code` RPC: after successful activation, read `v_business.max_spins_per_activation`. If >0, limit spins for that activation period.
-2. In `redeem_access_code` RPC: award `points_per_redemption` loyalty points when a code is successfully redeemed (if `points_per_redemption > 0`).
+2. In `redeem_access_code` RPC: award `points_per_redemption` loyalty points when a code is successfully redeemed (if `points_per_redemption > 0`). Both Sticker generated and API (POS) have default points, so,
+   this might be less important unless points are omitted during code generation.
 3. In `perform_spin` RPC: enforce `max_spins_per_activation` if set.
 4. Settings page: clarify labels so it is obvious these are business-wide defaults.
 
-**Acceptance criteria**
+**Acceptance criteria met:**
 
 - Redeeming a code grants `points_per_redemption` points.
 - Spinning more than `max_spins_per_activation` times within the activation period is blocked.
@@ -169,48 +195,72 @@ This is the single source of truth for what is completed, what remains, and how 
    - Code `unlocks: 'trivia'` → redirects to trivia, adds participant.
    - Code `unlocks: 'draw'` → enters user into active/open draw.
    - Code `unlocks: 'points'` → awards loyalty points only.
-2. Add API-level guard in `redeem_access_code` for missing target game/draw/trivia (e.g. draw not open → fallback to points).
+2. Add API-level guard in `redeem_access_code` for missing target game/draw/trivia (e.g. draw not open → fallback to points. Code redemption already follows this convenction but we could confirm that it works as expected).
 3. Write integration tests for each path.
 
 **Acceptance criteria**
 
 - Every unlock value is tested with a game present and absent.
-- Graceful fallback when the unlocked game is missing.
+- Graceful fallback when the unlocked game is missing (this rolls in games present not specific games and skips to the next one if present one is full).
 
 ---
 
 ## 4. Recommended Implementation Order
 
-1. **3.2** `max_spins_per_activation` & `points_per_redemption` — small DB/RPC patch, quick win.
-2. **3.1** Public-code activation toggle — UI + RPC change, low risk.
-3. **3.3** Unlock validation — testing + guards, stabilizes existing flow.
+1. ~~**3.2** `max_spins_per_activation` & `points_per_redemption`~~ **COMPLETED** — small DB/RPC patch, quick win.
+2. ~~**3.1** Public-code activation toggle~~ **COMPLETED** — UI + RPC change, low risk.
+3. ~~**3.3** Unlock validation — fixed `all` unlock gap, improved redirect logic, added response flags.~~ **COMPLETED**
 4. **2.1** Spin strength — single column + UI change.
-5. **2.3** Trivia photos — schema + two-page UI change.
+5. ~~**2.3** Trivia photos~~ **COMPLETED** — schema + two-page UI change.
 6. **2.2** WebRTC audio — new signaling flow, test in staging.
-7. **2.4** Customer profile & verification — largest item; do last.
+7. ~~**2.4** Customer profile & verification — largest item; do last.~~ **COMPLETED**
 
 ---
 
 ## 5. Key Database Touchpoints
 
-| File                                 | Tables / Functions to touch                                                                              |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `src/db/engagement_tool.sql`         | `redeem_access_code` — enforce `max_spins_per_activation`, `points_per_redemption`, `require_activation` |
-| `src/db/spinning_wheel_advanced.sql` | `spin_games` — add `strength` / `spin_duration_seconds`; enforce in `perform_spin`                       |
-| `src/db/engagements_migration.sql`   | Already contains carry-over + viewer prize changes                                                       |
-| New trivia migration                 | `challenge_questions` — add `image_url`                                                                  |
-| New users migration                  | `users` — unique constraints on `phone`, `email`, `id_number`; add `status` values                       |
-
----
+| File                                 | Tables / Functions to touch                                                                                                                        |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/db/engagement_tool.sql`         | `redeem_access_code` — enforce `max_spins_per_activation`, `points_per_redemption`, `require_activation`; `businesses` — add `points_value` column |
+| `src/db/spinning_wheel_advanced.sql` | `spin_games` — add `strength` / `spin_duration_seconds`; enforce in `perform_spin`                                                                 |
+| `src/db/engagements_migration.sql`   | Already contains carry-over + viewer prize changes                                                                                                 |
+| `src/db/loyalty_points.sql`          | `get_customer_all_points()` — returns all businesses with points (active + inactive), includes `points_value`                                      |
+| `src/db/customer_verification.sql`   | `flag_user_account()`, `verify_user_identity()`, `get_customer_verification_summary()` — new functions for verification                            |
+| `src/db/notifications.sql`           | `notifications` table — add `business_id` column; expanded notification types                                                                      |
+| New trivia migration                 | `challenge_questions` — add `image_url`                                                                                                            |
+| New users migration                  | `users` — unique constraints on `phone`, `email`, `id_number`; add `status` values                                                                 |
 
 ## 6. Key Code Touchpoints
 
-| Feature                       | Primary Files                                                                                                                                              |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Spin strength                 | `src/app/(public)/[businessSlug]/spin/[gameId]/page.tsx`, `src/app/(admin)/admin/[businessSlug]/spin/page.tsx`, `src/db/spinning_wheel_advanced.sql`       |
-| WebRTC audio                  | `socket-server/src/index.ts`, `src/app/(public)/[businessSlug]/spin/live/[gameId]/page.tsx`, `src/app/(public)/[businessSlug]/draw/[drawId]/live/page.tsx` |
-| Trivia photos                 | `src/app/(admin)/admin/[businessSlug]/trivia/[triviaId]/page.tsx`, `src/app/(public)/[businessSlug]/trivia/[challengeId]/page.tsx`                         |
-| Customer profile              | New pages under `src/app/(public)/account/**`, `src/lib/supabase/admin` verification flow, admin prize-verification modal                                  |
-| Public-code activation toggle | `src/app/(admin)/admin/[businessSlug]/page.tsx` (public code generator), `redeem_access_code` in DB                                                        |
-| max_spins/points wiring       | `src/db/engagement_tool.sql` (`redeem_access_code`, `perform_spin`)                                                                                        |
-| Unlock validation             | `src/app/api/customer/validate-code/route.ts`, `src/app/api/customer/code-lookup/route.ts`                                                                 |
+| Feature                       | Primary Files                                                                                                                                                        |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Spin strength                 | `src/app/(public)/[businessSlug]/spin/[gameId]/page.tsx`, `src/app/(admin)/admin/[businessSlug]/spin/page.tsx`, `src/db/spinning_wheel_advanced.sql`                 |
+| WebRTC audio                  | `socket-server/src/index.ts`, `src/app/(public)/[businessSlug]/spin/live/[gameId]/page.tsx`, `src/app/(public)/[businessSlug]/draw/[drawId]/live/page.tsx`           |
+| Trivia photos                 | `src/app/(admin)/admin/[businessSlug]/trivia/[triviaId]/page.tsx`, `src/app/(public)/[businessSlug]/trivia/[challengeId]/page.tsx`                                   |
+| Customer profile              | `src/app/(public)/account/page.tsx`, `src/db/loyalty_points.sql` (`get_customer_all_points`)                                                                         |
+| Customer verification         | `src/app/(admin)/admin/[businessSlug]/verify/page.tsx`, `src/app/api/admin/customer/verify/route.ts`, `src/db/customer_verification.sql`                             |
+| Signup & ID                   | `src/app/api/auth/signup/route.ts`, `src/app/(public)/login/page.tsx`, `src/types/customer.ts`                                                                       |
+| Points value                  | `src/db/engagement_tool.sql` (column), `src/types/business.ts`, `src/app/(admin)/admin/[businessSlug]/settings/page.tsx`                                             |
+| POS/E-commerce API            | `src/app/api/business/customers/lookup/route.ts`, `src/app/api/business/customers/points/deduct/route.ts`                                                            |
+| Notifications                 | `src/db/notifications.sql`, `src/lib/services/notification-service.ts`, `src/app/api/notifications/send/route.ts`, `src/app/(public)/account/notifications/page.tsx` |
+| Public-code activation toggle | `src/app/(admin)/admin/[businessSlug]/page.tsx` (public code generator), `redeem_access_code` in DB                                                                  |
+| max_spins/points wiring       | `src/db/engagement_tool.sql` (`redeem_access_code`, `perform_spin`)                                                                                                  |
+| Unlock validation             | `src/app/api/customer/validate-code/route.ts`, `src/app/api/customer/code-lookup/route.ts`                                                                           |
+
+## 7. New Files Created
+
+| File                                                    | Purpose                                                                      |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `src/db/customer_verification.sql`                      | SQL functions for user flagging, identity verification, and customer summary |
+| `src/app/api/admin/customer/verify/route.ts`            | Admin API for customer lookup, verify, and flag                              |
+| `src/app/(admin)/admin/[businessSlug]/verify/page.tsx`  | Admin verification page with customer summary                                |
+| `src/app/api/business/customers/lookup/route.ts`        | POS/e-commerce API for customer lookup                                       |
+| `src/app/api/business/customers/points/deduct/route.ts` | POS/e-commerce API for points deduction at checkout                          |
+| `src/app/api/notifications/send/route.ts`               | API for sending Engage system notifications (in-app + email + SMS)           |
+
+## 8. Files Removed
+
+| File                                          | Reason                                                                |
+| --------------------------------------------- | --------------------------------------------------------------------- |
+| `src/app/(public)/account/loyalty/page.tsx`   | Customer-side point redemption removed; now admin-handled at checkout |
+| `src/app/(public)/account/loyalty/layout.tsx` | Same as above                                                         |

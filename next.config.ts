@@ -43,7 +43,7 @@ export default withSentryConfig(withBotId(nextConfig as any), {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
-  org: "blessedtwoelectronics-afks-org",
+  org: "admin-apparels",
 
   project: "javascript-nextjs",
 

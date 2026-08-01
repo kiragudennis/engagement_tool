@@ -1,9 +1,7 @@
 // lib/limit.ts
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
-import { supabaseAdmin } from "./supabase/admin";
 import { Resend } from "resend";
-import { createClient } from "./supabase/server";
 import { getPaystackPlanCode } from "./config/plans";
 
 // ✅ Shared Redis instance
@@ -74,8 +72,6 @@ export async function countryAwareRateLimit(
       await redis.setex(`block:ip:${ip}`, 86400, "1"); // 1 day block
     }
 
-    await logAbuseToSupabase(ip, country, strikes, req, "ip_soft_limit");
-
     await new Promise((res) => setTimeout(res, delay));
   }
 
@@ -91,25 +87,6 @@ export async function countryAwareRateLimit(
   return {
     blocked: Boolean(isBlocked),
   };
-}
-
-async function logAbuseToSupabase(
-  ip: string,
-  country: string,
-  strikes: number,
-  req: Request,
-  reason: string,
-): Promise<void> {
-  const userAgent: string = req.headers.get("user-agent") || "unknown";
-
-  await supabaseAdmin.from("bot_breaches").insert({
-    ip_address: ip,
-    country,
-    user_agent: userAgent,
-    reason,
-    strike_count: strikes,
-    burst_count: 0,
-  });
 }
 
 // 🧠 Extract IP
@@ -143,132 +120,6 @@ export async function banIfInvalid(
   }
 
   return true;
-}
-
-export async function recordBundlePurchases(order: any) {
-  try {
-    const bundleData = order.metadata?.bundle;
-
-    if (!bundleData || !bundleData.bundle_id) {
-      console.log("No bundle data found for order", order.id);
-      return;
-    }
-
-    // Start a transaction to ensure data consistency
-    const { data: purchase, error: purchaseError } = await supabaseAdmin
-      .from("bundle_purchases")
-      .insert({
-        bundle_id: bundleData.bundle_id,
-        user_id: order.user_id,
-        order_id: order.id,
-        quantity: 1, // One bundle per order
-        price_paid: bundleData.discounted_total,
-        savings_amount: bundleData.savings,
-        points_used: bundleData.points_required || 0,
-        // loyalty_transaction_id will be linked separately if points were used
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (purchaseError) {
-      throw new Error(
-        `Failed to insert bundle purchase: ${purchaseError.message}`,
-      );
-    }
-
-    console.log("Bundle purchase recorded:", purchase);
-
-    // Update bundle current purchases count
-    const { error: updateError } = await supabaseAdmin.rpc(
-      "increment_mistry_bundle",
-      { bundle_id: bundleData.bundle_id },
-    );
-
-    if (updateError) {
-      console.error("Failed to update bundle purchase count:", updateError);
-      // Don't throw - this is non-critical
-    }
-
-    // If points were used, link the loyalty transaction
-    if (bundleData.points_required && bundleData.points_required > 0) {
-      // Find the loyalty transaction for this order where points were used
-      const { data: loyaltyTx, error: txError } = await supabaseAdmin
-        .from("loyalty_transactions")
-        .select("id")
-        .eq("order_id", order.id)
-        .eq("transaction_type", "redeemed")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-
-      if (!txError && loyaltyTx) {
-        // Link the transaction to bundle purchase
-        await supabaseAdmin
-          .from("bundle_purchases")
-          .update({ loyalty_transaction_id: loyaltyTx.id })
-          .eq("id", purchase.id);
-      }
-    }
-
-    return purchase;
-  } catch (error) {
-    console.error("Error in recordBundlePurchases:", error);
-    throw error;
-  }
-}
-
-// Email worker function (to be called via cron job or edge function)
-export async function processEmailQueue(): Promise<{
-  sent: number;
-  failed: number;
-}> {
-  const supabase = await createClient(); // Your server client
-
-  const { data: pendingEmails } = await supabase
-    .from("email_queue")
-    .select("*")
-    .eq("status", "pending")
-    .lte("scheduled_for", new Date().toISOString())
-    .limit(50);
-
-  let sent = 0;
-  let failed = 0;
-
-  for (const email of pendingEmails || []) {
-    try {
-      await resend.emails.send({
-        from: "noreply@yourstore.com",
-        to: email.to_email,
-        subject: email.subject,
-        html: email.html_content,
-        text: email.text_content,
-      });
-
-      await supabase
-        .from("email_queue")
-        .update({ status: "sent", sent_at: new Date().toISOString() })
-        .eq("id", email.id);
-
-      sent++;
-    } catch (error: any) {
-      const retryCount = (email.retry_count || 0) + 1;
-      const newStatus = retryCount >= 3 ? "failed" : "retry";
-
-      await supabase
-        .from("email_queue")
-        .update({
-          status: newStatus,
-          retry_count: retryCount,
-          error_message: error.message,
-        })
-        .eq("id", email.id);
-
-      failed++;
-    }
-  }
-
-  return { sent, failed };
 }
 
 export const getPlanCode = getPaystackPlanCode;

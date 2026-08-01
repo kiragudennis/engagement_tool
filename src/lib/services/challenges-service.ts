@@ -1,4 +1,6 @@
 // src/lib/services/challenges-service.ts (Enhanced Version)
+// This service manages challenges, participants, and scoring logic.
+// Client-side code should not directly send notifications; instead, it should call API routes that handle notifications to avoid bundling server-only modules.
 // @ts-nocheck
 
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -10,7 +12,8 @@ import {
   ScoringConfig,
 } from "@/types/challenges";
 import { PointsService } from "./points-service";
-import { NotificationService } from "./notification-service";
+// Notifications are sent via API routes, not directly from this service
+// to avoid bundling server-only modules (twilio, supabase admin) in client code
 
 export class ChallengesService {
   private cache = new Map();
@@ -141,15 +144,15 @@ export class ChallengesService {
       joined_at: now.toISOString(),
     });
 
-    // Send notification
-    const notificationService = new NotificationService(this.supabase);
-    await notificationService.sendInAppNotification(
-      userId,
-      "challenge_joined",
-      `🎯 You've joined ${challenge.name}!`,
-      `Start earning points by completing actions. Good luck!`,
-      { challenge_id: challengeId, challenge_name: challenge.name },
-    );
+    // Send notification via direct RPC
+    await this.supabase.rpc("create_notification", {
+      p_user_id: userId,
+      p_type: "challenge_joined",
+      p_title: `🎯 You've joined ${challenge.name}!`,
+      p_message: `Start earning points by completing actions. Good luck!`,
+      p_metadata: { challenge_id: challengeId, challenge_name: challenge.name },
+      p_business_id: null,
+    });
 
     // Add to live ticker
     const { data: user } = await this.supabase
@@ -303,20 +306,20 @@ export class ChallengesService {
     const { rank: newRank } = await this.getUserRank(challengeId, userId);
 
     if (oldRank !== newRank && newRank > 0) {
-      const notificationService = new NotificationService(this.supabase);
       if (newRank < (oldRank || 999)) {
-        notificationService.sendInAppNotification(
-          userId,
-          "rank_improved",
-          `📈 You moved up to #${newRank}!`,
-          `You're now rank ${newRank} in ${challenge.name}. Keep going!`,
-          {
+        await this.supabase.rpc("create_notification", {
+          p_user_id: userId,
+          p_type: "rank_improved",
+          p_title: `📈 You moved up to #${newRank}!`,
+          p_message: `You're now rank ${newRank} in ${challenge.name}. Keep going!`,
+          p_metadata: {
             challenge_id: challengeId,
             challenge_name: challenge.name,
             old_rank: oldRank,
             new_rank: newRank,
           },
-        );
+          p_business_id: null,
+        });
       }
     }
 

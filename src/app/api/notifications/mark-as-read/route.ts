@@ -1,4 +1,4 @@
-// /api/notifications/received/route.ts
+// /api/notifications/mark-as-read/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { NotificationService } from "@/lib/services/notification-service";
 import { createClient } from "@/lib/supabase/server";

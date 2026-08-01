@@ -1,4 +1,5 @@
 // src/lib/services/notification-service.ts (UPDATED)
+// Should happen in the backend, not in the frontend. This file is for server-side notification handling.
 import { SupabaseClient } from "@supabase/supabase-js";
 import twilio from "twilio";
 
@@ -186,23 +187,19 @@ export class NotificationService {
     metadata?: any,
   ): Promise<void> {
     const { resend } = await import("@/lib/limit");
-      await resend.emails.send({
-        from: `Engage <${process.env.RESEND_FROM_EMAIL || "notifications@engagespin.com"}>`,
-        to,
-        subject,
-        html,
-        text,
-      } as any);
+    await resend.emails.send({
+      from: `Engage <${process.env.RESEND_FROM_EMAIL || "notifications@engagespin.com"}>`,
+      to,
+      subject,
+      html,
+      text,
+    } as any);
   }
 
   /**
    * Send SMS via Twilio
    */
-  async sendSMS(
-    to: string,
-    body: string,
-    metadata?: any,
-  ): Promise<void> {
+  async sendSMS(to: string, body: string, metadata?: any): Promise<void> {
     const twilioClient = twilio(
       process.env.TWILIO_ACCOUNT_SID,
       process.env.TWILIO_AUTH_TOKEN,

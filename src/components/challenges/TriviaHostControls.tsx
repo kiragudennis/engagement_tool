@@ -25,30 +25,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Brain,
-  Play,
-  Pause,
   SkipForward,
   Users,
-  Timer,
   CheckCircle,
   XCircle,
   Trophy,
-  Zap,
-  Clock,
-  Star,
   Eye,
-  EyeOff,
-  Loader2,
   Plus,
   Trash2,
   Edit,
   ArrowRight,
-  Award,
-  Target,
-  Volume2,
-  VolumeX,
-  MessageSquare,
   Send,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -810,10 +796,10 @@ export function TriviaHostControls({
                               category: q.category || "",
                               explanation: q.explanation || "",
                               question_type: q.question_type || "",
-                               accepted_answers: q.accepted_answers || [],
-                               case_sensitive: q.case_sensitive,
-                               image_url: q.image_url || "",
-                             });
+                              accepted_answers: q.accepted_answers || [],
+                              case_sensitive: q.case_sensitive,
+                              image_url: q.image_url || "",
+                            });
                             setShowQuestionEditor(true);
                           }}
                         >
@@ -1102,34 +1088,34 @@ export function TriviaHostControls({
                 onChange={(e) =>
                   setNewQuestion({ ...newQuestion, question: e.target.value })
                 }
-                 placeholder="Enter your trivia question..."
-                 rows={3}
-               />
-             </div>
+                placeholder="Enter your trivia question..."
+                rows={3}
+              />
+            </div>
 
-             <div>
-               <Label>Image URL (optional)</Label>
-               <Input
-                 value={newQuestion.image_url || ""}
-                 onChange={(e) =>
-                   setNewQuestion({
-                     ...newQuestion,
-                     image_url: e.target.value,
-                   })
-                 }
-                 placeholder="https://example.com/image.jpg"
-               />
-               {newQuestion.image_url && (
-                 <img
-                   src={newQuestion.image_url}
-                   alt="Question preview"
-                   className="mt-2 max-h-48 w-full object-contain rounded-lg"
-                   onError={(e) => {
-                     (e.target as HTMLImageElement).style.display = "none";
-                   }}
-                 />
-               )}
-             </div>
+            <div>
+              <Label>Image URL (optional)</Label>
+              <Input
+                value={newQuestion.image_url || ""}
+                onChange={(e) =>
+                  setNewQuestion({
+                    ...newQuestion,
+                    image_url: e.target.value,
+                  })
+                }
+                placeholder="https://example.com/image.jpg"
+              />
+              {newQuestion.image_url && (
+                <img
+                  src={newQuestion.image_url}
+                  alt="Question preview"
+                  className="mt-2 max-h-48 w-full object-contain rounded-lg"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              )}
+            </div>
 
             <div className="grid grid-cols-3 gap-4">
               <div>

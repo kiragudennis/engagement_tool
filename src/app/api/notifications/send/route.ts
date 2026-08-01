@@ -24,25 +24,25 @@ export async function POST(req: NextRequest) {
     if (!user_id || !type || !title || !message) {
       return NextResponse.json(
         { error: "Missing required fields: user_id, type, title, message" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Verify auth
     const supabase = await createClient();
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user },
+    } = await supabase.auth.getUser();
 
     let isAdmin = false;
     let isBusinessAdmin = false;
     let effectiveBusinessId: string | null = business_id || null;
 
-    if (session) {
+    if (user) {
       const { data: profile } = await supabaseAdmin
         .from("users")
         .select("id, role")
-        .eq("id", session.user.id)
+        .eq("id", user.id)
         .single();
 
       if (profile?.role === "admin") {
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
         const { data: adminBiz } = await supabaseAdmin
           .from("business_admins")
           .select("business_id")
-          .eq("user_id", session.user.id)
+          .eq("user_id", user.id)
           .eq("business_id", business_id)
           .single();
 
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     if (!isAdmin && !isBusinessAdmin) {
       return NextResponse.json(
         { error: "Unauthorized - admin or business access required" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     if (business_id && effectiveBusinessId !== business_id) {
       return NextResponse.json(
         { error: "Forbidden - you do not have access to this business" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
     console.error("Notification send error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

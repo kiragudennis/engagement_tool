@@ -20,7 +20,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
 import {
-  Gift,
   Ticket,
   Users,
   QrCode,
@@ -33,21 +32,16 @@ import {
   Zap,
   Brain,
   Trophy,
-  TrendingUp,
   Eye,
-  BarChart3,
-  Lock,
   ArrowUpRight,
-  AlertTriangle,
   Printer,
   ShoppingBag,
   Globe,
-  Coins,
   Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { formatDistanceToNow, format } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { PlanLimitBanner } from "@/components/billing/PlanLimitBanner";
 import { getPlanLimits, isUnlimited } from "@/lib/config/plans";
@@ -130,10 +124,10 @@ export default function BusinessAdminDashboard() {
         body: JSON.stringify({
           slug: businessSlug,
           type: "public",
-           label: publicCodeLabel || undefined,
-           unlocks: publicCodeUnlocks,
-           require_activation: publicCodeRequireActivation,
-         }),
+          label: publicCodeLabel || undefined,
+          unlocks: publicCodeUnlocks,
+          require_activation: publicCodeRequireActivation,
+        }),
       });
 
       const data = await res.json();
@@ -454,12 +448,12 @@ export default function BusinessAdminDashboard() {
                   <Globe className="h-5 w-5 text-orange-400" /> Generate Public
                   Code
                 </h3>
-                 <p className="text-white/40 text-xs mb-3">
-                   Create a public marketing code for social media.{" "}
-                   {publicCodeRequireActivation
-                     ? "Requires customer to be active."
-                     : "No activation required."}
-                 </p>
+                <p className="text-white/40 text-xs mb-3">
+                  Create a public marketing code for social media.{" "}
+                  {publicCodeRequireActivation
+                    ? "Requires customer to be active."
+                    : "No activation required."}
+                </p>
                 {generatedPublicCode ? (
                   <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
                     <p className="text-green-400 text-sm font-medium mb-1">
@@ -508,21 +502,21 @@ export default function BusinessAdminDashboard() {
                           <SelectItem value="draw">Draws Only</SelectItem>
                         </SelectContent>
                       </Select>
-                     <div className="flex items-center justify-between">
-                       <div>
-                         <Label className="text-white/60 text-xs">
-                           Require Activation
-                         </Label>
-                         <p className="text-white/30 text-xs mt-1">
-                           When enabled, customers must be an active user of this
-                           business to redeem the code
-                         </p>
-                       </div>
-                       <Switch
-                         checked={publicCodeRequireActivation}
-                         onCheckedChange={setPublicCodeRequireActivation}
-                       />
-                     </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-white/60 text-xs">
+                            Require Activation
+                          </Label>
+                          <p className="text-white/30 text-xs mt-1">
+                            When enabled, customers must be an active user of
+                            this business to redeem the code
+                          </p>
+                        </div>
+                        <Switch
+                          checked={publicCodeRequireActivation}
+                          onCheckedChange={setPublicCodeRequireActivation}
+                        />
+                      </div>
                     </div>
                     <Button
                       onClick={handleGeneratePublicCode}

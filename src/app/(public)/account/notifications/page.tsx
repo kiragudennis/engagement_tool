@@ -3,44 +3,100 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/context/AuthContext";
-import { NotificationService } from "@/lib/services/notification-service";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bell, Gift, Clock, Ticket, Megaphone, Check, XCircle, TrendingUp, UserCheck, AlertTriangle, UserX, Coins, Trophy, Brain, RotateCcw, Shield } from "lucide-react";
+import {
+  Bell,
+  Gift,
+  Clock,
+  Ticket,
+  Megaphone,
+  Check,
+  XCircle,
+  TrendingUp,
+  UserCheck,
+  AlertTriangle,
+  UserX,
+  Coins,
+  Trophy,
+  Brain,
+  RotateCcw,
+  Shield,
+} from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 
 export default function NotificationsPage() {
-  const { supabase, profile } = useAuth();
+  const { profile } = useAuth();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
 
-  const notificationService = new NotificationService(supabase);
-
   const loadNotifications = useCallback(async () => {
     if (!profile?.id) return;
 
-    const { notifications: data } =
-      await notificationService.getUserNotifications(profile.id, 50);
+    const res = await fetch("/api/notifications/received");
+
+    if (!res.ok) {
+      console.error("Failed to fetch notifications");
+      setLoading(false);
+      return;
+    }
+
+    const data = await res.json();
+
     setNotifications(data);
     setLoading(false);
-  }, [profile?.id, notificationService]);
+  }, [profile?.id]);
 
   useEffect(() => {
     loadNotifications();
   }, [loadNotifications]);
 
   const markAsRead = async (notificationId: string) => {
-    await notificationService.markAsRead(notificationId, profile!.id);
-    loadNotifications();
+    const res = await fetch(`/api/notifications/mark-as-read`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ notificationId }),
+    });
+
+    if (!res.ok) {
+      console.error("Failed to mark notification as read");
+      return;
+    }
+
+    // Update the local state to reflect the change
+    setNotifications((prev) =>
+      prev.map((n) =>
+        n.id === notificationId
+          ? { ...n, is_read: true, read_at: Date.now }
+          : n,
+      ),
+    );
   };
 
   const markAllAsRead = async () => {
-    await notificationService.markAllAsRead(profile!.id);
-    loadNotifications();
+    const res = await fetch(`/api/notifications/mark-as-read`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ notificationId: null }), // Assuming null marks all as read
+    });
+
+    if (!res.ok) {
+      console.error("Failed to mark all notifications as read");
+      return;
+    }
+
+    // Update the local state to reflect the change
+    setNotifications((prev) =>
+      prev.map((n) => ({ ...n, is_read: true, read_at: Date.now })),
+    );
   };
 
   const getIcon = (type: string) => {

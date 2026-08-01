@@ -80,19 +80,20 @@ This is the single source of truth for what is completed, what remains, and how 
 
 ### 2.2 Real-Time Audio via WebRTC for Internal Streams (Spins, Trivia, Draws)
 
-**Context:** Socket.IO server exists (`socket-server/src/index.ts`) but audio transport is not implemented. Only HTML text/state events travel over sockets today.
+**Status: COMPLETED** — WebRTC signaling implemented in Socket.IO server and wired into all live pages.
 
-**What needs to happen:**
+**What was implemented:**
 
-1. Add a lightweight signaling channel over existing Socket.IO rooms: `audio:offer`, `audio:answer`, `ice-candidate`.
-2. Rooms: `audio:spin:{gameId}`, `audio:trivia:{challengeId}`, `audio:draw:{drawId}`.
-3. Admin side broadcasts a live audio track via WebRTC (e.g. using `simple-peer` or native RTCPeerConnection).
-4. Viewer side receives the track and plays it in the live page.
-5. Only active during `stream_type = 'internal'`.
+1. Added `webrtc:join`, `webrtc:offer`, `webrtc:answer`, `webrtc:ice-candidate`, `webrtc:leave` signaling handlers to `socket-server/src/index.ts` with `peerRooms` tracking
+2. WebRTC rooms: `webrtc:{roomId}` for signaling, `viewer:{gameId}` for heartbeat audio status
+3. Host side broadcasts audio via native RTCPeerConnection using `useWebRTC` hook + `AudioBroadcastControls` component
+4. Viewer side receives the track and plays it via `AudioPlayer` component
+5. Only active during `stream_type = 'internal'`
+6. Added `hasAudio` to `viewer:heartbeat` handler for audio status broadcasting
 
-**Acceptance criteria**
+**Acceptance criteria met:**
 
-- Admin can start/stop audio from the control page.
+- Admin can start/stop/mute audio from the control page.
 - Viewers on the internal live page hear the stream with <2s latency.
 - External streams continue to work without audio.
 
@@ -211,8 +212,8 @@ This is the single source of truth for what is completed, what remains, and how 
 2. ~~**3.1** Public-code activation toggle~~ **COMPLETED** — UI + RPC change, low risk.
 3. ~~**3.3** Unlock validation — fixed `all` unlock gap, improved redirect logic, added response flags.~~ **COMPLETED**
 4. **2.1** Spin strength — single column + UI change.
-5. ~~**2.3** Trivia photos~~ **COMPLETED** — schema + two-page UI change.
-6. **2.2** WebRTC audio — new signaling flow, test in staging.
+5. ~~**2.3** Trivia photos~~ **COMPLETED** — schema + two-page UI change + ImageUpload integration.
+6. ~~**2.2** WebRTC audio — signaling flow via Socket.IO server, host controls + viewer playback.~~ **COMPLETED** — WebRTC signaling in `socket-server/src/index.ts`, `useWebRTC` hook, `AudioBroadcastControls`, `AudioPlayer`, integrated into spin/trivia/draw live pages, docs updated.
 7. ~~**2.4** Customer profile & verification — largest item; do last.~~ **COMPLETED**
 
 ---
@@ -235,7 +236,7 @@ This is the single source of truth for what is completed, what remains, and how 
 | Feature                       | Primary Files                                                                                                                                                        |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Spin strength                 | `src/app/(public)/[businessSlug]/spin/[gameId]/page.tsx`, `src/app/(admin)/admin/[businessSlug]/spin/page.tsx`, `src/db/spinning_wheel_advanced.sql`                 |
-| WebRTC audio                  | `socket-server/src/index.ts`, `src/app/(public)/[businessSlug]/spin/live/[gameId]/page.tsx`, `src/app/(public)/[businessSlug]/draw/[drawId]/live/page.tsx`           |
+| WebRTC audio                  | `socket-server/src/index.ts`, `src/lib/socket/useWebRTC.ts`, `src/components/webrtc/AudioBroadcastControls.tsx`, `src/components/webrtc/AudioPlayer.tsx`, `src/app/(public)/[businessSlug]/spin/live/[gameId]/page.tsx`, `src/app/(public)/[businessSlug]/trivia/[challengeId]/live/page.tsx`, `src/app/(public)/[businessSlug]/draw/[drawId]/live/page.tsx`, `src/app/(admin)/admin/[businessSlug]/trivia/[triviaId]/live-controls/page.tsx`, `src/app/(admin)/admin/[businessSlug]/draws/[drawId]/control/page.tsx` |
 | Trivia photos                 | `src/app/(admin)/admin/[businessSlug]/trivia/[triviaId]/page.tsx`, `src/app/(public)/[businessSlug]/trivia/[challengeId]/page.tsx`                                   |
 | Customer profile              | `src/app/(public)/account/page.tsx`, `src/db/loyalty_points.sql` (`get_customer_all_points`)                                                                         |
 | Customer verification         | `src/app/(admin)/admin/[businessSlug]/verify/page.tsx`, `src/app/api/admin/customer/verify/route.ts`, `src/db/customer_verification.sql`                             |
@@ -246,6 +247,7 @@ This is the single source of truth for what is completed, what remains, and how 
 | Public-code activation toggle | `src/app/(admin)/admin/[businessSlug]/page.tsx` (public code generator), `redeem_access_code` in DB                                                                  |
 | max_spins/points wiring       | `src/db/engagement_tool.sql` (`redeem_access_code`, `perform_spin`)                                                                                                  |
 | Unlock validation             | `src/app/api/customer/validate-code/route.ts`, `src/app/api/customer/code-lookup/route.ts`                                                                           |
+| Socket.IO signaling server   | `socket-server/src/index.ts` — `webrtc:join/offer/answer/ice-candidate/leave/peer-left/peer-joined/existing-peers` handlers, `peerRooms` tracking, `broadcastWebRTCEvent` |
 
 ## 7. New Files Created
 
@@ -257,6 +259,9 @@ This is the single source of truth for what is completed, what remains, and how 
 | `src/app/api/business/customers/lookup/route.ts`        | POS/e-commerce API for customer lookup                                       |
 | `src/app/api/business/customers/points/deduct/route.ts` | POS/e-commerce API for points deduction at checkout                          |
 | `src/app/api/notifications/send/route.ts`               | API for sending Engage system notifications (in-app + email + SMS)           |
+| `src/lib/socket/useWebRTC.ts`                           | WebRTC hook: manages RTCPeerConnection lifecycle, takes socket as param      |
+| `src/components/webrtc/AudioBroadcastControls.tsx`      | Host-side audio controls (start mic, mute, viewer count)                     |
+| `src/components/webrtc/AudioPlayer.tsx`                 | Viewer-side audio playback (hidden audio, mute toggle)                     |
 
 ## 8. Files Removed
 
@@ -264,3 +269,34 @@ This is the single source of truth for what is completed, what remains, and how 
 | --------------------------------------------- | --------------------------------------------------------------------- |
 | `src/app/(public)/account/loyalty/page.tsx`   | Customer-side point redemption removed; now admin-handled at checkout |
 | `src/app/(public)/account/loyalty/layout.tsx` | Same as above                                                         |
+
+## 9. Socket.IO Server (`socket-server/`)
+
+**Status: COMPLETED** — Separate Socket.IO v4.8.1 server with WebRTC signaling.
+
+**Files:**
+
+| File | Purpose |
+|------|---------|
+| `socket-server/src/index.ts` | Socket.IO server with WebRTC signaling handlers + real-time control events |
+| `socket-server/package.json` | Dependencies: socket.io v4.8.1 |
+| `socket-server/README.md` | Deployment guide (Railway, Fly.io, Docker) + event reference |
+| `socket-server/plan.md` | Architecture plan with implementation details and flow diagrams |
+| `socket-server/tsconfig.json` | TypeScript config |
+
+**What it does:**
+
+1. **Real-time Control** — Relays queue events, viewer heartbeats, and admin actions between browsers via Socket.IO rooms (`spin:{gameId}`, `draw:{drawId}`, `trivia:{challengeId}`, `viewer:{gameId}`, `business:{id}`, `admin:{id}`)
+2. **WebRTC Signaling** — Exchanges SDP offers/answers and ICE candidates between peers for P2P audio streaming in live game pages (internal streams only)
+
+**Key handlers added for WebRTC:**
+
+- `webrtc:join` — peer joins a WebRTC room, receives existing peer list, other peers notified
+- `webrtc:existing-peers` — sends peer list to new joiner
+- `webrtc:peer-joined` — broadcasts new peer to existing members
+- `webrtc:peer-left` — broadcasts peer departure to remaining members
+- `webrtc:offer`/`webrtc:answer`/`webrtc:ice-candidate` — signal forwarding via `io.to(targetId).emit()`
+- `webrtc:leave` — cleanup peer tracking
+- `disconnect` — cleanup WebRTC room membership on socket disconnect
+- `broadcastWebRTCEvent` — exported helper for server-initiated WebRTC events
+- `peerRooms` — `Map<string, Set<string>>` tracking peer socket IDs per room

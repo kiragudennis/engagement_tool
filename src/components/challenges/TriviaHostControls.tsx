@@ -40,6 +40,7 @@ import {
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { ImageUpload } from "@/components/admin/ImageUpload";
 
 interface TriviaQuestion {
   id: string;
@@ -1094,27 +1095,17 @@ export function TriviaHostControls({
             </div>
 
             <div>
-              <Label>Image URL (optional)</Label>
-              <Input
-                value={newQuestion.image_url || ""}
-                onChange={(e) =>
+              <Label>Question Image (optional)</Label>
+              <ImageUpload
+                value={newQuestion.image_url ? [newQuestion.image_url] : []}
+                onChange={(urls) =>
                   setNewQuestion({
                     ...newQuestion,
-                    image_url: e.target.value,
+                    image_url: urls[0] || "",
                   })
                 }
-                placeholder="https://example.com/image.jpg"
+                maxFiles={1}
               />
-              {newQuestion.image_url && (
-                <img
-                  src={newQuestion.image_url}
-                  alt="Question preview"
-                  className="mt-2 max-h-48 w-full object-contain rounded-lg"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
-                />
-              )}
             </div>
 
             <div className="grid grid-cols-3 gap-4">

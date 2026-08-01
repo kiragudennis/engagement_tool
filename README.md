@@ -19,6 +19,8 @@
 | Customer loyalty points                     | ✅                   |
 | Customer account dashboard                  | ✅                   |
 | Streak tracking hook                        | ✅                   |
+| Real-time audio (WebRTC via Socket.IO)      | ✅ Complete          |
+| Socket.IO signaling server                  | ✅ Complete (separate deployment) |
 
 ## What's Missing
 
@@ -78,7 +80,7 @@
 | Framework  | Next.js 14 (App Router)        |
 | Database   | Supabase (PostgreSQL)          |
 | Auth       | Supabase Auth                  |
-| Real-time  | Supabase Realtime (WebSockets) |
+| Real-time  | Supabase Realtime (WebSockets) + Socket.IO server |
 | Styling    | Tailwind CSS + shadcn/ui       |
 | Animations | Framer Motion                  |
 | Payments   | PayPal API + M-Pesa Daraja API |
@@ -114,6 +116,7 @@
 - canvas-confetti for win celebrations
 - Framer Motion animations throughout
 - Responsive mobile-first design
+- Real-time audio streaming via WebRTC (Socket.IO signaling server)
 
 ### Technical
 
@@ -124,6 +127,7 @@
 - Server-side middleware for plan enforcement
 - Webhook handlers for PayPal and M-Pesa
 - Database functions for points, activations, and code redemption
+- Separate Socket.IO signaling server (`socket-server/`) for WebRTC audio
 
 ## 📦 Project Structure
 ```
@@ -167,7 +171,7 @@
 │ ├── services/ # Challenges, notifications, plan limits
 │ └── hooks/ # useStreakTracker
 │
-└── types/ # TypeScript types
+├── socket-server/            # Separate Socket.IO + WebRTC signaling server
 
 ````
 

@@ -1,4 +1,4 @@
-// ImageUpload.tsx
+// src/components/admin/ImageUpload.tsx
 "use client";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -53,10 +53,10 @@ export function ImageUpload({
         const fileName = `${Math.random()
           .toString(36)
           .substring(2, 15)}.${fileExt}`;
-        const filePath = `products/${fileName}`;
+        const filePath = `trivia/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
-          .from("product-images")
+          .from("trivia-images")
           .upload(filePath, file, {
             cacheControl: "3600",
             upsert: false,
@@ -72,7 +72,7 @@ export function ImageUpload({
         // Get public URL
         const {
           data: { publicUrl },
-        } = supabase.storage.from("product-images").getPublicUrl(filePath);
+        } = supabase.storage.from("trivia-images").getPublicUrl(filePath);
 
         uploadedUrls.push(publicUrl);
       }
@@ -93,12 +93,12 @@ export function ImageUpload({
       // Extract file path from URL
       const urlParts = url.split("/");
       const filePath = urlParts
-        .slice(urlParts.indexOf("product-images") + 1)
+        .slice(urlParts.indexOf("trivia-images") + 1)
         .join("/");
 
       // Delete from storage
       const { error } = await supabase.storage
-        .from("product-images")
+        .from("trivia-images")
         .remove([filePath]);
 
       if (error) throw error;
@@ -157,7 +157,7 @@ export function ImageUpload({
             <div key={index} className="relative group">
               <img
                 src={url}
-                alt={`Product image ${index + 1}`}
+                alt={`Uploaded image ${index + 1}`}
                 className="w-full h-32 object-cover rounded-lg"
               />
               <Button

@@ -46,6 +46,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { Challenge } from "@/types/challenges";
 import { useSocket } from "@/lib/socket/useSocket";
+import { AudioBroadcastControls } from "@/components/webrtc/AudioBroadcastControls";
 
 interface Participant {
   id: string;
@@ -72,7 +73,7 @@ interface SuspiciousActivity {
 }
 
 export default function ChallengeLiveControls() {
-  const { challengeId } = useParams<{ challengeId: string }>();
+  const { businessSlug, challengeId } = useParams<{ businessSlug: string; challengeId: string }>();
   const { supabase } = useAuth();
   const { emit: emitTriviaSocket } = useSocket();
   const [challenge, setChallenge] = useState<Challenge | null>(null);
@@ -509,6 +510,16 @@ export default function ChallengeLiveControls() {
                   </div>
                 </CardContent>
               </Card>
+               {/* Audio Broadcast (WebRTC) */}
+               <Card className="bg-black/30 backdrop-blur border-purple-500/30">
+                 <CardContent className="p-6">
+                   <AudioBroadcastControls
+                     gameId={challengeId as string}
+                     gameType="trivia"
+                     businessSlug={businessSlug as string}
+                   />
+                 </CardContent>
+               </Card>
 
               {/* Manual Score Adjustment */}
               <Card className="bg-black/30 backdrop-blur border-purple-500/30 md:col-span-2">

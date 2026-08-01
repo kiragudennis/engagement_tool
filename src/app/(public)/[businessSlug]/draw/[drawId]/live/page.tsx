@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNowStrict } from "date-fns";
 import Link from "next/link";
 import { ViewerPrizeClaimButton } from "@/components/viewer/ViewerPrizeClaimButton";
+import { AudioPlayer } from "@/components/webrtc/AudioPlayer";
 
 // ─── Types ──────────────────────────────────────────────
 interface TickerEntry {
@@ -558,6 +559,11 @@ export default function BusinessDrawLivePage() {
                 <Users className="h-3 w-3" />
                 <span className="text-sm">{activeViewers}</span>
               </div>
+              <AudioPlayer
+                gameId={drawId as string}
+                gameType="draw"
+                businessSlug={businessSlug as string}
+              />
             </div>
           </div>
         </div>

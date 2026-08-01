@@ -1929,6 +1929,14 @@ export default function DocsPage() {
                         </ul>
                       </div>
                     </div>
+                    <p className="text-white/40 text-xs mt-3">
+                      <strong className="text-white">Internal streams</strong>
+                      &nbsp; supports audio for host narration. Video is not
+                      available on internal streams because&nbsp;
+                      <strong className="text-white/60">Engage</strong>
+                      &nbsp; encourages businesses to broadcast on social media
+                      (TikTok, Instagram, YouTube) to maximize organic reach.
+                    </p>
                   </CardContent>
                 </Card>
               </section>

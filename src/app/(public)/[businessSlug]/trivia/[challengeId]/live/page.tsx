@@ -25,6 +25,7 @@ import {
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { ViewerPrizeClaimButton } from "@/components/viewer/ViewerPrizeClaimButton";
+import { AudioPlayer } from "@/components/webrtc/AudioPlayer";
 
 // ─── Types ──────────────────────────────────────────────
 interface QueueParticipant {
@@ -374,6 +375,11 @@ export default function TriviaLivePage() {
                 </span>
                 <span className="text-xs text-purple-300">pts</span>
               </div>
+               <AudioPlayer
+                 gameId={challengeId as string}
+                 gameType="trivia"
+                 businessSlug={businessSlug as string}
+               />
             </div>
           </div>
         </div>

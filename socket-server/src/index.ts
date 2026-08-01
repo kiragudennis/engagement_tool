@@ -12,6 +12,8 @@ type BusinessRoom = { businessId: string; role: "admin" | "viewer" };
 
 const rooms = new Map<string, Set<string>>();
 
+const peerRooms = new Map<string, Set<string>>();
+
 io.on("connection", (socket) => {
   console.log(`Client connected: ${socket.id}`);
 
@@ -73,11 +75,16 @@ io.on("connection", (socket) => {
     ({
       gameId,
       watchedSeconds,
+      hasAudio = false,
     }: {
       gameId: string;
       watchedSeconds: number;
+      hasAudio?: boolean;
     }) => {
       io.to(`viewer:${gameId}`).emit("viewer:progress", { watchedSeconds });
+      if (hasAudio) {
+        io.to(`viewer:${gameId}`).emit("viewer:audio-status", { hasAudio });
+      }
     },
   );
 
@@ -136,6 +143,108 @@ io.on("connection", (socket) => {
     },
   );
 
+  // ========== WebRTC Signaling ==========
+
+  // Join a WebRTC room for audio streaming
+  socket.on(
+    "webrtc:join",
+    ({
+      roomId,
+      streamType,
+    }: {
+      roomId: string;
+      streamType: "audio" | "video" | "both";
+    }) => {
+      socket.join(`webrtc:${roomId}`);
+      socket.data.webrtcRoom = roomId;
+      socket.data.webrtcStreamType = streamType;
+
+      if (!peerRooms.has(roomId)) {
+        peerRooms.set(roomId, new Set());
+      }
+      const roomPeers = peerRooms.get(roomId)!;
+
+      const existingPeers = Array.from(roomPeers).filter(
+        (id) => id !== socket.id,
+      );
+
+      socket.emit("webrtc:existing-peers", { peers: existingPeers });
+
+      socket.to(`webrtc:${roomId}`).emit("webrtc:peer-joined", {
+        peerId: socket.id,
+        streamType,
+      });
+
+      roomPeers.add(socket.id);
+    },
+  );
+
+  // WebRTC offer forwarding
+  socket.on(
+    "webrtc:offer",
+    ({
+      targetId,
+      offer,
+    }: {
+      targetId: string;
+      offer: RTCSessionDescriptionInit;
+    }) => {
+      io.to(targetId).emit("webrtc:offer", {
+        from: socket.id,
+        offer,
+      });
+    },
+  );
+
+  // WebRTC answer forwarding
+  socket.on(
+    "webrtc:answer",
+    ({
+      targetId,
+      answer,
+    }: {
+      targetId: string;
+      answer: RTCSessionDescriptionInit;
+    }) => {
+      io.to(targetId).emit("webrtc:answer", {
+        from: socket.id,
+        answer,
+      });
+    },
+  );
+
+  // WebRTC ICE candidate forwarding
+  socket.on(
+    "webrtc:ice-candidate",
+    ({
+      targetId,
+      candidate,
+    }: {
+      targetId: string;
+      candidate: RTCIceCandidateInit;
+    }) => {
+      io.to(targetId).emit("webrtc:ice-candidate", {
+        from: socket.id,
+        candidate,
+      });
+    },
+  );
+
+  // Leave WebRTC room
+  socket.on("webrtc:leave", ({ roomId }: { roomId: string }) => {
+    socket.leave(`webrtc:${roomId}`);
+    const room = peerRooms.get(roomId);
+    if (room) {
+      room.delete(socket.id);
+      if (room.size === 0) {
+        peerRooms.delete(roomId);
+      }
+    }
+    socket.to(`webrtc:${roomId}`).emit("webrtc:peer-left", {
+      peerId: socket.id,
+    });
+  });
+
   socket.on("leave:room", (room: string) => {
     socket.leave(room);
   });
@@ -151,6 +260,22 @@ io.on("connection", (socket) => {
         }
       }
     }
+
+    // Clean up WebRTC rooms
+    const webrtcRoom = socket.data.webrtcRoom;
+    if (webrtcRoom) {
+      const peerRoom = peerRooms.get(webrtcRoom);
+      if (peerRoom) {
+        peerRoom.delete(socket.id);
+        if (peerRoom.size === 0) {
+          peerRooms.delete(webrtcRoom);
+        }
+      }
+      socket.to(`webrtc:${webrtcRoom}`).emit("webrtc:peer-left", {
+        peerId: socket.id,
+      });
+    }
+
     console.log(`Client disconnected: ${socket.id}`);
   });
 });
@@ -201,6 +326,14 @@ export function broadcastToTriviaQueue(
 
 export function broadcastToViewers(gameId: string, event: string, data: any) {
   io.to(`viewer:${gameId}`).emit(event, data);
+}
+
+export function broadcastWebRTCEvent(
+  roomId: string,
+  event: string,
+  data: any,
+) {
+  io.to(`webrtc:${roomId}`).emit(event, data);
 }
 
 const PORT = Number(process.env.SOCKET_PORT || 4000);

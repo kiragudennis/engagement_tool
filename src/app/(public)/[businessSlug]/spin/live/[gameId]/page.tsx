@@ -32,6 +32,8 @@ import { SpinGame } from "@/types/spinning-wheel";
 import Link from "next/link";
 import { useSocket } from "@/lib/socket/useSocket";
 import { ViewerPrizeClaimButton } from "@/components/viewer/ViewerPrizeClaimButton";
+import { AudioPlayer } from "@/components/webrtc/AudioPlayer";
+import { AudioBroadcastControls } from "@/components/webrtc/AudioBroadcastControls";
 
 // ─── Types ──────────────────────────────────────────────
 interface Participant {
@@ -708,6 +710,20 @@ export default function BusinessLiveGamePage() {
                    {participantStats.total_spins}
                  </span>
                </div>
+                {streamType === "internal" && (
+                  <AudioBroadcastControls
+                    gameId={gameId as string}
+                    gameType="spin"
+                    businessSlug={businessSlug as string}
+                  />
+                )}
+                {streamType === "internal" && (
+                  <AudioPlayer
+                    gameId={gameId as string}
+                    gameType="spin"
+                    businessSlug={businessSlug as string}
+                  />
+                )}
              </div>
           </div>
         </div>

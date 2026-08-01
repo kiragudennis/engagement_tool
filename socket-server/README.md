@@ -1,3 +1,39 @@
+# Engage Socket.IO Server
+
+Real-time communication server for the Engage platform. Runs separately from the Next.js application.
+
+## What This Server Is For
+
+This Socket.IO server serves two purposes:
+
+1. **Real-time Control Plane** — Relays live broadcast events (queue calls, viewer heartbeats, stage transitions) from admin dashboards to viewer displays across spin wheels, trivia nights, and prize draws.
+
+2. **WebRTC Signaling Server** — Exchanges SDP offers/answers and ICE candidates between peers for peer-to-peer WebRTC audio streaming. The actual audio flows directly P2P (low latency, zero server bandwidth cost for media). Socket.IO handles room management, peer discovery, and signal forwarding only.
+
+### Event Summary
+
+| Event | Direction | Purpose |
+|-------|-----------|---------|
+| `authenticate` | client→server | Join business + admin rooms |
+| `join:spin` / `join:draw` / `join:trivia` | client→server | Join game-specific broadcast rooms |
+| `join:viewer` | client→server | Join viewer room for internal streams |
+| `viewer:heartbeat` | client→server | Report watched time + audio status |
+| `admin:queue:called` | client→server | Call next participant |
+| `admin:queue:skipped` | client→server | Skip current participant |
+| `admin:queue:update` | client→server | Trigger queue refresh |
+| `webrtc:join` | client→server | Join a WebRTC peer room |
+| `webrtc:existing-peers` | server→client | List peers in room |
+| `webrtc:peer-joined` | server→client | New peer joined room |
+| `webrtc:peer-left` | server→client | Peer left room |
+| `webrtc:offer` | client→server→client | SDP offer forwarding |
+| `webrtc:answer` | client→server→client | SDP answer forwarding |
+| `webrtc:ice-candidate` | client→server→client | ICE candidate forwarding |
+| `webrtc:leave` | client→server | Leave WebRTC room |
+| `queue:called` / `queue:skipped` / `queue:update` | server→client | Queue state to viewers |
+| `trivia:queue:called` / etc. | server→client | Trivia queue state |
+| `viewer:progress` | server→client | Viewer watch time |
+| `viewer:audio-status` | server→client | Host audio availability |
+
 ## Deploy Socket Server Separately
 
 Keep the socket server as a completely separate deployment on a platform like:

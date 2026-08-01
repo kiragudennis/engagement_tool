@@ -13,8 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { AudioBroadcastControls } from "@/components/webrtc/AudioBroadcastControls";
 import {
   Loader2,
+  Radio,
   Trophy,
   Users,
   Ticket,
@@ -47,7 +49,7 @@ type ViewerPrizeConfig = {
 };
 
 export default function DrawControlPage() {
-  const { drawId } = useParams<{ drawId: string }>();
+  const { businessSlug, drawId } = useParams<{ businessSlug: string; drawId: string }>();
   const { supabase } = useAuth();
   const [draw, setDraw] = useState<DrawControl | null>(null);
   const [participants, setParticipants] = useState<any[]>([]);
@@ -525,6 +527,21 @@ export default function DrawControlPage() {
             )}
             Save Viewer Prize Configuration
           </Button>
+        </CardContent>
+      </Card>
+      <Card className="mt-6 border-white/10">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Radio className="h-5 w-5 text-green-400" />
+            Audio Broadcast (WebRTC)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AudioBroadcastControls
+            gameId={drawId as string}
+            gameType="draw"
+            businessSlug={businessSlug as string}
+          />
         </CardContent>
       </Card>
     </div>

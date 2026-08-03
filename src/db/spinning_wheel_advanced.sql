@@ -87,6 +87,28 @@ CREATE TABLE IF NOT EXISTS user_spin_allocations (
     PRIMARY KEY (user_id, game_id, date)
 );
 
+-- 3b. Spin participants (enrollment tracking, like challenge_participants)
+CREATE TABLE IF NOT EXISTS spin_participants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    game_id UUID REFERENCES spin_games(id) ON DELETE CASCADE,
+    business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    
+    enrolled_at TIMESTAMPTZ DEFAULT NOW(),
+    enrolled_via TEXT NOT NULL DEFAULT 'code' CHECK (enrolled_via IN ('code', 'manual', 'free')),
+    source_code_id UUID,
+    source_code TEXT,
+    
+    ticket_number INTEGER,
+    
+    is_eligible BOOLEAN DEFAULT TRUE,
+    ineligible_reason TEXT,
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    UNIQUE(game_id, user_id)
+);
+
 -- 4. Live ticker
 CREATE TABLE IF NOT EXISTS spin_live_ticker (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -110,6 +132,9 @@ CREATE INDEX IF NOT EXISTS idx_spin_attempts_business ON spin_attempts(business_
 CREATE INDEX IF NOT EXISTS idx_spin_attempts_user ON spin_attempts(user_id);
 CREATE INDEX IF NOT EXISTS idx_spin_live_ticker_game ON spin_live_ticker(game_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_spin_live_ticker_business ON spin_live_ticker(business_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_spin_participants_game ON spin_participants(game_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_spin_participants_business ON spin_participants(business_id, enrolled_at DESC);
+CREATE INDEX IF NOT EXISTS idx_spin_participants_user ON spin_participants(user_id);
 
 -- ============================================
 -- RLS Policies
@@ -118,6 +143,7 @@ ALTER TABLE spin_games ENABLE ROW LEVEL SECURITY;
 ALTER TABLE spin_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_spin_allocations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE spin_live_ticker ENABLE ROW LEVEL SECURITY;
+ALTER TABLE spin_participants ENABLE ROW LEVEL SECURITY;
 
 -- Anyone can view spin games
 CREATE POLICY "Anyone can view spin games" ON spin_games
@@ -141,6 +167,10 @@ CREATE POLICY "Users can manage own allocations" ON user_spin_allocations
 
 -- Anyone can view live ticker
 CREATE POLICY "Anyone can view live ticker" ON spin_live_ticker
+    FOR SELECT USING (true);
+
+-- Anyone can view spin participants
+CREATE POLICY "Anyone can view spin participants" ON spin_participants
     FOR SELECT USING (true);
 
 -- Admin policies (scoped to business)
@@ -299,15 +329,23 @@ BEGIN
         RAISE EXCEPTION 'This business has reached its monthly engagement limit. Try again next month or ask them to upgrade.';
     END IF;
 
-    -- Participant limit
+    -- Check participant limit (now uses spin_participants table, not spin_attempts)
     IF v_game.participant_limit IS NOT NULL THEN
-        SELECT COUNT(DISTINCT user_id) INTO v_current_participants
-        FROM spin_attempts
+        SELECT COUNT(*) INTO v_current_participants
+        FROM spin_participants
         WHERE game_id = p_game_id;
         
         IF v_current_participants >= v_game.participant_limit THEN
             RAISE EXCEPTION 'This spin game has reached its participant limit.';
         END IF;
+    END IF;
+
+    -- Require enrollment: user must be an enrolled spin participant
+    IF NOT EXISTS (
+        SELECT 1 FROM spin_participants
+        WHERE game_id = p_game_id AND user_id = v_user_id
+    ) THEN
+        RAISE EXCEPTION 'You are not enrolled as a participant in this spin game. Redeem a code to get enrolled.';
     END IF;
 
     -- Live broadcast: spin animation start
@@ -515,6 +553,182 @@ BEGIN
 END;
 $$;
 
+-- ============================================
+-- Spin participant enrollment and game selection
+-- ============================================
+
+-- Find the first available spin game for a business that has capacity
+-- Games with participant_limit = NULL accept unlimited participants
+CREATE OR REPLACE FUNCTION get_available_spin_game(p_business_id UUID)
+RETURNS TABLE(
+    game_id UUID,
+    name TEXT,
+    participant_limit INTEGER,
+    current_participants BIGINT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        g.id, g.name, g.participant_limit,
+        COALESCE((SELECT COUNT(*) FROM spin_participants WHERE game_id = g.id), 0)
+    FROM spin_games g
+    WHERE g.business_id = p_business_id
+      AND g.is_active = true
+      AND (g.starts_at IS NULL OR g.starts_at <= NOW())
+      AND (g.ends_at IS NULL OR g.ends_at >= NOW())
+      AND (
+        g.participant_limit IS NULL
+        OR (SELECT COUNT(*) FROM spin_participants WHERE game_id = g.id) < g.participant_limit
+      )
+    ORDER BY g.created_at ASC
+    LIMIT 1;
+END;
+$$;
+
+-- Enroll a user as a spin participant (respects participant_limit)
+CREATE OR REPLACE FUNCTION enroll_spin_participant(
+    p_game_id UUID,
+    p_user_id UUID,
+    p_enrolled_via TEXT DEFAULT 'code'
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_game RECORD;
+    v_current_count BIGINT;
+    v_participant_limit INTEGER;
+    v_result JSON;
+BEGIN
+    -- Get game
+    SELECT sg.*, sg.business_id INTO v_game
+    FROM spin_games sg
+    WHERE sg.id = p_game_id;
+
+    IF NOT FOUND THEN
+        RETURN json_build_object('success', false, 'error', 'Game not found');
+    END IF;
+
+    v_participant_limit := v_game.participant_limit;
+    v_current_count := COALESCE((SELECT COUNT(*) FROM spin_participants WHERE game_id = p_game_id), 0);
+
+    -- Check participant limit
+    IF v_participant_limit IS NOT NULL AND v_current_count >= v_participant_limit THEN
+        RETURN json_build_object(
+            'success', false,
+            'error', 'This game has reached its participant limit',
+            'participant_limit', v_participant_limit,
+            'current_participants', v_current_count
+        );
+    END IF;
+
+    -- Check if already enrolled
+    IF EXISTS (SELECT 1 FROM spin_participants WHERE game_id = p_game_id AND user_id = p_user_id) THEN
+        RETURN json_build_object(
+            'success', true,
+            'message', 'Already enrolled',
+            'game_id', p_game_id,
+            'game_name', v_game.name
+        );
+    END IF;
+
+    -- Enroll the user
+    INSERT INTO spin_participants (game_id, business_id, user_id, enrolled_via)
+    VALUES (p_game_id, v_game.business_id, p_user_id, p_enrolled_via);
+
+    -- Generate ticket number
+    UPDATE spin_participants
+    SET ticket_number = (SELECT COALESCE(MAX(ticket_number), 0) + 1 FROM spin_participants WHERE game_id = p_game_id)
+    WHERE game_id = p_game_id AND user_id = p_user_id;
+
+    RETURN json_build_object(
+        'success', true,
+        'game_id', p_game_id,
+        'game_name', v_game.name,
+        'participant_limit', v_participant_limit,
+        'current_participants', v_current_count + 1,
+        'ticket_number', (SELECT ticket_number FROM spin_participants WHERE game_id = p_game_id AND user_id = p_user_id)
+    );
+END;
+$$;
+
+-- Auto-enroll user into first available spin game for a business
+CREATE OR REPLACE FUNCTION enroll_in_available_spin_game(
+    p_business_id UUID,
+    p_user_id UUID,
+    p_enrolled_via TEXT DEFAULT 'code'
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_available RECORD;
+    v_result JSON;
+BEGIN
+    SELECT * INTO v_available FROM get_available_spin_game(p_business_id);
+
+    IF NOT FOUND THEN
+        RETURN json_build_object(
+            'success', false,
+            'error', 'No available spin games. All games are full or inactive.'
+        );
+    END IF;
+
+    SELECT * INTO v_result FROM enroll_spin_participant(v_available.game_id, p_user_id, p_enrolled_via);
+
+    IF v_result->>'success' = 'false' THEN
+        RETURN v_result;
+    END IF;
+
+    -- Merge with game info
+    RETURN json_build_object(
+        'success', true,
+        'game_id', v_available.game_id,
+        'game_name', v_available.name,
+        'participant_limit', v_available.participant_limit,
+        'current_participants', v_available.current_participants + 1,
+        'ticket_number', v_result->>'ticket_number'
+    );
+END;
+$$;
+
+-- Get game a user is enrolled in
+CREATE OR REPLACE FUNCTION get_user_spin_enrollment(
+    p_user_id UUID,
+    p_business_id UUID
+)
+RETURNS TABLE(
+    game_id UUID,
+    game_name TEXT,
+    ticket_number INTEGER,
+    enrolled_at TIMESTAMPTZ,
+    enrolled_via TEXT,
+    participant_limit INTEGER,
+    current_participants BIGINT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        sp.game_id, g.name as game_name, sp.ticket_number,
+        sp.enrolled_at, sp.enrolled_via,
+        g.participant_limit,
+        COALESCE((SELECT COUNT(*) FROM spin_participants WHERE game_id = sp.game_id), 0)
+    FROM spin_participants sp
+    JOIN spin_games g ON g.id = sp.game_id
+    WHERE sp.user_id = p_user_id
+      AND g.business_id = p_business_id
+    ORDER BY sp.enrolled_at DESC;
+END;
+$$;
+
 -- Get user allocation for a game
 CREATE OR REPLACE FUNCTION get_user_allocation(
     p_user_id UUID,
@@ -529,6 +743,7 @@ DECLARE
     v_allocation RECORD;
     v_game RECORD;
     v_is_active BOOLEAN;
+    v_is_enrolled BOOLEAN;
     v_result JSON;
 BEGIN
     SELECT sg.*, sg.business_id INTO v_game FROM spin_games sg WHERE sg.id = p_game_id;
@@ -541,6 +756,11 @@ BEGIN
     FROM customer_business_activations
     WHERE user_id = p_user_id AND business_id = v_game.business_id
     AND is_active = TRUE AND expires_at > NOW();
+    
+    -- Check spin participant enrollment
+    SELECT TRUE INTO v_is_enrolled
+    FROM spin_participants
+    WHERE game_id = p_game_id AND user_id = p_user_id;
     
     -- Get allocation
     SELECT * INTO v_allocation
@@ -559,12 +779,14 @@ BEGIN
         'free_spins_remaining_week', GREATEST(0, COALESCE(v_game.free_spins_per_week, 0) - COALESCE(v_allocation.spins_used_this_week, 0)),
         'free_spins_remaining_total', GREATEST(0, COALESCE(v_game.free_spins_total, 0) - COALESCE(v_allocation.spins_used_total, 0)),
         'points_required_for_paid', COALESCE(v_game.points_per_paid_spin, 0),
-        'can_spin_free', COALESCE(v_is_active, FALSE) 
-                         AND GREATEST(0, COALESCE(v_game.free_spins_total, 0) - COALESCE(v_allocation.spins_used_total, 0)) > 0
-                         AND GREATEST(0, COALESCE(v_game.free_spins_per_day, 0) - COALESCE(v_allocation.spins_used_today, 0)) > 0
-                         AND GREATEST(0, COALESCE(v_game.free_spins_per_week, 0) - COALESCE(v_allocation.spins_used_this_week, 0)) > 0,
-        'can_spin_paid', COALESCE(v_is_active, FALSE),
-        'is_active', COALESCE(v_is_active, FALSE)
+        'can_spin_free', COALESCE(v_is_enrolled, FALSE)
+                          AND COALESCE(v_is_active, FALSE) 
+                          AND GREATEST(0, COALESCE(v_game.free_spins_total, 0) - COALESCE(v_allocation.spins_used_total, 0)) > 0
+                          AND GREATEST(0, COALESCE(v_game.free_spins_per_day, 0) - COALESCE(v_allocation.spins_used_today, 0)) > 0
+                          AND GREATEST(0, COALESCE(v_game.free_spins_per_week, 0) - COALESCE(v_allocation.spins_used_this_week, 0)) > 0,
+        'can_spin_paid', COALESCE(v_is_enrolled, FALSE) AND COALESCE(v_is_active, FALSE),
+        'is_active', COALESCE(v_is_active, FALSE),
+        'is_enrolled', COALESCE(v_is_enrolled, FALSE)
     ) INTO v_result;
     
     RETURN v_result;
@@ -593,8 +815,8 @@ BEGIN
         g.points_per_paid_spin, g.prize_config,
         g.is_single_prize, g.single_prize_claimed,
         g.theme_color,
-        COALESCE((SELECT COUNT(*)::BIGINT FROM spin_attempts sa WHERE sa.game_id = g.id AND sa.created_at::DATE = CURRENT_DATE), 0),
-        COALESCE((SELECT COUNT(DISTINCT sa.user_id)::BIGINT FROM spin_attempts sa WHERE sa.game_id = g.id), 0)
+         COALESCE((SELECT COUNT(*)::BIGINT FROM spin_attempts sa WHERE sa.game_id = g.id AND sa.created_at::DATE = CURRENT_DATE), 0),
+         COALESCE((SELECT COUNT(DISTINCT sp.user_id)::BIGINT FROM spin_participants sp WHERE sp.game_id = g.id), 0)
     FROM spin_games g
     WHERE g.business_id = p_business_id
     ORDER BY g.is_active DESC, g.created_at DESC;
@@ -655,6 +877,10 @@ GRANT EXECUTE ON FUNCTION get_user_allocation(UUID, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_business_spin_games(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_game_participant_stats(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_game_participants(UUID, INT) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_available_spin_game(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION enroll_spin_participant(UUID, UUID, TEXT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION enroll_in_available_spin_game(UUID, UUID, TEXT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION get_user_spin_enrollment(UUID, UUID) TO authenticated;
 
 -- ============================================
 -- SPIN QUEUE SYSTEM

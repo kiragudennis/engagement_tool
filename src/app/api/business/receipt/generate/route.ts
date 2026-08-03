@@ -36,7 +36,17 @@ const receiptSchema = z.object({
   pointsOverride: z.number().optional(), // If POS wants to set exact points
 
   // Optional - what this code unlocks
-  unlocks: z.enum(["spin", "draw", "spin_draw", "points"]).default("points"),
+  unlocks: z
+    .enum([
+      "points",
+      "spin",
+      "draw",
+      "spin_draw",
+      "trivia",
+      "trivia_draw",
+      "all",
+    ])
+    .default("points"),
 
   // Optional - print preferences
   printReceipt: z.boolean().default(false),
@@ -248,7 +258,7 @@ export async function POST(req: NextRequest) {
       receipt: {
         ...receipt,
         // Additional info for the POS
-        engagement_url: `engagespin.com/code-entry?code=${(receipt as any).code}`,
+        engagement_url: `engagespin.com/${business.slug}/code-entry?code=${(receipt as any).code}`,
         business_url: `engagespin.com/${business.slug}`,
         activation_days: business.activation_duration_days || 30,
       },

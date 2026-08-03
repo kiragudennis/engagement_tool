@@ -27,6 +27,7 @@ export default function BusinessSpinLanding() {
   const [games, setGames] = useState<SpinGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [userActivated, setUserActivated] = useState<boolean | null>(null);
+  const [enrolledGameId, setEnrolledGameId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!businessSlug || !supabase) return;
@@ -44,6 +45,19 @@ export default function BusinessSpinLanding() {
           .maybeSingle();
 
         setUserActivated(activation?.is_active || false);
+
+        // Check which game the user is enrolled in
+        const { data: enrollment } = await supabase
+          .from("spin_participants")
+          .select("game_id")
+          .eq("user_id", profile.id)
+          .eq("business_id", business?.id)
+          .order("enrolled_at", { ascending: false })
+          .maybeSingle();
+
+        if (enrollment?.game_id) {
+          setEnrolledGameId(enrollment.game_id);
+        }
       }
 
       // Load available spin games for this business
@@ -56,13 +70,7 @@ export default function BusinessSpinLanding() {
 
       if (error) throw error;
 
-      // Filter games by participant limit
-      const availableGames = (gamesData || []).filter((game) => {
-        if (game.participant_limit === null) return true;
-        return true; // Will show participant count on each card
-      });
-
-      setGames(availableGames);
+      setGames(gamesData || []);
     } catch (err: any) {
       console.error("Error loading games:", err);
       toast.error("Failed to load spin games");
@@ -77,7 +85,7 @@ export default function BusinessSpinLanding() {
 
   const getParticipantCount = async (gameId: string) => {
     const { count } = await supabase
-      .from("spin_attempts")
+      .from("spin_participants")
       .select("*", { count: "exact", head: true })
       .eq("game_id", gameId);
     return count || 0;
@@ -137,13 +145,14 @@ export default function BusinessSpinLanding() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {games.map((game) => (
-              <GameCard
-                key={game.id}
-                game={game}
-                businessSlug={businessSlug}
-                userActivated={userActivated}
-              />
+             {games.map((game) => (
+               <GameCard
+                 key={game.id}
+                 game={game}
+                 businessSlug={businessSlug}
+                 userActivated={userActivated}
+                 enrolledGameId={enrolledGameId}
+               />
             ))}
           </div>
         )}
@@ -156,10 +165,12 @@ function GameCard({
   game,
   businessSlug,
   userActivated,
+  enrolledGameId,
 }: {
   game: SpinGame;
   businessSlug?: string;
   userActivated: boolean | null;
+  enrolledGameId: string | null;
 }) {
   const [participantCount, setParticipantCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -242,6 +253,13 @@ function GameCard({
           </Badge>
         )}
 
+        {enrolledGameId === game.id && userActivated && (
+          <Badge className="w-full justify-center bg-green-500/20 text-green-400 border-0">
+            <CheckCircle2 className="h-3 w-3 mr-1" />
+            Your Game
+          </Badge>
+        )}
+
         <Button
           asChild
           className="w-full"
@@ -256,10 +274,15 @@ function GameCard({
               <Clock className="h-4 w-4" />
               Game Full
             </span>
+          ) : enrolledGameId === game.id && userActivated ? (
+            <Link href={`/${businessSlug}/spin/${game.id}`}>
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Spin Now
+            </Link>
           ) : (
             <Link href={`/${businessSlug}/spin/${game.id}`}>
               <RotateCcw className="h-4 w-4 mr-2" />
-              {userActivated === false ? "Activate Code First" : "Spin Now"}
+              {userActivated === false ? "Activate Code First" : "View Game"}
             </Link>
           )}
         </Button>

@@ -138,6 +138,24 @@ const UNLOCKS_OPTIONS = [
     description: "Only enter prize draws",
     icon: Trophy,
   },
+  {
+    value: "trivia",
+    label: "Trivia Only",
+    description: "Only enter prize trivia",
+    icon: Trophy,
+  },
+  {
+    value: "trivia_draw",
+    label: "Trivia + Draw",
+    description: "Trivia + auto enter draws",
+    icon: Trophy,
+  },
+  {
+    value: "all",
+    label: "Points + Spin + Draw + Trivia",
+    description: "Auto enter all",
+    icon: Trophy,
+  },
 ];
 
 // ─── Main Component ─────────────────────────────────────
@@ -156,11 +174,9 @@ export default function CodeManagementPage() {
 
   // Dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showBulkDialog, setShowBulkDialog] = useState(false);
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [selectedQRCode, setSelectedQRCode] = useState<any>(null);
   const [creating, setCreating] = useState(false);
-  const [bulkCodes, setBulkCodes] = useState<string[]>([]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -262,44 +278,6 @@ export default function CodeManagementPage() {
     }
   };
 
-  // ─── Create Bulk Codes ────────────────────────────────
-  const handleCreateBulkCodes = async () => {
-    if (!business) return;
-
-    const check = canCreateCode(codes.length);
-    if (!check.allowed) {
-      toast.error(check.reason);
-      return;
-    }
-
-    setCreating(true);
-    try {
-      const res = await fetch("/api/business/codes/bulk-create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          slug: businessSlug,
-          count: bulkCount,
-          unlocks: formData.unlocks,
-          label: formData.label || undefined,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to generate codes");
-
-      setBulkCodes(data.codes || []);
-      toast.success(`${data.count || bulkCount} codes generated!`);
-      loadData();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to generate codes");
-    } finally {
-      setCreating(false);
-    }
-  };
-
   // ─── Toggle / Delete ──────────────────────────────────
   const toggleCodeStatus = async (code: any) => {
     await supabase
@@ -394,17 +372,6 @@ export default function CodeManagementPage() {
                 <Link href={`/admin/${businessSlug}/stickers`}>
                   <Printer className="h-4 w-4" /> Sticker Generator
                 </Link>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1 border-white/10"
-                onClick={() => {
-                  resetForm();
-                  setShowBulkDialog(true);
-                }}
-              >
-                <Zap className="h-4 w-4" /> Bulk
               </Button>
               <Button
                 size="sm"
@@ -833,111 +800,6 @@ export default function CodeManagementPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Generate Dialog */}
-      <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
-        <DialogContent className="max-w-md bg-gray-900 border-white/10">
-          <DialogHeader>
-            <DialogTitle className="text-white">
-              Generate Bulk Codes
-            </DialogTitle>
-            <DialogDescription className="text-white/50">
-              Create multiple codes at once
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label className="text-white">Number of Codes</Label>
-              <Input
-                type="number"
-                value={bulkCount}
-                onChange={(e) => setBulkCount(parseInt(e.target.value) || 10)}
-                className="bg-white/5 border-white/10 text-white"
-                min={1}
-                max={500}
-              />
-            </div>
-            <div>
-              <Label className="text-white">Unlocks</Label>
-              <Select
-                value={formData.unlocks}
-                onValueChange={(v) =>
-                  setFormData((p) => ({ ...p, unlocks: v }))
-                }
-              >
-                <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {UNLOCKS_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      <div className="flex items-center gap-2">
-                        <opt.icon className="h-4 w-4" />
-                        {opt.label}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {bulkCodes.length > 0 && (
-              <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 max-h-40 overflow-y-auto">
-                <p className="text-green-400 text-sm font-medium mb-2">
-                  {bulkCodes.length} codes generated
-                </p>
-                {bulkCodes.slice(0, 10).map((c, i) => (
-                  <code
-                    key={i}
-                    className="block text-xs text-green-300 font-mono"
-                  >
-                    {c}
-                  </code>
-                ))}
-                {bulkCodes.length > 10 && (
-                  <p className="text-xs text-green-400/50 mt-1">
-                    ...and {bulkCodes.length - 10} more
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-          <DialogFooter className="flex flex-col gap-2">
-            {bulkCodes.length > 0 && (
-              <Button
-                variant="outline"
-                onClick={() => exportCodes(bulkCodes)}
-                className="border-white/10 w-full"
-              >
-                <Download className="h-4 w-4 mr-2" /> Export CSV
-              </Button>
-            )}
-            <div className="flex gap-2 w-full">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowBulkDialog(false);
-                  setBulkCodes([]);
-                }}
-                className="border-white/10 flex-1"
-              >
-                Close
-              </Button>
-              <Button
-                onClick={handleCreateBulkCodes}
-                disabled={creating}
-                className="flex-1"
-                style={{ backgroundColor: brandColor }}
-              >
-                {creating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  "Generate"
-                )}
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* QR Dialog */}
       <Dialog open={showQRDialog} onOpenChange={setShowQRDialog}>
         <DialogHeader>
@@ -961,7 +823,7 @@ export default function CodeManagementPage() {
               <Button
                 onClick={() => {
                   navigator.clipboard.writeText(
-                    `engagespin.com/spin?code=${selectedQRCode.code}`,
+                    `engagespin.com/${businessSlug}/code-entry?code=${selectedQRCode.code}`,
                   );
                   toast.success("URL copied!");
                 }}

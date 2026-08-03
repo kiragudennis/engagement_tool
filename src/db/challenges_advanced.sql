@@ -36,6 +36,9 @@ CREATE TABLE IF NOT EXISTS challenges (
     
     participation_points INTEGER DEFAULT 0,
     
+    -- Participant limit for capacity management
+    max_participants INTEGER,
+    
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     created_by UUID REFERENCES users(id)
@@ -220,6 +223,7 @@ CREATE TABLE IF NOT EXISTS challenge_live_ticker (
 -- Indexes
 -- ============================================
 CREATE INDEX IF NOT EXISTS idx_challenges_business ON challenges(business_id, status);
+CREATE INDEX IF NOT EXISTS idx_challanges_max_participants ON challenges(max_participants);
 CREATE INDEX IF NOT EXISTS idx_challenge_participants_challenge ON challenge_participants(challenge_id, current_score DESC);
 CREATE INDEX IF NOT EXISTS idx_challenge_participants_ticket ON challenge_participants(challenge_id, ticket_number);
 CREATE INDEX IF NOT EXISTS idx_challenge_participants_business ON challenge_participants(business_id, joined_via_spin);

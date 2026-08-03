@@ -97,6 +97,36 @@ This is the single source of truth for what is completed, what remains, and how 
 - Viewers on the internal live page hear the stream with <2s latency.
 - External streams continue to work without audio.
 
+### 2.5 Spin Participant Enrollment & Auto-Game Selection
+
+**Status: COMPLETED** — Spin games now use a dedicated `spin_participants` table for enrollment tracking with participant limits and auto-selection.
+
+**What was implemented:**
+
+1. Created `spin_participants` table (`src/db/spinning_wheel_advanced.sql`) — tracks enrollment per game/user with ticket numbers, enrollment source, and eligibility flags. Mirrors the `challenge_participants` pattern used by trivia.
+2. Added `max_participants` column to `challenges` table (`src/db/challenges_advanced.sql`) — was referenced in code but never defined.
+3. Added `participant_limit` column to `draws` table (`src/db/draws_advanced.sql`) — for draw capacity management.
+4. Created `enroll_spin_participant()` function — enrolls a user into a specific spin game, respecting `participant_limit`. Returns enrollment result JSON with ticket number.
+5. Created `enroll_in_available_spin_game()` function — finds the first available spin game with capacity (auto-selection) and enrolls the user. Returns `all_spins_full` if all games are full.
+6. Created `get_user_spin_enrollment()` function — queries which game a user is enrolled in for the spin landing page.
+7. Updated `redeem_access_code()` (`src/db/engagement_tool.sql`) — when code unlocks spin, automatically enrolls user into first available game. Returns `spin_enrolled`, `spin_game_id`, `spin_game_name`, `spin_ticket_number`, `all_spins_full` fields. Updated underutilized participant-limit check to use `spin_participants` table. **Also improved**: trivia enrollment now loops through open challenges to find one with capacity (NULL `max_participants` = unlimited); draw enrollment now loops through open draws checking `participant_limit` + `max_entries_total`, linked draws take priority.
+8. Updated `perform_spin()` — now checks `spin_participants` table for participant limit (instead of `spin_attempts`) and **requires enrollment** before allowing any spins.
+9. Updated `get_user_allocation()` — added `is_enrolled` field; `can_spin_free`/`can_spin_paid` now require spin participant enrollment.
+10. Updated `get_business_spin_games()` — participant count now uses `spin_participants` table.
+11. Updated spin landing page (`src/app/(public)/[businessSlug]/spin/page.tsx`) — shows enrolled game badge ("Your Game"), uses `spin_participants` table for participant counts, displays enrollment status on game cards.
+12. Updated API endpoint (`src/app/api/public/spin-participants/route.ts`) — counts from `spin_participants` table.
+13. Updated `src/app/(public)/docs/page.tsx` — documents spin participant enrollment, auto-selection, and capacity management.
+
+**Acceptance criteria met:**
+
+- Code redemption enrolls users into first available spin game with capacity.
+- Users cannot spin without being enrolled as a participant.
+- Full games are skipped; if all games are full, `all_spins_full` is returned.
+- Spin landing page shows which game the customer is enrolled in.
+- Trivia and draws now have `max_participants`/`participant_limit` fields.
+- Trivia enrollment loops through open challenges to find one with capacity (NULL = unlimited).
+- Draw enrollment loops through open draws checking `participant_limit` and `max_entries_total`; linked draws take priority.
+
 ### 2.3 Trivia — Photo / Image Questions
 
 **Status: COMPLETED**
@@ -214,7 +244,8 @@ This is the single source of truth for what is completed, what remains, and how 
 4. **2.1** Spin strength — single column + UI change.
 5. ~~**2.3** Trivia photos~~ **COMPLETED** — schema + two-page UI change + ImageUpload integration.
 6. ~~**2.2** WebRTC audio — signaling flow via Socket.IO server, host controls + viewer playback.~~ **COMPLETED** — WebRTC signaling in `socket-server/src/index.ts`, `useWebRTC` hook, `AudioBroadcastControls`, `AudioPlayer`, integrated into spin/trivia/draw live pages, docs updated.
-7. ~~**2.4** Customer profile & verification — largest item; do last.~~ **COMPLETED**
+7. ~~**2.5** Spin participant enrollment — `spin_participants` table, auto-game selection, enrollment enforcement.~~ **COMPLETED** — table + 3 SQL functions, `redeem_access_code`/`perform_spin`/`get_user_allocation`/`get_business_spin_games` updated, spin landing page + API updated.
+8. ~~**2.4** Customer profile & verification — largest item; do last.~~ **COMPLETED**
 
 ---
 
@@ -223,7 +254,10 @@ This is the single source of truth for what is completed, what remains, and how 
 | File                                 | Tables / Functions to touch                                                                                                                        |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/db/engagement_tool.sql`         | `redeem_access_code` — enforce `max_spins_per_activation`, `points_per_redemption`, `require_activation`; `businesses` — add `points_value` column |
-| `src/db/spinning_wheel_advanced.sql` | `spin_games` — add `strength` / `spin_duration_seconds`; enforce in `perform_spin`                                                                 |
+| `src/db/spinning_wheel_advanced.sql` | `spin_games` — add `strength` / `spin_duration_seconds`; enforce in `perform_spin`; `spin_participants` table; `enroll_spin_participant`, `enroll_in_available_spin_game`, `get_user_spin_enrollment` functions; update `get_user_allocation` and `get_business_spin_games` |
+| `src/db/challenges_advanced.sql`         | `challenges` — add `max_participants` column (was referenced but missing)                                                                                           |
+| `src/db/draws_advanced.sql`              | `draws` — add `participant_limit` column for draw capacity management                                                                                               |
+| `src/db/engagement_tool.sql`             | `redeem_access_code` — auto-enroll in spin games via `enroll_in_available_spin_game`, return enrollment info; loop-based trivia enrollment (finds first open challenge with capacity); loop-based draw enrollment (checks `participant_limit` + `max_entries_total`, linked draws take priority); update participant-limit check to use `spin_participants`   |
 | `src/db/engagements_migration.sql`   | Already contains carry-over + viewer prize changes                                                                                                 |
 | `src/db/loyalty_points.sql`          | `get_customer_all_points()` — returns all businesses with points (active + inactive), includes `points_value`                                      |
 | `src/db/customer_verification.sql`   | `flag_user_account()`, `verify_user_identity()`, `get_customer_verification_summary()` — new functions for verification                            |
@@ -248,6 +282,7 @@ This is the single source of truth for what is completed, what remains, and how 
 | max_spins/points wiring       | `src/db/engagement_tool.sql` (`redeem_access_code`, `perform_spin`)                                                                                                  |
 | Unlock validation             | `src/app/api/customer/validate-code/route.ts`, `src/app/api/customer/code-lookup/route.ts`                                                                           |
 | Socket.IO signaling server   | `socket-server/src/index.ts` — `webrtc:join/offer/answer/ice-candidate/leave/peer-left/peer-joined/existing-peers` handlers, `peerRooms` tracking, `broadcastWebRTCEvent` |
+| Spin participant enrollment  | `redeem_access_code` + `perform_spin` + `get_user_allocation` + `get_business_spin_games` in `src/db/*.sql`, `spin_participants` table, `enroll_spin_participant/enroll_in_available_spin_game/get_user_spin_enrollment` functions |
 
 ## 7. New Files Created
 
@@ -262,6 +297,10 @@ This is the single source of truth for what is completed, what remains, and how 
 | `src/lib/socket/useWebRTC.ts`                           | WebRTC hook: manages RTCPeerConnection lifecycle, takes socket as param      |
 | `src/components/webrtc/AudioBroadcastControls.tsx`      | Host-side audio controls (start mic, mute, viewer count)                     |
 | `src/components/webrtc/AudioPlayer.tsx`                 | Viewer-side audio playback (hidden audio, mute toggle)                     |
+
+**Modified files (spin participant enrollment):**
+- `src/app/api/public/spin-participants/route.ts` — counts from `spin_participants` instead of `spin_attempts`
+- `src/app/(public)/[businessSlug]/spin/page.tsx` — shows enrolled game badge, uses `spin_participants` for counts
 
 ## 8. Files Removed
 

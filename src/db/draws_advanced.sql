@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS draws (
     -- Entry limits
     max_entries_total INTEGER,
     max_entries_per_user INTEGER,
+    participant_limit INTEGER,  -- Hard cap on unique participants
     
     -- Timing
     entry_starts_at TIMESTAMPTZ NOT NULL,
@@ -131,6 +132,7 @@ CREATE TABLE IF NOT EXISTS draw_claim_tokens (
 -- ============================================
 CREATE INDEX IF NOT EXISTS idx_draws_business ON draws(business_id, status);
 CREATE INDEX IF NOT EXISTS idx_draws_status_dates ON draws(status, entry_starts_at, entry_ends_at);
+CREATE INDEX IF NOT EXISTS idx_draws_participant_limit ON draws(participant_limit);
 CREATE INDEX IF NOT EXISTS idx_draw_entries_draw ON draw_entries(draw_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_draw_entries_business ON draw_entries(business_id, draw_id);
 CREATE INDEX IF NOT EXISTS idx_draw_tickets_draw ON draw_tickets(draw_id, is_winner);

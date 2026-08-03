@@ -12,8 +12,16 @@ const createCodeSchema = z.object({
     .default("public"),
   label: z.string().optional(),
   unlocks: z
-    .enum(["spin", "trivia", "draw", "spin_draw", "trivia_draw", "all"])
-    .default("spin"),
+    .enum([
+      "points",
+      "spin",
+      "trivia",
+      "draw",
+      "spin_draw",
+      "trivia_draw",
+      "all",
+    ])
+    .default("points"),
   tier: z.enum(["standard", "bronze", "silver", "gold", "diamond"]).optional(),
   point_value: z.number().positive().optional(),
   max_uses: z.number().positive().optional(),
@@ -55,11 +63,11 @@ export async function POST(req: NextRequest) {
       tier,
       point_value,
       max_uses,
-    max_uses_per_user,
-    valid_from,
-    valid_until,
-    require_activation,
-  } = parsed.data;
+      max_uses_per_user,
+      valid_from,
+      valid_until,
+      require_activation,
+    } = parsed.data;
 
     // Get business
     const { data: business } = await supabaseAdmin
@@ -118,7 +126,14 @@ export async function POST(req: NextRequest) {
         .from("access_codes")
         .select("*", { count: "exact", head: true })
         .eq("business_id", business.id)
-        .eq("type", type === "sticker" || type === "qr" ? type : type === "public" ? "public" : type);
+        .eq(
+          "type",
+          type === "sticker" || type === "qr"
+            ? type
+            : type === "public"
+              ? "public"
+              : type,
+        );
 
       if ((existingCount || 0) >= effectiveLimit) {
         const limitName =
@@ -130,7 +145,9 @@ export async function POST(req: NextRequest) {
                 ? "QR codes"
                 : "access codes";
         return NextResponse.json(
-          { error: `Plan limit reached. You can only create ${effectiveLimit} ${limitName}.` },
+          {
+            error: `Plan limit reached. You can only create ${effectiveLimit} ${limitName}.`,
+          },
           { status: 403 },
         );
       }
@@ -154,11 +171,11 @@ export async function POST(req: NextRequest) {
         p_code_subtype: codeSubtype,
         p_tier: tier || "standard",
         p_points_earned: point_value || null,
-         p_unlocks: unlocks,
-         p_source: "dashboard",
-         p_created_by: user.id,
-         p_require_activation: require_activation,
-       },
+        p_unlocks: unlocks,
+        p_source: "dashboard",
+        p_created_by: user.id,
+        p_require_activation: require_activation,
+      },
     );
 
     if (codeError || !result) {

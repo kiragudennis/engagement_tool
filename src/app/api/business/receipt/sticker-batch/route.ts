@@ -13,7 +13,15 @@ const stickerBatchSchema = z.object({
       percentage: z.number(),
       points: z.number().positive(),
       unlocks: z
-        .enum(["points", "spin", "spin_draw", "draw"])
+        .enum([
+          "points",
+          "spin",
+          "draw",
+          "spin_draw",
+          "trivia",
+          "trivia_draw",
+          "all",
+        ])
         .default("points"),
       count: z.number(),
     }),

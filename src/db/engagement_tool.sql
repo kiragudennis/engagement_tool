@@ -487,7 +487,14 @@ DECLARE
     v_trivia_ticket_count INTEGER;
     v_trivia_limit INTEGER;
     v_trivia_result JSON;
-    v_period_count INTEGER;
+    v_spin_enrolled BOOLEAN := FALSE;
+    v_spin_game_id TEXT := NULL;
+    v_spin_game_name TEXT := NULL;
+    v_spin_ticket_number INTEGER;
+    v_spin_all_full BOOLEAN := FALSE;
+    v_spin_result JSON;
+    v_draw_participant_count INTEGER;
+    v_draw_entry_count INTEGER;
 BEGIN
     -- Find and validate code
     SELECT * INTO v_code
@@ -616,78 +623,124 @@ BEGIN
     
     -- ─── AUTO-ENTER DRAWS ───────────────────────────────
     -- Only if code unlocks draws
-    IF v_code.unlocks IN ('draw', 'spin_draw', 'all') THEN
-        -- Try linked draw first, then any open draw
-        SELECT d.id, d.name, d.prize_name, d.entry_ends_at INTO v_draw
-        FROM draws d
-        WHERE d.access_code_id = v_code.id 
-          AND d.status = 'open'
-          AND d.entry_starts_at <= NOW() 
-          AND d.entry_ends_at >= NOW()
-        LIMIT 1;
-        
-        IF NOT FOUND THEN
-            SELECT d.id, d.name, d.prize_name, d.entry_ends_at INTO v_draw
+    IF v_code.unlocks IN ('draw', 'spin_draw', 'trivia_draw', 'all') THEN
+        -- Try linked draw first, then any open draw with capacity
+        -- Loop through draws to find one the user can enter
+        FOR v_draw IN
+            SELECT d.id, d.name, d.prize_name, d.entry_ends_at,
+                   d.participant_limit, d.max_entries_total
             FROM draws d
-            WHERE d.business_id = v_code.business_id 
+            WHERE d.business_id = v_code.business_id
               AND d.status = 'open'
-              AND d.entry_starts_at <= NOW() 
+              AND d.entry_starts_at <= NOW()
               AND d.entry_ends_at >= NOW()
-            ORDER BY d.entry_ends_at ASC 
-            LIMIT 1;
-        END IF;
-        
-        IF FOUND AND NOT EXISTS (
-            SELECT 1 FROM draw_entries WHERE draw_id = v_draw.id AND user_id = p_user_id
-        ) THEN
+            ORDER BY CASE WHEN d.access_code_id = v_code.id THEN 0 ELSE 1 END,
+                     d.entry_ends_at ASC
+        LOOP
+            -- Check if user already entered this draw
+            IF EXISTS (
+                SELECT 1 FROM draw_entries WHERE draw_id = v_draw.id AND user_id = p_user_id
+            ) THEN
+                CONTINUE;
+            END IF;
+
+            -- Check participant_limit (unique participant cap)
+            IF v_draw.participant_limit IS NOT NULL THEN
+                SELECT COUNT(DISTINCT user_id) INTO v_draw_participant_count
+                FROM draw_entries WHERE draw_id = v_draw.id;
+                IF v_draw_participant_count >= v_draw.participant_limit THEN
+                    CONTINUE;  -- draw is full, try next
+                END IF;
+            END IF;
+
+            -- Check max_entries_total
+            IF v_draw.max_entries_total IS NOT NULL THEN
+                SELECT COUNT(*) INTO v_draw_entry_count
+                FROM draw_entries WHERE draw_id = v_draw.id;
+                IF v_draw_entry_count >= v_draw.max_entries_total THEN
+                    CONTINUE;  -- draw is full, try next
+                END IF;
+            END IF;
+
+            -- Enroll user in this draw
             INSERT INTO draw_entries (draw_id, user_id, entry_count, entry_method, source_id, metadata)
             VALUES (v_draw.id, p_user_id, COALESCE(v_code.max_uses_per_user, 1), 'code', v_code.id::TEXT,
                 jsonb_build_object('code', v_code.code, 'code_type', v_code.type, 'entered_at', NOW()));
-            
+
             FOR i IN 1..COALESCE(v_code.max_uses_per_user, 1) LOOP
                 INSERT INTO draw_tickets (draw_id, user_id, ticket_number) VALUES (v_draw.id, p_user_id, i);
             END LOOP;
-            
+
             INSERT INTO draw_live_ticker (draw_id, user_name, entry_count, entry_method)
             SELECT v_draw.id, COALESCE(u.full_name, 'Customer'), COALESCE(v_code.max_uses_per_user, 1), 'code'
             FROM users u WHERE u.id = p_user_id;
-            
+
             v_draw_entered := TRUE;
             v_draw_name := v_draw.name;
             v_draw_prize := v_draw.prize_name;
             v_draw_ends_at := v_draw.entry_ends_at;
-        END IF;
+            EXIT;  -- found a draw, done
+        END LOOP;
     END IF;
 
     -- ─── DIRECT TRIVIA TICKET REDEMPTION ─────────────────
     -- When code unlocks trivia directly (not just via spin prize),
-    -- add the user as a trivia participant immediately
+    -- add the user as a trivia participant immediately.
+    -- Loops through open challenges to find one with capacity.
     IF v_code.unlocks IN ('trivia', 'trivia_draw', 'all') THEN
-        -- Find an open trivia challenge for this business
-        SELECT c.id, c.name, c.max_participants INTO v_trivia
-        FROM challenges c
-        WHERE c.business_id = v_business.id
-          AND c.status = 'open'
-          AND (c.ends_at IS NULL OR c.ends_at >= NOW())
-        LIMIT 1;
-
-        IF FOUND THEN
+        FOR v_trivia IN
+            SELECT c.id, c.name, c.max_participants
+            FROM challenges c
+            WHERE c.business_id = v_business.id
+              AND c.status = 'open'
+              AND (c.ends_at IS NULL OR c.ends_at >= NOW())
+            ORDER BY c.created_at ASC
+        LOOP
             -- Check if challenge has a participant limit
             v_trivia_limit := v_trivia.max_participants;
             SELECT COUNT(*) INTO v_trivia_ticket_count
             FROM challenge_participants
             WHERE challenge_id = v_trivia.id;
 
-            IF v_trivia_limit IS NULL OR v_trivia_ticket_count < v_trivia_limit THEN
-                -- Check if already participating
-                IF NOT EXISTS (
-                    SELECT 1 FROM challenge_participants
-                    WHERE challenge_id = v_trivia.id AND user_id = p_user_id
-                ) THEN
-                    PERFORM add_trivia_participant_from_spin(v_trivia.id, p_user_id, NULL);
-                    v_trivia_result := json_build_object('success', true, 'challenge_id', v_trivia.id);
-                END IF;
+            -- Skip if challenge is full (NULL limit = unlimited)
+            IF v_trivia_limit IS NOT NULL AND v_trivia_ticket_count >= v_trivia_limit THEN
+                CONTINUE;
             END IF;
+
+            -- Check if already participating
+            IF NOT EXISTS (
+                SELECT 1 FROM challenge_participants
+                WHERE challenge_id = v_trivia.id AND user_id = p_user_id
+            ) THEN
+                PERFORM add_trivia_participant_from_spin(v_trivia.id, p_user_id, NULL);
+                v_trivia_result := json_build_object('success', true, 'challenge_id', v_trivia.id);
+                EXIT;  -- enrolled, done
+            ELSE
+                -- Already participating in this challenge
+                v_trivia_result := json_build_object('success', true, 'challenge_id', v_trivia.id);
+                EXIT;
+            END IF;
+        END LOOP;
+    END IF;
+
+    -- ─── ENROLL IN SPIN GAME ──────────────────────────────
+    -- When code unlocks spin, enroll user into first available spin game
+    -- that still has capacity. If participant_limit is NULL (no limit set),
+    -- the game accepts unlimited participants and enrollment is automatic.
+    -- If all games with limits are full, v_spin_all_full is set to TRUE.
+    -- This replaces the old "check if games are full" only-awareness check.
+    IF v_code.unlocks IN ('spin', 'spin_draw', 'all') THEN
+        SELECT * INTO v_spin_result FROM enroll_in_available_spin_game(
+            v_business.id, p_user_id, 'code'
+        );
+
+        IF v_spin_result->>'success' = 'true' THEN
+            v_spin_enrolled := TRUE;
+            v_spin_game_id := v_spin_result->>'game_id';
+            v_spin_game_name := v_spin_result->>'game_name';
+            v_spin_ticket_number := (v_spin_result->>'ticket_number')::INTEGER;
+        ELSIF v_spin_result->>'error' LIKE '%No available spin games%' THEN
+            v_spin_all_full := TRUE;
         END IF;
     END IF;
 
@@ -696,7 +749,7 @@ BEGIN
 
     -- ─── REDIRECT ───────────────────────────────────────
     -- points → business page (loyalty points only)
-    -- spin → spin page
+    -- spin → spin page (or specific game if enrolled)
     -- spin_draw → spin page (draw entry already handled above)
     -- draw → draw page
     -- trivia → trivia page (if trivia was directly redeemed)
@@ -705,17 +758,11 @@ BEGIN
         v_redirect_url := '/' || v_business.slug || '/trivia/' || (v_trivia_result->>'challenge_id');
     ELSIF v_code.unlocks = 'points' THEN
         v_redirect_url := '/' || v_business.slug || '/code-entry?redeemed=true';
+    ELSIF v_spin_enrolled THEN
+        v_redirect_url := '/' || v_business.slug || '/spin/' || v_spin_game_id;
     ELSE
         v_redirect_url := '/' || v_business.slug || '/spin';
     END IF;
-
-    -- Check if any spin games have reached participant limits (for UI awareness)
-    SELECT COUNT(*) INTO v_period_count
-    FROM spin_games sg
-    WHERE sg.business_id = v_business.id
-      AND sg.is_active = true
-      AND sg.participant_limit IS NOT NULL
-      AND (SELECT COUNT(DISTINCT user_id) FROM spin_attempts WHERE game_id = sg.id) >= sg.participant_limit;
 
     RETURN json_build_object(
         'success', true,
@@ -738,7 +785,11 @@ BEGIN
         'trivia_entered', v_trivia_result IS NOT NULL,
         'trivia_available', v_trivia_result IS NOT NULL,
         'trivia_challenge_id', v_trivia_result->>'challenge_id',
-        'all_spins_full', v_period_count > 0
+        'spin_enrolled', v_spin_enrolled,
+        'spin_game_id', v_spin_game_id,
+        'spin_game_name', v_spin_game_name,
+        'spin_ticket_number', v_spin_ticket_number,
+        'all_spins_full', v_spin_all_full
     );
 END;
 $$;

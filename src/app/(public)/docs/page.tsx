@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   CreditCard,
   Bell,
+  Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -55,7 +56,7 @@ export default function DocsPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-950 to-slate-950">
       {/* Hero - Full width with inner container */}
       <div className="w-full border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-16 text-center">
           <Badge className="mb-4 bg-purple-500/20 text-purple-300 border-0">
             Documentation
           </Badge>
@@ -72,7 +73,7 @@ export default function DocsPage() {
 
       {/* Content - Full width with inner container */}
       <div className="w-full">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-12">
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Sidebar Navigation - Hidden on mobile, shown on desktop */}
             <nav className="hidden lg:block w-56 flex-shrink-0">
@@ -168,7 +169,7 @@ export default function DocsPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 not-prose">
                     <Card className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20">
-                      <CardContent className="p-6">
+                      <CardContent>
                         <div className="flex items-center gap-2 mb-3">
                           <Printer className="h-5 w-5 text-purple-400" />
                           <Badge className="bg-purple-500/20 text-purple-400 border-0">
@@ -202,7 +203,7 @@ export default function DocsPage() {
                     </Card>
 
                     <Card className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-blue-500/20">
-                      <CardContent className="p-6">
+                      <CardContent>
                         <div className="flex items-center gap-2 mb-3">
                           <ShoppingBag className="h-5 w-5 text-blue-400" />
                           <Badge className="bg-blue-500/20 text-blue-400 border-0">
@@ -295,7 +296,7 @@ export default function DocsPage() {
                 </h2>
                 <div className="space-y-6">
                   <Card className="bg-white/5 border-white/10">
-                    <CardContent className="p-6 space-y-4">
+                    <CardContent className="space-y-4">
                       <h3 className="text-white font-semibold text-lg">
                         How Engage Protects Your Business
                       </h3>
@@ -398,7 +399,7 @@ export default function DocsPage() {
                   </Card>
 
                   <Card className="bg-white/5 border-white/10">
-                    <CardContent className="p-6 space-y-4">
+                    <CardContent className="space-y-4">
                       <h3 className="text-white font-semibold text-lg">
                         Flagged Accounts
                       </h3>
@@ -429,7 +430,7 @@ export default function DocsPage() {
                   </Card>
 
                   <Card className="bg-white/5 border-white/10">
-                    <CardContent className="p-6 space-y-4">
+                    <CardContent className="space-y-4">
                       <h3 className="text-white font-semibold text-lg">
                         Using Truecaller for Quick Verification
                       </h3>
@@ -482,7 +483,7 @@ export default function DocsPage() {
                 </h2>
                 <div className="space-y-6">
                   <Card className="bg-white/5 border-white/10">
-                    <CardContent className="p-6 space-y-4">
+                    <CardContent className="space-y-4">
                       <h3 className="text-white font-semibold text-lg">
                         Your Engagement Summary
                       </h3>
@@ -530,7 +531,7 @@ export default function DocsPage() {
                   </Card>
 
                   <Card className="bg-white/5 border-white/10">
-                    <CardContent className="p-6 space-y-4">
+                    <CardContent className="space-y-4">
                       <h3 className="text-white font-semibold text-lg">
                         How to Redeem / Withdraw Points
                       </h3>
@@ -567,7 +568,7 @@ export default function DocsPage() {
                   </Card>
 
                   <Card className="bg-white/5 border-white/10">
-                    <CardContent className="p-6 space-y-4">
+                    <CardContent className="space-y-4">
                       <h3 className="text-white font-semibold text-lg">
                         Point Value
                       </h3>
@@ -601,7 +602,7 @@ export default function DocsPage() {
                 </h2>
                 <div className="space-y-6">
                   <Card className="bg-white/5 border-white/10">
-                    <CardContent className="p-6 space-y-4">
+                    <CardContent className="space-y-4">
                       <h3 className="text-white font-semibold text-lg">
                         How Notifications Work
                       </h3>
@@ -636,7 +637,7 @@ export default function DocsPage() {
                   </Card>
 
                   <Card className="bg-white/5 border-white/10">
-                    <CardContent className="p-6 space-y-4">
+                    <CardContent className="space-y-4">
                       <h3 className="text-white font-semibold text-lg">
                         Business-Specific Notifications
                       </h3>
@@ -659,7 +660,7 @@ export default function DocsPage() {
                   </Card>
 
                   <Card className="bg-white/5 border-white/10">
-                    <CardContent className="p-6 space-y-4">
+                    <CardContent className="space-y-4">
                       <h3 className="text-white font-semibold text-lg">
                         Notification Types
                       </h3>
@@ -719,7 +720,7 @@ export default function DocsPage() {
 
                 <div className="space-y-6">
                   <Card className="bg-white/5 border-white/10">
-                    <CardContent className="p-6">
+                    <CardContent>
                       <h3 className="text-white font-semibold mb-4">
                         Code Types
                       </h3>
@@ -846,7 +847,7 @@ export default function DocsPage() {
                   </Card>
 
                   <Card className="bg-white/5 border-white/10">
-                    <CardContent className="p-6">
+                    <CardContent>
                       <h3 className="text-white font-semibold mb-4">
                         Activation System
                       </h3>
@@ -888,7 +889,7 @@ export default function DocsPage() {
                             not require activation
                           </strong>
                           &nbsp; from the dashboard. When activation is
-                          required, the customer must already be an active user
+                          required, the user must already be an active customer
                           of your business &nbsp;
                           <strong className="text-white">
                             (30-day window)
@@ -941,7 +942,7 @@ export default function DocsPage() {
 
                 <div className="space-y-6">
                   <Card className="bg-white/5 border-white/10">
-                    <CardContent className="p-6">
+                    <CardContent>
                       <h3 className="text-white font-semibold mb-4">
                         Rarity Tiers & Unlocks
                       </h3>
@@ -989,7 +990,7 @@ export default function DocsPage() {
                             points: 500,
                             pct: "2%",
                             unlocks: "VIP Access",
-                            unlocksDesc: "Spins, draws, VIP status",
+                            unlocksDesc: "Spins, draws, trivia, VIP status",
                             desc: "Ultra rare",
                           },
                         ].map((t) => (
@@ -1033,7 +1034,7 @@ export default function DocsPage() {
                   </Card>
 
                   <Card className="bg-white/5 border-white/10">
-                    <CardContent className="p-6">
+                    <CardContent>
                       <h3 className="text-white font-semibold mb-4">
                         How Unlocks Work
                       </h3>
@@ -1070,7 +1071,7 @@ export default function DocsPage() {
                               icon: Gift,
                               desc: "Customer gets spin access AND is automatically entered into active prize draws. Premium experience.",
                               example:
-                                "Gold/Diamond: 'JACKPOT! Spins, draws, and points!'",
+                                "Gold/Diamond: 'JACKPOT! Spins, draws, trivia, and points!'",
                             },
                             {
                               level: "Draws Only",
@@ -1127,7 +1128,7 @@ export default function DocsPage() {
                   </Card>
 
                   <Card className="bg-white/5 border-white/10">
-                    <CardContent className="p-6">
+                    <CardContent>
                       <h3 className="text-white font-semibold mb-4">
                         Customer Experience by Tier
                       </h3>
@@ -1173,7 +1174,7 @@ export default function DocsPage() {
                                 "💎 Diamond",
                                 "500 pts",
                                 "VIP Access",
-                                "JACKPOT! Spins, draws, and 500 points! You're a VIP!",
+                                "JACKPOT! Spins, draws, trivia, and 500 points! You're a VIP!",
                               ],
                             ].map((row, i) => (
                               <tr key={i} className="border-b border-white/5">
@@ -1194,7 +1195,7 @@ export default function DocsPage() {
                   </Card>
 
                   <Card className="bg-white/5 border-white/10">
-                    <CardContent className="p-6">
+                    <CardContent>
                       <h3 className="text-white font-semibold mb-4">
                         How to Print
                       </h3>
@@ -1254,7 +1255,7 @@ export default function DocsPage() {
                 </h2>
 
                 <Card className="bg-white/5 border-white/10 mb-6">
-                  <CardContent className="p-6 space-y-4">
+                  <CardContent className="space-y-4">
                     <div className="flex items-center gap-2">
                       <Badge className="bg-blue-500/20 text-blue-400 border-0">
                         Pro & Enterprise
@@ -1283,35 +1284,56 @@ export default function DocsPage() {
                           campaigns.
                         </p>
 
+                        {/* Points note - ALWAYS awarded */}
+                        <div className="mb-3 p-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                          <p className="text-amber-400/80 text-xs flex items-center gap-2">
+                            <Coins className="h-3 w-3 flex-shrink-0" />
+                            <span>
+                              <strong className="text-amber-300">
+                                Points are always awarded
+                              </strong>{" "}
+                              on every redemption. The{" "}
+                              <code className="text-amber-400">unlocks</code>{" "}
+                              parameter determines what{" "}
+                              <strong>additional access</strong> the customer
+                              receives:
+                            </span>
+                          </p>
+                        </div>
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {[
                             {
-                              unlock: "points",
-                              icon: Coins,
-                              desc: "Customer earns points only. They'll need another code (sticker or receipt) to access the spin wheel. Best for small purchases where you want to encourage repeat visits.",
-                              example: "Cart total < KES 100 → Points only",
-                              label: "Points Only",
-                            },
-                            {
                               unlock: "spin",
                               icon: RotateCcw,
-                              desc: "Customer unlocks the spin wheel immediately. Great for mid-tier purchases that deserve a reward.",
+                              desc: "Customer unlocks the spin wheel immediately. Great for mid-tier purchases that deserve an instant reward.",
                               example: "Cart total KES 100-500 → Spin access",
                               label: "Spin Access",
+                              color: "blue",
                             },
                             {
                               unlock: "draw",
                               icon: Trophy,
-                              desc: "Customer is automatically entered into your active prize draws but can't spin. Perfect for promotional periods or when you want to build anticipation.",
+                              desc: "Customer is automatically entered into your active prize draws. Perfect for promotional periods or building anticipation.",
                               example: "Weekend promotion → Draw entry",
                               label: "Draw Entry",
+                              color: "amber",
                             },
                             {
-                              unlock: "spin_draw",
+                              unlock: "trivia",
+                              icon: Brain,
+                              desc: "Customer gets direct access to your trivia challenge. Great for engagement campaigns and testing customer knowledge.",
+                              example: "Quiz night → Trivia access",
+                              label: "Trivia Access",
+                              color: "green",
+                            },
+                            {
+                              unlock: "all",
                               icon: Crown,
-                              desc: "The premium experience — customer gets both spin access AND automatic entry into prize draws. Use this for high-value purchases or VIP customers.",
-                              example: "Cart total > KES 500 → Spin + Draw",
-                              label: "Spin + Draw (Premium)",
+                              desc: "The premium experience — customer gets spin access, trivia entry, AND automatic draw entry. Use this for high-value purchases or VIP customers.",
+                              example: "Cart total > KES 500 → All access",
+                              label: "All Access (Premium)",
+                              color: "purple",
                             },
                           ].map((item, i) => (
                             <div
@@ -1323,13 +1345,13 @@ export default function DocsPage() {
                                 <Badge
                                   className={cn(
                                     "text-xs border-0",
-                                    item.unlock === "points" &&
-                                      "bg-gray-500/20 text-gray-400",
-                                    item.unlock === "spin" &&
+                                    item.color === "blue" &&
                                       "bg-blue-500/20 text-blue-400",
-                                    item.unlock === "draw" &&
+                                    item.color === "amber" &&
                                       "bg-amber-500/20 text-amber-400",
-                                    item.unlock === "spin_draw" &&
+                                    item.color === "green" &&
+                                      "bg-green-500/20 text-green-400",
+                                    item.color === "purple" &&
                                       "bg-purple-500/20 text-purple-400",
                                   )}
                                 >
@@ -1360,7 +1382,7 @@ export default function DocsPage() {
                               <code className="text-purple-400">
                                 "unlocks": "points"
                               </code>{" "}
-                              — customer earns points, needs to come back
+                              — customer earns points only, no extra access
                             </li>
                             <li>
                               •{" "}
@@ -1376,41 +1398,44 @@ export default function DocsPage() {
                             <li>
                               •{" "}
                               <strong className="text-purple-300">
-                                High spend:
-                              </strong>{" "}
-                              Send{" "}
-                              <code className="text-purple-400">
-                                "unlocks": "spin_draw"
-                              </code>{" "}
-                              — premium experience rewards loyalty
-                            </li>
-                            <li>
-                              •{" "}
-                              <strong className="text-purple-300">
                                 Promotions:
                               </strong>{" "}
                               Send{" "}
                               <code className="text-purple-400">
                                 "unlocks": "draw"
                               </code>{" "}
-                              — build excitement for upcoming events
+                              — build excitement for prize events
                             </li>
                             <li>
                               •{" "}
                               <strong className="text-purple-300">
-                                VIP / All-access:
+                                Engagement:
+                              </strong>{" "}
+                              Send{" "}
+                              <code className="text-purple-400">
+                                "unlocks": "trivia"
+                              </code>{" "}
+                              — interactive trivia for customer engagement
+                            </li>
+                            <li>
+                              •{" "}
+                              <strong className="text-purple-300">
+                                High spend / VIP:
                               </strong>{" "}
                               Send{" "}
                               <code className="text-purple-400">
                                 "unlocks": "all"
                               </code>{" "}
-                              — give spins, trivia, and draws in one code
+                              — spin + trivia + draw in one code
+                            </li>
+                            <li className="text-amber-400/60 border-t border-white/5 pt-1 mt-1">
+                              ⚡ <strong>Remember:</strong> Points are always
+                              awarded regardless of the unlock type selected.
                             </li>
                           </ul>
                         </div>
                       </CardContent>
                     </Card>
-
                     {/* What Engage needs from your POS */}
                     <Card className="bg-white/5 border-white/10">
                       <CardContent className="p-4">
@@ -1481,7 +1506,7 @@ export default function DocsPage() {
                     </Card>
 
                     <Card className="bg-white/5 border-white/10">
-                      <CardContent className="p-6 space-y-4">
+                      <CardContent className="space-y-4">
                         <h3 className="text-white font-semibold text-lg flex items-center gap-2">
                           <CreditCard className="h-5 w-5 text-purple-400" />
                           Points Redemption at Checkout
@@ -1503,7 +1528,7 @@ export default function DocsPage() {
                               Returns their points balance and engagement
                               summary.
                             </p>
-                            <code className="text-green-400 text-xs">
+                            <code className="block text-green-400 text-xs break-all">
                               POST /api/business/customers/lookup
                             </code>
                           </div>
@@ -1511,11 +1536,11 @@ export default function DocsPage() {
                             <h4 className="text-blue-400 font-medium text-sm mb-2">
                               Deduct Points
                             </h4>
-                            <p className="text-white/50 text-xs mb-2">
+                            <p className="flex flex-wrap text-white/50 text-xs mb-2">
                               Deduct points from a customer's balance for a
                               purchase. Creates a transaction record for audit.
                             </p>
-                            <code className="text-blue-400 text-xs">
+                            <code className="block text-blue-400 text-xs break-all">
                               POST /api/business/customers/points/deduct
                             </code>
                           </div>
@@ -1532,7 +1557,7 @@ export default function DocsPage() {
                             </li>
                             <li>
                               Your POS/e-commerce system calls{" "}
-                              <code className="text-purple-400">
+                              <code className="block text-purple-400 text-xs break-all">
                                 /api/business/customers/lookup
                               </code>{" "}
                               with their phone/email/ID
@@ -1543,7 +1568,7 @@ export default function DocsPage() {
                             </li>
                             <li>
                               If they have enough points, call{" "}
-                              <code className="text-purple-400">
+                              <code className="text-purple-400 block text-xs break-all">
                                 /api/business/customers/points/deduct
                               </code>{" "}
                               with the amount to deduct
@@ -1570,7 +1595,7 @@ export default function DocsPage() {
 
                 {/* Example scenarios */}
                 <Card className="bg-white/5 border-white/10">
-                  <CardContent className="p-6">
+                  <CardContent>
                     <h3 className="text-white font-semibold mb-4">
                       Real-World Examples
                     </h3>
@@ -1676,7 +1701,7 @@ export default function DocsPage() {
 
                 {/* Spin & Win */}
                 <Card className="bg-white/5 border-white/10 mb-6">
-                  <CardContent className="p-6">
+                  <CardContent>
                     <div className="flex items-center gap-2 mb-4">
                       <RotateCcw className="h-5 w-5 text-purple-400" />
                       <h3 className="text-white font-bold text-lg">
@@ -1735,7 +1760,7 @@ export default function DocsPage() {
 
                 {/* Live Trivia */}
                 <Card className="bg-white/5 border-white/10 mb-6">
-                  <CardContent className="p-6">
+                  <CardContent>
                     <div className="flex items-center gap-2 mb-4">
                       <Brain className="h-5 w-5 text-blue-400" />
                       <h3 className="text-white font-bold text-lg">
@@ -1811,7 +1836,7 @@ export default function DocsPage() {
 
                 {/* Prize Draws */}
                 <Card className="bg-white/5 border-white/10 mb-6">
-                  <CardContent className="p-6">
+                  <CardContent>
                     <div className="flex items-center gap-2 mb-4">
                       <Gift className="h-5 w-5 text-amber-400" />
                       <h3 className="text-white font-bold text-lg">
@@ -1948,7 +1973,7 @@ export default function DocsPage() {
                 </h2>
 
                 <Card className="bg-white/5 border-white/10 mb-6">
-                  <CardContent className="p-6">
+                  <CardContent>
                     <h3 className="text-white font-semibold mb-4">
                       How Limits Work
                     </h3>
@@ -1986,12 +2011,7 @@ export default function DocsPage() {
                             ["Trivia Questions", "50", "200", "Unlimited"],
                             ["Sticker Codes", "500", "1,000", "Unlimited"],
                             ["POS Codes", "0", "5,000", "Unlimited"],
-                            [
-                              "Access Codes (Public)",
-                              "200",
-                              "2,000",
-                              "Unlimited",
-                            ],
+                            ["Access Codes (Public)", "20", "30", "Unlimited"],
                             ["Admin Users", "1", "5", "20"],
                             ["API Access", "✗", "✓", "✓"],
                             [
@@ -2034,7 +2054,7 @@ export default function DocsPage() {
                 </Card>
 
                 <Card className="bg-white/5 border-white/10 mb-6">
-                  <CardContent className="p-6">
+                  <CardContent>
                     <h3 className="text-white font-semibold mb-4">
                       Game Capacity & Auto-Selection
                     </h3>
@@ -2042,46 +2062,134 @@ export default function DocsPage() {
                     <div className="space-y-4 text-white/50 text-sm leading-relaxed">
                       <p>
                         <strong className="text-white">Spin Games:</strong> When
-                        you have multiple spin games active, customers are
-                        directed to the first available game. If a game reaches
-                        its engagement limit, the next game automatically starts
-                        accepting players.
+                        you have multiple spin games with{" "}
+                        <span className="text-purple-400 font-mono text-xs bg-white/5 px-1.5 py-0.5 rounded">
+                          participant limit
+                        </span>
+                        , customers are automatically enrolled into the first
+                        available game that still has capacity when they redeem
+                        their code. If{" "}
+                        <span className="text-purple-400 font-mono text-xs bg-white/5 px-1.5 py-0.5 rounded">
+                          participant limit
+                        </span>{" "}
+                        is left empty (unlimited), the system enrolls{" "}
+                        <strong className="text-white">everyone</strong> whose
+                        code unlocks a spin experience into that game — no
+                        capacity check is performed. If all games with limits
+                        are full, a{" "}
+                        <strong className="text-white">"all games full"</strong>{" "}
+                        message is shown to customers. Each enrolled participant
+                        gets a ticket number and must be enrolled before they
+                        can spin.
                       </p>
 
                       <p>
                         <strong className="text-white">
                           Trivia Challenges:
                         </strong>{" "}
-                        Each trivia challenge can be linked to a specific spin
-                        game for ticket entry. When the linked spin game's slots
-                        fill up, new players are directed to the next available
-                        trivia challenge.
+                        Each challenge can set a{" "}
+                        <span className="text-purple-400 font-mono text-xs bg-white/5 px-1.5 py-0.5 rounded">
+                          max participants
+                        </span>{" "}
+                        limit. The system auto-enrolls customers into the first
+                        open challenge with available space. If no limit is set,
+                        unlimited participants are accepted.
                       </p>
 
                       <p>
-                        <strong className="text-white">Draws:</strong> The{" "}
-                        <code className="text-purple-400 text-xs">system</code>
-                        &nbsp;automatically enters customers into the first open
-                        draw for your business. If a draw is full or closed, it
-                        moves to the next one.
+                        <strong className="text-white">Draws:</strong> The
+                        system automatically enters customers into the first
+                        open draw for your business. Draws can set{" "}
+                        <span className="text-purple-400 font-mono text-xs bg-white/5 px-1.5 py-0.5 rounded">
+                          participant limit
+                        </span>{" "}
+                        (unique participants) and{" "}
+                        <span className="text-purple-400 font-mono text-xs bg-white/5 px-1.5 py-0.5 rounded">
+                          max entries
+                        </span>{" "}
+                        (total entries). If a draw is full, it moves to the next
+                        available one.
                       </p>
+
+                      {/* ⭐ CRITICAL: Calendar Planning Section */}
+                      <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                        <h4 className="text-amber-400 font-medium text-sm mb-2 flex gap-2">
+                          <Calendar className="h-6 w-6" />
+                          <span>
+                            ⚠️ Important: Plan Your Games at Month Start
+                          </span>
+                        </h4>
+                        <p className="text-amber-400/80 text-xs">
+                          <strong className="text-amber-300">
+                            Why this matters:
+                          </strong>{" "}
+                          Engage distributes participants across your available
+                          games based on capacity. If you{" "}
+                          <strong className="text-amber-300">
+                            leave the participant limit empty
+                          </strong>
+                          , the system will funnel{" "}
+                          <strong className="text-amber-300">all</strong>{" "}
+                          customers into the first game it finds — leaving your
+                          other games empty and wasting engagement
+                          opportunities.
+                        </p>
+                        <div className="mt-2 p-2 rounded bg-amber-500/5 border border-amber-500/10">
+                          <p className="text-amber-400/70 text-xs">
+                            <strong className="text-amber-300">
+                              Best practice:
+                            </strong>
+                            &nbsp; At the beginning of each month (or as soon as
+                            your subscription activates), set up all your games
+                            with{" "}
+                            <span className="text-amber-400 font-mono text-xs bg-white/5 px-1.5 py-0.5 rounded">
+                              participant limit
+                            </span>{" "}
+                            values. This ensures participants are distributed
+                            evenly across your available games and helps you
+                            stay within your subscription limits.
+                          </p>
+                        </div>
+                        <div className="mt-2 grid sm:grid-cols-3 gap-2">
+                          <div className="p-2 rounded bg-white/5 border border-white/10 text-center">
+                            <span className="text-xs text-white/60">
+                              Starter Plan
+                            </span>
+                            <div className="text-xs text-white/40">
+                              3 spins · 3 trivia · 3 draws
+                            </div>
+                          </div>
+                          <div className="p-2 rounded bg-white/5 border border-white/10 text-center">
+                            <span className="text-xs text-white/60">
+                              Pro Plan
+                            </span>
+                            <div className="text-xs text-white/40">
+                              10 spins · 10 trivia · 10 draws
+                            </div>
+                          </div>
+                          <div className="p-2 rounded bg-white/5 border border-white/10 text-center">
+                            <span className="text-xs text-white/60">
+                              Enterprise
+                            </span>
+                            <div className="text-xs text-white/40">
+                              Unlimited
+                            </div>
+                          </div>
+                        </div>
+                      </div>
 
                       <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
                         <h4 className="text-purple-400 font-medium text-sm mb-2">
-                          💡 Pro Tip: Calendar Planning
+                          💡 Pro Tip: Queue Mode for Live Events
                         </h4>
                         <p className="text-purple-400/60 text-xs">
-                          Schedule your games like a content calendar. Run a
-                          spin game all week, host trivia on Friday nights, and
-                          run a monthly draw. The system automatically manages
-                          capacity across all active games.
-                        </p>
-                        <p className="text-purple-400/60 text-xs mt-2">
-                          <strong className="text-white">Queue mode:</strong>{" "}
-                          For high-traffic venues, enable queue mode on your
-                          spin game to call customers one-by-one by name. This
-                          prevents overcrowding and creates a live show
-                          experience.
+                          For high-traffic venues, enable{" "}
+                          <span className="text-purple-400 font-mono text-xs bg-white/5 px-1.5 py-0.5 rounded">
+                            queue mode
+                          </span>{" "}
+                          on your spin game to call customers one-by-one by
+                          name. This prevents overcrowding and creates a live
+                          show experience.
                         </p>
                       </div>
                     </div>
@@ -2089,7 +2197,7 @@ export default function DocsPage() {
                 </Card>
 
                 <Card className="bg-white/5 border-white/10">
-                  <CardContent className="p-6">
+                  <CardContent>
                     <h3 className="text-white font-semibold mb-4">
                       What Counts as an Engagement?
                     </h3>

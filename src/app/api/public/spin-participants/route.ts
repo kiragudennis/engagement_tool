@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     }
 
     const { count, error } = await supabaseAdmin
-      .from("spin_attempts")
+      .from("spin_participants")
       .select("*", { count: "exact", head: true })
       .eq("game_id", gameId);
 

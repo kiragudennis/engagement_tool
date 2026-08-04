@@ -291,7 +291,7 @@ export default function LandingPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.6 }}
-                className="flex items-center gap-6 mt-8 text-xs sm:text-sm"
+                className="grid grid-cols-3 items-center gap-1 sm:gap-6 mt-8 text-xs sm:text-sm overflow-x-auto whitespace-nowrap"
               >
                 <span className="flex items-center gap-1">
                   <Check className="h-4 w-4 text-green-500" /> 14-day free trial

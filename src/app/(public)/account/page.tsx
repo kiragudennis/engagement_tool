@@ -17,11 +17,12 @@ import {
   ArrowRight,
   Loader2,
   Crown,
-  History,
   LogOut,
   Brain,
   Ticket,
   Coins,
+  Share2,
+  Copy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
@@ -37,7 +38,9 @@ export default function CustomerAccountPage() {
   const [redeemedCodes, setRedeemedCodes] = useState<any[]>([]);
   const [totalPoints, setTotalPoints] = useState(0);
   const [lifetimePoints, setLifetimePoints] = useState(0);
-  const [pointsConfig, setPointsConfig] = useState<{ pointsPerKsh: number } | null>(null);
+  const [pointsConfig, setPointsConfig] = useState<{
+    pointsPerKsh: number;
+  } | null>(null);
 
   const loadData = useCallback(async () => {
     if (!profile?.id) return;
@@ -123,9 +126,6 @@ export default function CustomerAccountPage() {
       </div>
     );
   }
-
-  const activeCount = allBusinesses.filter((b) => b.is_active).length;
-  const pointsPerKsh = pointsConfig?.pointsPerKsh || 10;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-950 to-slate-950">
@@ -222,6 +222,10 @@ export default function CustomerAccountPage() {
               <Gift className="h-4 w-4 mr-2" />
               Rewards
             </TabsTrigger>
+            <TabsTrigger value="refer">
+              <Share2 className="h-4 w-4 mr-2" />
+              Referral Program
+            </TabsTrigger>
           </TabsList>
 
           {/* My Businesses */}
@@ -297,7 +301,8 @@ export default function CustomerAccountPage() {
                               ⭐ Worth{" "}
                               {(biz.points_value != null
                                 ? (biz.points || 0) * biz.points_value
-                                : ((biz.points || 0) / (biz.points_per_redemption || 10))
+                                : (biz.points || 0) /
+                                  (biz.points_per_redemption || 10)
                               ).toFixed(2)}
                             </p>
                             <p className="text-white/40 text-xs">
@@ -381,7 +386,8 @@ export default function CustomerAccountPage() {
               <CardContent>
                 {drawEntries.length === 0 ? (
                   <p className="text-white/40 text-center py-8">
-                    No draw entries yet. Redeem codes that unlock draws to participate!
+                    No draw entries yet. Redeem codes that unlock draws to
+                    participate!
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -400,7 +406,10 @@ export default function CustomerAccountPage() {
                               {entry.draws?.name || "Unknown Draw"}
                             </p>
                             <p className="text-white/40 text-xs">
-                              {entry.entry_count} entry{entry.entry_count !== 1 ? "ies" : ""} • {entry.draws?.businesses?.name || "Unknown Business"}
+                              {entry.entry_count} entry
+                              {entry.entry_count !== 1 ? "ies" : ""} •{" "}
+                              {entry.draws?.businesses?.name ||
+                                "Unknown Business"}
                             </p>
                           </div>
                         </div>
@@ -421,7 +430,9 @@ export default function CustomerAccountPage() {
           <TabsContent value="trivia">
             <Card className="bg-white/5 border-white/10">
               <CardHeader>
-                <CardTitle className="text-white">Trivia Participation</CardTitle>
+                <CardTitle className="text-white">
+                  Trivia Participation
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {triviaHistory.length === 0 ? (
@@ -445,7 +456,10 @@ export default function CustomerAccountPage() {
                               {entry.challenges?.name || "Unknown Trivia"}
                             </p>
                             <p className="text-white/40 text-xs">
-                              Score: {entry.current_score || 0} • Rank: #{entry.current_rank || "N/A"} • {entry.challenges?.businesses?.name || "Unknown Business"}
+                              Score: {entry.current_score || 0} • Rank: #
+                              {entry.current_rank || "N/A"} •{" "}
+                              {entry.challenges?.businesses?.name ||
+                                "Unknown Business"}
                             </p>
                           </div>
                         </div>
@@ -490,7 +504,8 @@ export default function CustomerAccountPage() {
                               {code.access_codes?.code || "UNKNOWN"}
                             </p>
                             <p className="text-white/40 text-xs">
-                              {code.access_codes?.businesses?.name || "Unknown Business"}
+                              {code.access_codes?.businesses?.name ||
+                                "Unknown Business"}
                             </p>
                           </div>
                         </div>
@@ -526,7 +541,8 @@ export default function CustomerAccountPage() {
                               s +
                               (b.points_value != null
                                 ? (b.points || 0) * b.points_value
-                                : (b.points || 0) / (b.points_per_redemption || 10)),
+                                : (b.points || 0) /
+                                  (b.points_per_redemption || 10)),
                             0,
                           )
                           .toFixed(2)
@@ -576,7 +592,8 @@ export default function CustomerAccountPage() {
                             <p className="text-yellow-400 text-sm font-medium">
                               {biz.points_value != null
                                 ? (biz.points || 0) * biz.points_value
-                                : (biz.points || 0) / (biz.points_per_redemption || 10)}
+                                : (biz.points || 0) /
+                                  (biz.points_per_redemption || 10)}
                             </p>
                             <p className="text-white/30 text-xs">
                               {biz.is_active ? "Active" : "Inactive"}
@@ -603,6 +620,49 @@ export default function CustomerAccountPage() {
                   account and deduct points from your balance for that business.
                   Your points never expire as long as you keep engaging.
                 </p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Referral Program Tab */}
+          <TabsContent value="refer" className="space-y-6">
+            <Card className="bg-white/5 border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Share2 className="h-5 w-5 text-purple-400" />
+                  Refer Businesses & Earn
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-white/70">
+                  Share your referral link with businesses. When they subscribe,
+                  you earn a 50% commission on their first payment as loyalty
+                  points.
+                </p>
+
+                {profile?.referral_code && (
+                  <div className="flex items-center gap-2">
+                    <code className="px-3 py-2 bg-black/30 rounded-lg font-mono text-purple-300">
+                      {profile.referral_code}
+                    </code>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        navigator.clipboard.writeText(profile.referral_code!)
+                      }
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/account/referral" className="gap-2">
+                    Full Referral Dashboard
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>

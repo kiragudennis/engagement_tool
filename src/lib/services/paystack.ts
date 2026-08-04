@@ -179,6 +179,17 @@ export async function activateBusinessSubscription(params: {
     }
   }
 
+  // Process referral commission for business referrals
+  if (!error) {
+    try {
+      await supabaseAdmin.rpc("process_business_referral", {
+        p_business_id: params.businessId,
+      });
+    } catch (referralError) {
+      console.error("Failed to process business referral:", referralError);
+    }
+  }
+
   return { data, error };
 }
 

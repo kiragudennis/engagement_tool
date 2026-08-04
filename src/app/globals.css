@@ -277,6 +277,28 @@
   }
 }
 
+/* In your global CSS file */
+@property --a {
+  syntax: "<angle>";
+  initial-value: 0deg;
+}
+
+@keyframes spin {
+  to {
+    --a: 360deg;
+  }
+}
+
+.animate-spin-slow {
+  animation: spin 3s linear infinite;
+}
+
+/* For a more pronounced glow effect */
+.card-glow {
+  filter: blur(8px);
+  opacity: 0.7;
+}
+
 .animate-bounce-in {
   animation: bounce-in 0.5s ease-out;
 }

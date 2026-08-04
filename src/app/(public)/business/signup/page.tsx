@@ -47,6 +47,7 @@ export default function BusinessSignupPage() {
   const [businessSlug, setBusinessSlug] = useState("");
   const searchParams = useSearchParams();
   const planParam = searchParams.get("plan") || "";
+  const referralCode = searchParams.get("ref") || "";
   const isEarlyBird = planParam.startsWith("early_");
   const router = useRouter();
   const [businessId, setBusinessId] = useState<string | null>(null);
@@ -97,6 +98,7 @@ export default function BusinessSignupPage() {
           email: formData.email,
           password: formData.password,
           type: formData.type,
+          referralCode: referralCode || undefined,
         }),
       });
 

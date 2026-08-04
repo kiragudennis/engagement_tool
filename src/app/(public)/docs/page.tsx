@@ -29,7 +29,10 @@ import {
   AlertTriangle,
   CreditCard,
   Bell,
-  Calendar,
+  ExternalLink,
+  ArrowRight,
+  TriangleAlert,
+  BadgeDollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -46,6 +49,7 @@ const SECTIONS = [
   { id: "pos", label: "POS Integration", icon: ShoppingBag },
   { id: "engagement", label: "Engagement", icon: FunnelPlus },
   { id: "limits", label: "limits", icon: CirclePause },
+  { id: "referral-program", label: "Referral Program", icon: BadgeDollarSign },
   { id: "faq", label: "FAQ", icon: Shield },
 ];
 
@@ -290,9 +294,9 @@ export default function DocsPage() {
 
               {/* ─── VERIFICATION & SECURITY ───────────────── */}
               <section id="verification">
-                <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
-                  <Shield className="h-6 w-6 text-purple-400" /> Verification &
-                  Security
+                <h2 className="text-2xl font-bold text-white mb-4 flex gap-2">
+                  <Shield className="h-6 w-6 text-purple-400 mt-1" />{" "}
+                  <>Verification & Security</>
                 </h2>
                 <div className="space-y-6">
                   <Card className="bg-white/5 border-white/10">
@@ -477,9 +481,9 @@ export default function DocsPage() {
 
               {/* ─── CUSTOMER PROFILE & POINTS ─────────────── */}
               <section id="customer-profile">
-                <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
-                  <Users className="h-6 w-6 text-purple-400" /> Customer Profile
-                  & Points
+                <h2 className="text-2xl font-bold text-white mb-4 flex gap-2">
+                  <Users className="h-6 w-6 text-purple-400" />{" "}
+                  <>Customer Profile & Points</>
                 </h2>
                 <div className="space-y-6">
                   <Card className="bg-white/5 border-white/10">
@@ -1688,9 +1692,9 @@ export default function DocsPage() {
 
               {/* ─── ENGAGEMENT ───────────────────────────────────── */}
               <section id="engagement">
-                <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                  <FunnelPlus className="h-6 w-6 text-purple-400" /> The Full
-                  Engagement Flow
+                <h2 className="text-2xl font-bold text-white mb-6 flex gap-2">
+                  <FunnelPlus className="h-6 w-6 text-purple-400" />{" "}
+                  <>The Full Engagement Flow</>
                 </h2>
 
                 <p className="text-white/50 text-sm mb-8 leading-relaxed">
@@ -1967,9 +1971,9 @@ export default function DocsPage() {
               </section>
 
               <section id="limits">
-                <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                  <CirclePause className="h-8 w-8 text-purple-400" /> Engagement
-                  Limits & Game Capacity
+                <h2 className="text-2xl font-bold text-white mb-6 flex gap-2">
+                  <CirclePause className="h-8 w-8 text-purple-400 mt-1" />{" "}
+                  <>Engagement Limits & Game Capacity</>
                 </h2>
 
                 <Card className="bg-white/5 border-white/10 mb-6">
@@ -2114,10 +2118,8 @@ export default function DocsPage() {
                       {/* ⭐ CRITICAL: Calendar Planning Section */}
                       <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
                         <h4 className="text-amber-400 font-medium text-sm mb-2 flex gap-2">
-                          <Calendar className="h-6 w-6" />
-                          <span>
-                            ⚠️ Important: Plan Your Games at Month Start
-                          </span>
+                          <TriangleAlert className="h-5 w-5" />
+                          <span>Important: Plan Your Games at Month Start</span>
                         </h4>
                         <p className="text-amber-400/80 text-xs">
                           <strong className="text-amber-300">
@@ -2309,11 +2311,309 @@ export default function DocsPage() {
                 </Card>
               </section>
 
+              {/* Referral Program Section */}
+              <section className="mb-16 scroll-mt-20" id="referral-program">
+                <h2 className="text-2xl font-bold text-white flex items-center mb-6">
+                  <BadgeDollarSign className="h-6 w-6 text-purple-400" />
+                  &nbsp; Referral Program
+                </h2>
+
+                <p className="text-sm text-white/70 max-w-3xl mb-8">
+                  Engage's referral program lets you earn rewards for bringing
+                  new businesses to the platform. Share your unique referral
+                  link, and when a referred business subscribes to a paid plan,
+                  you earn a commission.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="text-center">
+                      <Gift className="h-8 w-8 text-yellow-400 mx-auto mb-2" />
+                      <h3 className="text-white font-semibold mb-1">
+                        50% Commission
+                      </h3>
+                      <p className="text-white/50 text-sm">
+                        Earn 50% of the first payment when a referred business
+                        subscribes
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="text-center">
+                      <Coins className="h-8 w-8 text-purple-400 mx-auto mb-2" />
+                      <h3 className="text-white font-semibold mb-1">
+                        Loyalty Points
+                      </h3>
+                      <p className="text-white/50 text-sm">
+                        Commissions are awarded as loyalty points on the system
+                        Engage entity — use them for spins and promotions
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="text-center">
+                      <ExternalLink className="h-8 w-8 text-pink-400 mx-auto mb-2" />
+                      <h3 className="text-white font-semibold mb-1">
+                        Easy Sharing
+                      </h3>
+                      <p className="text-white/50 text-sm">
+                        Share via link, social media, or QR code — anyone can
+                        become a referrer
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card className="bg-white/5 border-white/10 mb-8">
+                  <CardContent>
+                    <h3 className="text-lg font-bold text-white mb-4">
+                      How It Works
+                    </h3>
+                    <ol className="space-y-3 text-white/70 text-sm">
+                      <li className="flex items-start gap-3">
+                        <span className="text-purple-400 font-bold">1.</span>
+                        <span>
+                          <strong className="text-white">
+                            Share your link
+                          </strong>
+                          — Find your referral code in your account dashboard.
+                          Share the link ({" "}
+                          <code className="bg-black/30 px-1 rounded text-xs">
+                            engagespin.com/business/signup?ref=ENGXXXXXXXX
+                          </code>
+                          ).
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-purple-400 font-bold">2.</span>
+                        <span>
+                          <strong className="text-white">
+                            Business signs up
+                          </strong>{" "}
+                          — The referred business creates an account using your
+                          link.
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-purple-400 font-bold">3.</span>
+                        <span>
+                          <strong className="text-white">They subscribe</strong>{" "}
+                          — When the business pays for a subscription, you earn
+                          your commission.
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-purple-400 font-bold">4.</span>
+                        <div>
+                          <strong className="text-white">You get paid</strong> —
+                          You receive:
+                          <ul className="list-disc list-inside mt-1 space-y-1 text-white/80">
+                            <li>
+                              <span className="text-green-400 font-medium">
+                                Money commission:
+                              </span>{" "}
+                              Fixed one-time or recurring percentage, tracked
+                              for later Paystack/M-Pesa payout
+                            </li>
+                            <li>
+                              <span className="text-purple-400 font-medium">
+                                Loyalty points:
+                              </span>{" "}
+                              Commission × 100, awarded immediately for Engage
+                              experiences at the system Engage business entity
+                            </li>
+                          </ul>
+                        </div>
+                      </li>
+                    </ol>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white/5 border-white/10">
+                  <CardContent>
+                    <h3 className="text-lg font-bold text-white mb-4">
+                      Commission Structure
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
+                        <thead>
+                          <tr className="border-b border-white/10">
+                            <th className="text-white font-semibold pb-2 pr-4">
+                              Plan
+                            </th>
+                            <th className="text-white font-semibold pb-2 pr-4">
+                              Price
+                            </th>
+                            <th className="text-white font-semibold pb-2 pr-4">
+                              One-time Commission (50%)
+                            </th>
+                            <th className="text-white font-semibold pb-2 pr-4">
+                              Points Awarded
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="space-y-1">
+                          <tr className="border-b border-white/5">
+                            <td className="py-2 text-white/70 pr-4">Starter</td>
+                            <td className="py-2 text-white/70 pr-4">$29/mo</td>
+                            <td className="py-2 text-green-400 pr-4">$14.50</td>
+                            <td className="py-2 text-white/70 pr-4">
+                              1,450 pts
+                            </td>
+                          </tr>
+                          <tr className="border-b border-white/5">
+                            <td className="py-2 text-white/70 pr-4">Pro</td>
+                            <td className="py-2 text-white/70 pr-4">$79/mo</td>
+                            <td className="py-2 text-green-400 pr-4">$39.50</td>
+                            <td className="py-2 text-white/70 pr-4">
+                              3,950 pts
+                            </td>
+                          </tr>
+                          <tr className="border-b border-white/5">
+                            <td className="py-2 text-white/70 pr-4">
+                              Enterprise
+                            </td>
+                            <td className="py-2 text-white/70 pr-4">$194/mo</td>
+                            <td className="py-2 text-green-400 pr-4">$97.00</td>
+                            <td className="py-2 text-white/70 pr-4">
+                              9,700 pts
+                            </td>
+                          </tr>
+                          <tr className="border-b border-white/5">
+                            <td className="py-2 text-white/70 pr-4">Bronze</td>
+                            <td className="py-2 text-white/70 pr-4">
+                              $697 one-time
+                            </td>
+                            <td className="py-2 text-green-400 pr-4">
+                              $348.50
+                            </td>
+                            <td className="py-2 text-white/70 pr-4">
+                              34,850 pts
+                            </td>
+                          </tr>
+                          <tr className="border-b border-white/5">
+                            <td className="py-2 text-white/70 pr-4">Silver</td>
+                            <td className="py-2 text-white/70 pr-4">
+                              $1,797 one-time
+                            </td>
+                            <td className="py-2 text-green-400 pr-4">
+                              $898.50
+                            </td>
+                            <td className="py-2 text-white/70 pr-4">
+                              89,850 pts
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-2 text-white/70 pr-4">Gold</td>
+                            <td className="py-2 text-white/70 pr-4">
+                              $4,997 one-time
+                            </td>
+                            <td className="py-2 text-green-400 pr-4">
+                              $2,498.50
+                            </td>
+                            <td className="py-2 text-white/70 pr-4">
+                              249,850 pts
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="text-xs text-white/40 mt-3">
+                      <strong className="text-white">Dual Rewards:</strong>{" "}
+                      <span className="text-green-400">Money</span> — the
+                      commission amount is tracked in USD. When you request a
+                      payout (via admin panel), the commission is paid out via
+                      Paystack or M-Pesa once you reach the $100 threshold.
+                      <span className="text-yellow-400"> Points</span> — equal
+                      to commission amount × 100 — are awarded simultaneously as
+                      loyalty points. These points unlock Engage experiences at{" "}
+                      <code className="bg-black/30 px-1 rounded">
+                        engagespin.com/admin/engage
+                      </code>
+                      .
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border-yellow-500/20 mt-6">
+                  <CardContent>
+                    <h3 className="text-lg font-bold text-white mb-2">
+                      What can I do with loyalty points?
+                    </h3>
+                    <p className="text-white/50 text-sm mb-3">
+                      Points are awarded to the system "Engage" business entity
+                      ({" "}
+                      <code className="px-1 rounded">
+                        engagespin.com/admin/engage
+                      </code>
+                      ). They function exactly like points at any other
+                      business. You can use them for spins, draws, trivia, and
+                      more.
+                    </p>
+                    <ul className="text-white/70 space-y-1 text-sm">
+                      <li>
+                        • <strong>Spin to win</strong> — Free spins on the
+                        Engage wheel for prizes, discounts, and subscription
+                        credits
+                      </li>
+                      <li>
+                        • <strong>Enter draws</strong> — Monthly and special
+                        promotion draws across the Engage ecosystem
+                      </li>
+                      <li>
+                        • <strong>Play trivia</strong> — Access exclusive trivia
+                        challenges with point-based leaderboards
+                      </li>
+                      <li>
+                        • <strong>Early access</strong> — Priority access to new
+                        features, beta releases, and special events
+                      </li>
+                    </ul>
+                    <Card className="bg-white/5 border-white/10 mt-4">
+                      <CardContent className="p-4">
+                        <p className="text-sm text-white/60 mb-2">
+                          <strong>Affiliate Tiers:</strong>
+                        </p>
+                        <ul className="text-xs text-white/50 space-y-1">
+                          <li>
+                            • <strong>Without a business:</strong> Use your
+                            affiliate points directly at
+                            engagespin.com/admin/engage
+                          </li>
+                          <li>
+                            • <strong>With an active business:</strong>{" "}
+                            Auto-enrolled in Engage experiences (opt-out
+                            available)
+                          </li>
+                          <li>
+                            • <strong>Top affiliates:</strong> Qualify to become
+                            admins of the Engage business and run custom games
+                            for the community
+                          </li>
+                        </ul>
+                      </CardContent>
+                    </Card>
+
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="mt-4 border-yellow-500/20 text-yellow-400"
+                    >
+                      <Link href="/account/referral">
+                        View Your Referral Dashboard
+                        <ArrowRight className="h-3 w-3 ml-1" />
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              </section>
+
               {/* ─── FAQ ───────────────────────────────────── */}
               <section id="faq">
-                <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
-                  <Shield className="h-6 w-6 text-purple-400" /> Frequently
-                  Asked Questions
+                <h2 className="text-2xl font-bold text-white mb-4 flex gap-2">
+                  <Shield className="h-6 w-6 text-purple-400 mt-1" />{" "}
+                  <>Frequently Asked Questions</>
                 </h2>
                 <div className="space-y-3">
                   {[

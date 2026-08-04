@@ -8,6 +8,11 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { findUserIdByEmail } from "@/lib/auth/server";
 import { resend, secureRatelimit } from "@/lib/limit";
 import { checkBotId } from "botid/server";
+import { z } from "zod";
+
+const bodySchema = businessSignupSchema.extend({
+  referralCode: z.string().optional(),
+});
 
 export async function POST(req: NextRequest) {
   const verification = await checkBotId();
@@ -23,8 +28,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // Validate with Zod
-    const parsed = businessSignupSchema.safeParse(body);
+    const parsed = bodySchema.safeParse(body);
     if (!parsed.success) {
       const errors = parsed.error.flatten().fieldErrors;
       return NextResponse.json(
@@ -33,7 +37,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { businessName, fullName, email, password, type } = parsed.data;
+    const { businessName, fullName, email, password, type, referralCode } = parsed.data;
     const slug = generateSlug(businessName);
 
     // Check if business slug is taken
@@ -155,6 +159,36 @@ export async function POST(req: NextRequest) {
       max_uses_per_user: 1,
       description: "Default QR code for in-store customers",
     });
+
+    // Create referral record if referral code was provided
+    if (referralCode) {
+      try {
+        const { data: referrer } = await supabaseAdmin
+          .from("users")
+          .select("id, referral_code")
+          .eq("referral_code", referralCode)
+          .maybeSingle();
+
+        if (referrer) {
+          await supabaseAdmin.from("referrals").insert({
+            referrer_id: referrer.id,
+            referred_business_id: business.id,
+            referral_code: referralCode,
+            referral_type: "business",
+            conversion_type: "signup",
+            commission_type: "one_time",
+            commission_rate: 0.50,
+            status: "joined",
+            metadata: {
+              business_name: business.name,
+              business_slug: business.slug,
+            },
+          });
+        }
+      } catch (referralError) {
+        console.error("Failed to create referral record:", referralError);
+      }
+    }
 
     // Send welcome email
     if (resend) {

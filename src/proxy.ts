@@ -12,12 +12,15 @@ export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   const assets = path.match(/\.(png|jpg|jpeg|webp|svg|ico|json|txt|mp3)$/);
+  const isAdminRoute = path.startsWith("/admin");
+  const isAccountRoute = path.startsWith("/account");
 
   if (
     path.startsWith("/auth") ||
     path.startsWith("/_next") ||
     path.startsWith("/api/") ||
     path === "/auth/callback" ||
+    (!isAdminRoute && !isAccountRoute) ||
     assets
   ) {
     return NextResponse.next();
@@ -44,9 +47,6 @@ export async function proxy(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    const isAdminRoute = path.startsWith("/admin");
-    const isAccountRoute = path.startsWith("/account");
-
     if ((isAdminRoute || isAccountRoute) && !user) {
       const redirectUrl = new URL("/login", request.url);
       redirectUrl.searchParams.set("redirectedFrom", path);
@@ -55,7 +55,7 @@ export async function proxy(request: NextRequest) {
 
     if (isAdminRoute && user) {
       const slug = path.split("/")[2];
-      if (!slug || slug === "marketing") {
+      if (!slug) {
         return response;
       }
 

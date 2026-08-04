@@ -99,7 +99,6 @@ export function DemoWheel() {
   const [spinning, setSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [result, setResult] = useState<(typeof SEGMENTS)[number] | null>(null);
-  const [showResult, setShowResult] = useState(false);
   const [showAnnouncement, setShowAnnouncement] = useState(false);
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -211,7 +210,6 @@ export function DemoWheel() {
     if (spinning) return;
 
     setSpinning(true);
-    setShowResult(false);
     setShowAnnouncement(false);
     setResult(null);
 
@@ -263,7 +261,6 @@ export function DemoWheel() {
       }
 
       setResult(finalSegment);
-      setShowResult(true);
       setSpinning(false);
 
       // Announce the result (this will work for "Try Again" too)
@@ -297,7 +294,7 @@ export function DemoWheel() {
   };
 
   return (
-    <div className="relative flex flex-col items-center">
+    <div className="relative flex flex-col justify-between items-center">
       {/* Ambient glow */}
       <div className="absolute -inset-20 bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-purple-500/20 rounded-full blur-3xl animate-pulse" />
 
@@ -381,82 +378,113 @@ export function DemoWheel() {
           </motion.div>
         </div>
 
-        {/* Wheel */}
-        <motion.div
-          ref={wheelRef}
-          className="w-full h-full rounded-full relative overflow-hidden bg-gray-900"
-          style={{
-            border: "4px solid rgba(139, 92, 246, 0.3)",
-            boxShadow: "inset 0 0 30px rgba(0,0,0,0.3)",
-          }}
-          animate={{ rotate: rotation }}
-          transition={{
-            duration: 4.5,
-            ease: [0.08, 0.82, 0.17, 1.01],
-          }}
-        >
-          {SEGMENTS.map((segment, i) => {
-            const startAngle = i * segmentAngle;
-            const endAngle = (i + 1) * segmentAngle;
-            const startRad = (startAngle * Math.PI) / 180;
-            const endRad = (endAngle * Math.PI) / 180;
-            const midAngle = (startAngle + endAngle) / 2;
-            const midRad = (midAngle * Math.PI) / 180;
-            const textRadius = 34;
+        {/* Wheel Container with Glowing Border */}
+        <div className="relative w-full h-full">
+          {/* Animated glowing border */}
+          <div
+            className="absolute -inset-1 rounded-full"
+            style={
+              {
+                background:
+                  "conic-gradient(from var(--a, 0deg), #8b5cf6, #ec4899, #3b82f6)",
+                animation: "spin 3s linear infinite",
+                "--a": "0deg",
+              } as React.CSSProperties
+            }
+          />
 
-            return (
-              <div
-                key={i}
-                className="absolute inset-0 transition-opacity duration-200 cursor-pointer"
-                style={{
-                  clipPath: `polygon(50% 50%, ${50 + 50 * Math.cos(startRad)}% ${50 + 50 * Math.sin(startRad)}%, ${50 + 50 * Math.cos(endRad)}% ${50 + 50 * Math.sin(endRad)}%)`,
-                  background: `linear-gradient(135deg, ${segment.color}, ${segment.color}DD)`,
-                  opacity: hoveredSegment === i ? 0.9 : 0.85,
-                }}
-                onMouseEnter={() => !spinning && setHoveredSegment(i)}
-                onMouseLeave={() => setHoveredSegment(null)}
-              >
-                <span
-                  className="absolute text-white font-bold whitespace-nowrap select-none"
+          {/* Glow blur effect */}
+          <div
+            className="absolute -inset-2 rounded-full blur-xl opacity-50"
+            style={
+              {
+                background:
+                  "conic-gradient(from var(--a, 0deg), #8b5cf6, #ec4899, #3b82f6)",
+                animation: "spin 3s linear infinite",
+                "--a": "0deg",
+              } as React.CSSProperties
+            }
+          />
+
+          {/* The Wheel */}
+          <motion.div
+            ref={wheelRef}
+            className="w-full h-full rounded-full relative overflow-hidden bg-gray-900"
+            style={{
+              border: "4px solid rgba(139, 92, 246, 0.3)",
+              boxShadow: "inset 0 0 30px rgba(0,0,0,0.3)",
+              position: "relative",
+              zIndex: 1,
+            }}
+            animate={{ rotate: rotation }}
+            transition={{
+              duration: 4.5,
+              ease: [0.08, 0.82, 0.17, 1.01],
+            }}
+          >
+            {SEGMENTS.map((segment, i) => {
+              const startAngle = i * segmentAngle;
+              const endAngle = (i + 1) * segmentAngle;
+              const startRad = (startAngle * Math.PI) / 180;
+              const endRad = (endAngle * Math.PI) / 180;
+              const midAngle = (startAngle + endAngle) / 2;
+              const midRad = (midAngle * Math.PI) / 180;
+              const textRadius = 34;
+
+              return (
+                <div
+                  key={i}
+                  className="absolute inset-0 transition-opacity duration-200 cursor-pointer"
                   style={{
-                    left: `${50 + textRadius * Math.cos(midRad)}%`,
-                    top: `${50 + textRadius * Math.sin(midRad)}%`,
-                    transform: `translate(-50%, -50%) rotate(${midAngle}deg)`,
-                    fontSize: "11px",
-                    textShadow: "0 1px 3px rgba(0,0,0,0.5)",
-                    maxWidth: "55px",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    textAlign: "center",
-                    lineHeight: 1.2,
+                    clipPath: `polygon(50% 50%, ${50 + 50 * Math.cos(startRad)}% ${50 + 50 * Math.sin(startRad)}%, ${50 + 50 * Math.cos(endRad)}% ${50 + 50 * Math.sin(endRad)}%)`,
+                    background: `linear-gradient(135deg, ${segment.color}, ${segment.color}DD)`,
+                    opacity: hoveredSegment === i ? 0.9 : 0.85,
                   }}
+                  onMouseEnter={() => !spinning && setHoveredSegment(i)}
+                  onMouseLeave={() => setHoveredSegment(null)}
                 >
-                  {segment.icon} {segment.label}
-                </span>
-              </div>
-            );
-          })}
+                  <span
+                    className="absolute text-white font-bold whitespace-nowrap select-none"
+                    style={{
+                      left: `${50 + textRadius * Math.cos(midRad)}%`,
+                      top: `${50 + textRadius * Math.sin(midRad)}%`,
+                      transform: `translate(-50%, -50%) rotate(${midAngle}deg)`,
+                      fontSize: "11px",
+                      textShadow: "0 1px 3px rgba(0,0,0,0.5)",
+                      maxWidth: "55px",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      textAlign: "center",
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {segment.icon} {segment.label}
+                  </span>
+                </div>
+              );
+            })}
 
-          {/* Center hub */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-            <motion.div
-              className="w-16 h-16 rounded-full bg-gradient-to-br from-white to-gray-100 flex items-center justify-center shadow-lg"
-              animate={spinning ? { scale: [1, 1.05, 1] } : { scale: 1 }}
-              transition={{ duration: 0.5, repeat: spinning ? Infinity : 0 }}
-            >
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                <Sparkles className="h-5 w-5 text-white" />
-              </div>
-            </motion.div>
-          </div>
-        </motion.div>
+            {/* Center hub */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+              <motion.div
+                className="w-16 h-16 rounded-full bg-gradient-to-br from-white to-gray-100 flex items-center justify-center shadow-lg"
+                animate={spinning ? { scale: [1, 1.05, 1] } : { scale: 1 }}
+                transition={{ duration: 0.5, repeat: spinning ? Infinity : 0 }}
+              >
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                  <Sparkles className="h-5 w-5 text-white" />
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+        </div>
       </div>
 
       {/* Spin Button */}
       <motion.button
         onClick={handleSpin}
         disabled={spinning}
-        className="relative mt-6 px-16 py-3 rounded-lg font-bold text-lg text-white shadow-2xl transition-all disabled:opacity-60 disabled:cursor-not-allowed overflow-hidden group"
+        className="relative mt-12 px-16 py-3 rounded-lg font-bold text-lg text-white shadow-2xl transition-all disabled:opacity-60 disabled:cursor-not-allowed overflow-hidden group"
         style={{ background: "linear-gradient(135deg, #F59E0B, #D97706)" }}
         whileHover={!spinning ? { scale: 1.05 } : {}}
         whileTap={!spinning ? { scale: 0.95 } : {}}
@@ -486,34 +514,6 @@ export function DemoWheel() {
           )}
         </span>
       </motion.button>
-
-      {/* Result Popup */}
-      <AnimatePresence>
-        {showResult && result && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.5, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.5, y: 20 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            className="absolute -bottom-16 left-1/2 -translate-x-1/2 z-30 mt-4"
-          >
-            <div
-              className="px-6 py-3 rounded-full text-white font-bold text-lg shadow-2xl whitespace-nowrap"
-              style={{
-                background: `linear-gradient(135deg, ${result.color}, ${result.color}DD)`,
-              }}
-            >
-              <motion.span
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                {result.icon} {result.label}!
-              </motion.span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Full Announcement Banner */}
       <AnimatePresence>
@@ -553,7 +553,7 @@ export function DemoWheel() {
       </AnimatePresence>
 
       {/* Instruction text */}
-      <p className="text-xs mt-3">👆 Try spinning the demo wheel!</p>
+      <p className="text-xs mt-3">Try spinning the demo wheel!</p>
     </div>
   );
 }

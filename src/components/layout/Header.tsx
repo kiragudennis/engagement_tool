@@ -44,7 +44,7 @@ export default function Header() {
   const { profile } = useAuth();
   const hasBusiness = !!profile?.business_slug;
   const businessSlug = profile?.business_slug;
-  const businessRole = profile?.role; // 'business_owner', 'business_admin', 'business_host'
+  const businessRole = profile?.role; // 'business_owner', 'business_admin', 'business_host', 'customer'
 
   const adminNavigation = [
     { name: "Dashboard", href: `/admin/${businessSlug}` },
@@ -117,7 +117,7 @@ export default function Header() {
           </Button>
 
           {/* User Account Link */}
-          <Link href={isAdmin ? "/" : `/admin/${businessSlug}`}>
+          <Link href={"/account"}>
             <Button variant="ghost" size="icon" aria-label="User Account">
               <User className="h-5 w-5" />
             </Button>

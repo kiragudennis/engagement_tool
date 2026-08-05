@@ -439,22 +439,39 @@ Points are awarded via `award_engagement_points()` and function exactly like bus
 5. **Business owner view** — Simple page showing referral info for the business they own ✅
 6. **Admin panel** — Manage referrals, configure rates, process manual payouts ✅
 7. **Docs** — Add referral program documentation to the docs page ✅
+8. **Enrollment flow** — Add enrollment step where customers choose `one_time` or `recurring` commission preference ✅
+
+## Enrollment Flow (Phase 8)
+
+- `users` table extended with `referral_enrolled BOOLEAN DEFAULT FALSE` and `referral_commission_type TEXT DEFAULT 'one_time'` ✅
+- `enroll_in_referral_program(p_user_id, p_commission_type)` SQL function ✅
+- `check_referral_enrollment(p_user_id)` SQL function ✅
+- `POST /api/referral/enroll` — API route for enrollment ✅
+- `GET /api/referral/enroll` — API route to check enrollment status ✅
+- Referral dashboard (`/account/referral`) shows enrollment screen if not enrolled ✅
+  - Two options: "One-Time Commission" (recommended) or "Recurring Commission" (advanced)
+  - Choice stored in `users.referral_commission_type`
+- Business signup API uses referrer's `referral_commission_type` when creating referral record ✅
+- Account page (`/account`) shows enrollment status badge ✅
+- `AuthContext` updated to load `referral_enrolled` and `referral_commission_type` from user profile ✅
+- Docs page updated with enrollment step in "How It Works" ✅
 
 ## Files Created/Modified
 
 ### SQL
-- `src/db/referral_program.sql` — New file: schema extensions, functions, RLS policies
+- `src/db/referral_program.sql` — New file: schema extensions (users + referrals), functions (`process_business_referral`, `enroll_in_referral_program`, `check_referral_enrollment`, dashboards, withdrawals), RLS policies
 
 ### API
-- `src/app/api/business/create/route.ts` — Added `referralCode` to schema, creates referral record
+- `src/app/api/business/create/route.ts` — Added `referralCode` to schema, creates referral record with referrer's commission preference
+- `src/app/api/referral/enroll/route.ts` — New: enrollment API (POST enroll, GET status)
 
 ### Services
 - `src/lib/services/paystack.ts` — Calls `process_business_referral` in `activateBusinessSubscription`
 
 ### Pages
 - `src/app/(public)/business/signup/page.tsx` — Reads `ref` URL param, passes to API
-- `src/app/(public)/account/referral/page.tsx` — New: customer referral dashboard
-- `src/app/(public)/account/page.tsx` — Added "Referral Program" tab
-- `src/app/(admin)/admin/[businessSlug]/referrals/page.tsx` — New: business owner referral info
-- `src/app/(admin)/admin/referrals/page.tsx` — New: admin referral management panel
-- `src/app/(public)/docs/page.tsx` — Added referral program documentation section
+- `src/app/(public)/account/referral/page.tsx` — Customer referral dashboard with enrollment flow
+- `src/app/(public)/account/page.tsx` — Added "Referral Program" tab with enrollment status badge
+- `src/app/(admin)/admin/[businessSlug]/referrals/page.tsx` — Business owner referral info
+- `src/app/(admin)/admin/referrals/page.tsx` — Admin referral management + withdrawal processing
+- `src/app/(public)/docs/page.tsx` — Added referral program documentation section with enrollment step

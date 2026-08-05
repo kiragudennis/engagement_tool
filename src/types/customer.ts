@@ -87,11 +87,13 @@ export interface ProfileData {
   city?: string;
   postal_code?: string;
   country?: string;
-  referral_code?: string;
-  id_number?: string;
-  id_verified?: boolean;
-  flagged_reason?: string;
-  flagged_at?: string;
+   referral_code?: string;
+   id_number?: string;
+   id_verified?: boolean;
+   flagged_reason?: string;
+   flagged_at?: string;
+   referral_enrolled?: boolean;
+   referral_commission_type?: string;
 
   // business
   business_name?: string;

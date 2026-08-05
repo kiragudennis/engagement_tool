@@ -302,14 +302,14 @@ export default function DocsPage() {
                   <Card className="bg-white/5 border-white/10">
                     <CardContent className="space-y-4">
                       <h3 className="text-white font-semibold text-lg">
-                        How Engage Protects Your Business
+                        How Engage Protects Your Business &amp; Customer Data
                       </h3>
                       <p className="text-white/50 text-sm leading-relaxed">
                         Engage uses a business-led verification model. We do not
                         perform facial recognition or biometric checks. Instead,
                         businesses verify customer identity at the point of
-                        prize collection using the ID/phone/email captured
-                        during signup.
+                        prize collection using the email, phone, and national ID
+                        or driver's license number captured during signup.
                       </p>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -321,8 +321,8 @@ export default function DocsPage() {
                             <li className="flex items-start gap-2">
                               <Check className="h-3 w-3 text-green-400 mt-0.5" />
                               <span>
-                                Customers enter email, phone, and national ID
-                                number
+                                Customers enter email, phone, and national ID or
+                                driver's license number
                               </span>
                             </li>
                             <li className="flex items-start gap-2">
@@ -343,6 +343,14 @@ export default function DocsPage() {
                               <span>
                                 Duplicate emails, phones, or ID numbers are
                                 blocked automatically
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <Check className="h-3 w-3 text-green-400 mt-0.5" />
+                              <span>
+                                These identifiers are stored encrypted at rest
+                                (AES-256) and only used for customer-business
+                                uniqueness
                               </span>
                             </li>
                           </ul>
@@ -464,7 +472,7 @@ export default function DocsPage() {
                   <StepCard
                     number={2}
                     title="Enter It Online"
-                    description="Visit the business's Engage page or scan the QR code. Enter your code on your phone — no app download needed."
+                    description="Visit the business's Engage page or scan the QR code. Enter your code on your phone — no app download needed. You'll create your account with email, phone, and national ID or license for uniqueness."
                   />
                   <StepCard
                     number={3}
@@ -473,8 +481,8 @@ export default function DocsPage() {
                   />
                   <StepCard
                     number={4}
-                    title="Come Back"
-                    description="The more you engage, the more points you earn. Climb from Bronze to Platinum tier. Come back for new codes and new chances to win."
+                    title="Collect & Come Back"
+                    description="Redeem points or claim prizes in-store. The business verifies your identity (email, phone, ID) and follows up using your contact info. The more you engage, the more points you earn."
                   />
                 </div>
               </section>
@@ -530,6 +538,18 @@ export default function DocsPage() {
                             redeemed
                           </span>
                         </li>
+                        <li className="flex items-start gap-2">
+                          <Check className="h-4 w-4 text-green-400 mt-0.5" />
+                          <span>
+                            <strong className="text-white">
+                              Account ownership
+                            </strong>{" "}
+                            Your customer account is primary; business accounts
+                            are secondary and referenced to yours. If your
+                            account is banned or deleted, all associated
+                            business accounts are also removed.
+                          </span>
+                        </li>
                       </ul>
                     </CardContent>
                   </Card>
@@ -540,32 +560,49 @@ export default function DocsPage() {
                         How to Redeem / Withdraw Points
                       </h3>
                       <p className="text-white/50 text-sm leading-relaxed">
-                        Points are redeemed directly with the business during
-                        checkout. Here is how it works:
+                        Points and prizes are redeemed directly with the
+                        business. Here is the full flow from winning to
+                        collecting your prize:
                       </p>
                       <ol className="space-y-3 text-white/50 text-sm list-decimal list-inside">
                         <li>
-                          When you want to use your points, tell the cashier or
-                          business owner.
+                          You win a prize or accumulate points at a business
+                          through spins, draws, or trivia.
+                        </li>
+                        <li>
+                          When you want to use your points or claim a prize,
+                          tell the cashier or business owner.
                         </li>
                         <li>
                           The business looks up your account in their admin
-                          panel (or via their POS/e-commerce API).
+                          panel (or via their POS/e-commerce API) using your
+                          email, phone, or ID number.
                         </li>
                         <li>
-                          They verify your identity and deduct the points from
-                          your balance for that specific business.
+                          They verify your identity against the physical ID you
+                          provide, matching it to the details on your account.
                         </li>
                         <li>
-                          The points are applied as a discount toward your
-                          purchase.
+                          They deduct the points from your balance for that
+                          specific business and apply them as a discount toward
+                          your purchase, or hand you your physical prize.
+                        </li>
+                        <li>
+                          The business follows up with you using the contact
+                          information you provided at signup (email, phone).
+                          This is their data to use — Engage does not facilitate
+                          or monitor these communications.
                         </li>
                       </ol>
                       <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
                         <p className="text-purple-400 text-sm">
                           <strong>Note:</strong> Points cannot be transferred
                           between businesses. They are tied to the specific
-                          business where they were earned.
+                          business where they were earned. Your customer account
+                          is primary — business accounts are secondary and
+                          referenced to yours. If your account is banned or
+                          permanently deleted, all associated business accounts
+                          are also removed.
                         </p>
                       </div>
                     </CardContent>
@@ -2199,6 +2236,51 @@ export default function DocsPage() {
                 </Card>
 
                 <Card className="bg-white/5 border-white/10">
+                  <CardContent className="space-y-4">
+                    <h3 className="text-white font-semibold text-lg flex items-center gap-2">
+                      <Shield className="h-5 w-5 text-purple-400" />
+                      Data Breach Prevention
+                    </h3>
+                    <p className="text-white/50 text-sm leading-relaxed">
+                      Engage stores sensitive customer data including email,
+                      phone, and national ID or driver's license numbers. A data
+                      breach exposing this information could result in identity
+                      theft, regulatory fines (GDPR, KDPA), and loss of Merchant
+                      trust.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="p-3 rounded-lg bg-green-500/5 border border-green-500/20">
+                        <h4 className="text-green-400 font-medium text-xs mb-1">
+                          Measures We Take
+                        </h4>
+                        <ul className="space-y-1 text-white/50 text-xs">
+                          <li>• AES-256 encryption at rest for all PII</li>
+                          <li>• TLS encryption in transit</li>
+                          <li>• Row Level Security (RLS) for data isolation</li>
+                          <li>• HTTP-only, Secure, SameSite cookies</li>
+                          <li>• Audit logging on all data access</li>
+                        </ul>
+                      </div>
+                      <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                        <h4 className="text-amber-400 font-medium text-xs mb-1">
+                          Breach Notification
+                        </h4>
+                        <ul className="space-y-1 text-white/50 text-xs">
+                          <li>• 72-hour notification to regulators required</li>
+                          <li>
+                            • Customer notification when PII is compromised
+                          </li>
+                          <li>
+                            • Engage reserves right to terminate compromised
+                            accounts
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white/5 border-white/10">
                   <CardContent>
                     <h3 className="text-white font-semibold mb-4">
                       What Counts as an Engagement?
@@ -2330,11 +2412,14 @@ export default function DocsPage() {
                     <CardContent className="text-center">
                       <Gift className="h-8 w-8 text-yellow-400 mx-auto mb-2" />
                       <h3 className="text-white font-semibold mb-1">
-                        50% Commission
+                        Choose Your Commission
                       </h3>
                       <p className="text-white/50 text-sm">
-                        Earn 50% of the first payment when a referred business
-                        subscribes
+                        Choose between{" "}
+                        <span className="text-green-400">50% one-time</span> on
+                        first payment or{" "}
+                        <span className="text-blue-400">10% recurring</span> on
+                        every payment
                       </p>
                     </CardContent>
                   </Card>
@@ -2342,11 +2427,11 @@ export default function DocsPage() {
                     <CardContent className="text-center">
                       <Coins className="h-8 w-8 text-purple-400 mx-auto mb-2" />
                       <h3 className="text-white font-semibold mb-1">
-                        Loyalty Points
+                        Loyalty Points Always
                       </h3>
                       <p className="text-white/50 text-sm">
-                        Commissions are awarded as loyalty points on the system
-                        Engage entity — use them for spins and promotions
+                        Both options earn loyalty points = Cash commission ×
+                        100, awarded immediately for Engage experiences
                       </p>
                     </CardContent>
                   </Card>
@@ -2374,6 +2459,32 @@ export default function DocsPage() {
                         <span className="text-purple-400 font-bold">1.</span>
                         <span>
                           <strong className="text-white">
+                            Enroll in the program
+                          </strong>
+                          — Visit{" "}
+                          <Link
+                            href="/account/referral"
+                            className="text-purple-400 underline"
+                          >
+                            your referral dashboard
+                          </Link>{" "}
+                          and choose your commission preference:
+                          <ul className="list-disc list-inside mt-1 space-y-1 text-white/60">
+                            <li>
+                              <span className="text-green-400">One-time:</span>{" "}
+                              50% on first payment only
+                            </li>
+                            <li>
+                              <span className="text-blue-400">Recurring:</span>{" "}
+                              10% on every payment
+                            </li>
+                          </ul>
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-purple-400 font-bold">2.</span>
+                        <span>
+                          <strong className="text-white">
                             Share your link
                           </strong>
                           — Find your referral code in your account dashboard.
@@ -2385,7 +2496,7 @@ export default function DocsPage() {
                         </span>
                       </li>
                       <li className="flex items-start gap-3">
-                        <span className="text-purple-400 font-bold">2.</span>
+                        <span className="text-purple-400 font-bold">3.</span>
                         <span>
                           <strong className="text-white">
                             Business signs up
@@ -2395,32 +2506,42 @@ export default function DocsPage() {
                         </span>
                       </li>
                       <li className="flex items-start gap-3">
-                        <span className="text-purple-400 font-bold">3.</span>
+                        <span className="text-purple-400 font-bold">4.</span>
                         <span>
                           <strong className="text-white">They subscribe</strong>{" "}
                           — When the business pays for a subscription, you earn
-                          your commission.
+                          your commission based on your chosen preference.
                         </span>
                       </li>
                       <li className="flex items-start gap-3">
-                        <span className="text-purple-400 font-bold">4.</span>
+                        <span className="text-purple-400 font-bold">5.</span>
                         <div>
                           <strong className="text-white">You get paid</strong> —
                           You receive:
                           <ul className="list-disc list-inside mt-1 space-y-1 text-white/80">
                             <li>
                               <span className="text-green-400 font-medium">
-                                Money commission:
+                                Cash commission:
                               </span>{" "}
-                              Fixed one-time or recurring percentage, tracked
-                              for later Paystack/M-Pesa payout
+                              <span className="text-green-400">
+                                50% one-time
+                              </span>{" "}
+                              on first payment{" "}
+                              <span className="text-white/40">OR</span>{" "}
+                              <span className="text-blue-400">
+                                10% recurring
+                              </span>{" "}
+                              on every payment
+                              <span className="text-white/40 text-xs block">
+                                (based on your enrollment choice)
+                              </span>
                             </li>
                             <li>
                               <span className="text-purple-400 font-medium">
                                 Loyalty points:
                               </span>{" "}
-                              Commission × 100, awarded immediately for Engage
-                              experiences at the system Engage business entity
+                              Commission × 100, awarded immediately regardless
+                              of your choice
                             </li>
                           </ul>
                         </div>
@@ -2445,10 +2566,13 @@ export default function DocsPage() {
                               Price
                             </th>
                             <th className="text-white font-semibold pb-2 pr-4">
-                              One-time Commission (50%)
+                              One-Time (50%)
                             </th>
                             <th className="text-white font-semibold pb-2 pr-4">
-                              Points Awarded
+                              Recurring (10%)
+                            </th>
+                            <th className="text-white font-semibold pb-2 pr-4">
+                              Points (×100)
                             </th>
                           </tr>
                         </thead>
@@ -2457,6 +2581,9 @@ export default function DocsPage() {
                             <td className="py-2 text-white/70 pr-4">Starter</td>
                             <td className="py-2 text-white/70 pr-4">$29/mo</td>
                             <td className="py-2 text-green-400 pr-4">$14.50</td>
+                            <td className="py-2 text-blue-400 pr-4">
+                              $2.90/mo
+                            </td>
                             <td className="py-2 text-white/70 pr-4">
                               1,450 pts
                             </td>
@@ -2465,6 +2592,9 @@ export default function DocsPage() {
                             <td className="py-2 text-white/70 pr-4">Pro</td>
                             <td className="py-2 text-white/70 pr-4">$79/mo</td>
                             <td className="py-2 text-green-400 pr-4">$39.50</td>
+                            <td className="py-2 text-blue-400 pr-4">
+                              $7.90/mo
+                            </td>
                             <td className="py-2 text-white/70 pr-4">
                               3,950 pts
                             </td>
@@ -2475,6 +2605,9 @@ export default function DocsPage() {
                             </td>
                             <td className="py-2 text-white/70 pr-4">$194/mo</td>
                             <td className="py-2 text-green-400 pr-4">$97.00</td>
+                            <td className="py-2 text-blue-400 pr-4">
+                              $19.40/mo
+                            </td>
                             <td className="py-2 text-white/70 pr-4">
                               9,700 pts
                             </td>
@@ -2487,6 +2620,7 @@ export default function DocsPage() {
                             <td className="py-2 text-green-400 pr-4">
                               $348.50
                             </td>
+                            <td className="py-2 text-white/40 pr-4">N/A</td>
                             <td className="py-2 text-white/70 pr-4">
                               34,850 pts
                             </td>
@@ -2499,6 +2633,7 @@ export default function DocsPage() {
                             <td className="py-2 text-green-400 pr-4">
                               $898.50
                             </td>
+                            <td className="py-2 text-white/40 pr-4">N/A</td>
                             <td className="py-2 text-white/70 pr-4">
                               89,850 pts
                             </td>
@@ -2511,6 +2646,7 @@ export default function DocsPage() {
                             <td className="py-2 text-green-400 pr-4">
                               $2,498.50
                             </td>
+                            <td className="py-2 text-white/40 pr-4">N/A</td>
                             <td className="py-2 text-white/70 pr-4">
                               249,850 pts
                             </td>
@@ -2520,18 +2656,30 @@ export default function DocsPage() {
                     </div>
                     <p className="text-xs text-white/40 mt-3">
                       <strong className="text-white">Dual Rewards:</strong>{" "}
-                      <span className="text-green-400">Money</span> — the
-                      commission amount is tracked in USD. When you request a
-                      payout (via admin panel), the commission is paid out via
-                      Paystack or M-Pesa once you reach the $100 threshold.
-                      <span className="text-yellow-400"> Points</span> — equal
-                      to commission amount × 100 — are awarded simultaneously as
-                      loyalty points. These points unlock Engage experiences at{" "}
-                      <code className="bg-black/30 px-1 rounded">
-                        engagespin.com/admin/engage
-                      </code>
-                      .
+                      <span className="text-green-400">Cash</span> — choose{" "}
+                      <span className="text-green-400">50% one-time</span> on
+                      first payment <span className="text-white/40">OR</span>{" "}
+                      <span className="text-blue-400">10% recurring</span> on
+                      every payment. Tracked for Paystack/M-Pesa payout (min.
+                      $100 threshold).
+                      <span className="text-yellow-400"> Points</span> — Cash
+                      commission × 100, awarded immediately as loyalty points.
+                      Both options earn points.
                     </p>
+                    <div className="mt-2 text-xs text-white/30">
+                      <span className="font-medium text-white/50">
+                        Example:
+                      </span>{" "}
+                      Refer a Pro plan ($79/mo) —
+                      <span className="text-green-400"> One-time: $39.50</span>{" "}
+                      <span className="text-white/30">|</span>{" "}
+                      <span className="text-blue-400">
+                        {" "}
+                        Recurring: $7.90/mo
+                      </span>
+                      <span className="text-white/30"> | </span>
+                      <span className="text-purple-400"> Both: 3,950 pts</span>
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -2541,14 +2689,10 @@ export default function DocsPage() {
                       What can I do with loyalty points?
                     </h3>
                     <p className="text-white/50 text-sm mb-3">
-                      Points are awarded to the system "Engage" business entity
-                      ({" "}
-                      <code className="px-1 rounded">
-                        engagespin.com/admin/engage
-                      </code>
-                      ). They function exactly like points at any other
-                      business. You can use them for spins, draws, trivia, and
-                      more.
+                      Points are awarded to the system "Engage" business entity.
+                      They function exactly like points at any other business.
+                      Use them for spins, draws, trivia, and more — regardless
+                      of which commission option you chose.
                     </p>
                     <ul className="text-white/70 space-y-1 text-sm">
                       <li>
@@ -2569,30 +2713,6 @@ export default function DocsPage() {
                         features, beta releases, and special events
                       </li>
                     </ul>
-                    <Card className="bg-white/5 border-white/10 mt-4">
-                      <CardContent className="p-4">
-                        <p className="text-sm text-white/60 mb-2">
-                          <strong>Affiliate Tiers:</strong>
-                        </p>
-                        <ul className="text-xs text-white/50 space-y-1">
-                          <li>
-                            • <strong>Without a business:</strong> Use your
-                            affiliate points directly at
-                            engagespin.com/admin/engage
-                          </li>
-                          <li>
-                            • <strong>With an active business:</strong>{" "}
-                            Auto-enrolled in Engage experiences (opt-out
-                            available)
-                          </li>
-                          <li>
-                            • <strong>Top affiliates:</strong> Qualify to become
-                            admins of the Engage business and run custom games
-                            for the community
-                          </li>
-                        </ul>
-                      </CardContent>
-                    </Card>
 
                     <Button
                       asChild
@@ -2635,7 +2755,7 @@ export default function DocsPage() {
                     },
                     {
                       q: "Who owns the customer data?",
-                      a: "You do. Every email and engagement history belongs to your business. Export anytime. We never market to your customers.",
+                      a: "You do. Every email, phone, and ID number belongs to your business. Export anytime. We never market to your customers.",
                     },
                     {
                       q: "What if I run out of stickers?",
@@ -2643,7 +2763,15 @@ export default function DocsPage() {
                     },
                     {
                       q: "How does customer verification work?",
-                      a: "Engage captures email, phone, and ID number at signup. When collecting prizes, businesses verify identity against these details. If there's a mismatch, you can flag the account — other businesses will be alerted.",
+                      a: "Engage captures email, phone, and national ID or driver's license number at signup for customer-business uniqueness. When collecting prizes, businesses verify identity against these details. If there's a mismatch, you can flag the account — other businesses will be alerted.",
+                    },
+                    {
+                      q: "What happens if my account is banned or deleted?",
+                      a: "Engage reserves the right to ban or permanently delete any customer or business account. Since business accounts are secondary and referenced to the customer account, deleting a customer account also terminates all associated business accounts.",
+                    },
+                    {
+                      q: "How does the referral payment flow work?",
+                      a: "Choose your commission structure: 50% one-time on first payment OR 10% recurring on every payment. Both earn loyalty points (commission × 100) immediately. Cash payouts via Paystack/M-Pesa (min. $100 threshold).",
                     },
                   ].map((faq, i) => (
                     <Card key={i} className="bg-white/5 border-white/10">

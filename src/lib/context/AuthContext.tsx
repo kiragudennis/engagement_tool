@@ -97,6 +97,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id_verified: data.id_verified,
           flagged_reason: data.flagged_reason,
           flagged_at: data.flagged_at,
+          referral_enrolled: data.referral_enrolled,
+          referral_commission_type: data.referral_commission_type,
           business_name: data.business_name,
           business_slug: data.business_slug,
           business_type: data.business_type,

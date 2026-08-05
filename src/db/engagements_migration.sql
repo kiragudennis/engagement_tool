@@ -55,9 +55,9 @@ IMMUTABLE
 AS $$
   SELECT CASE p_plan
     WHEN 'trial' THEN 100
-    WHEN 'starter' THEN 1000
-    WHEN 'pro' THEN 10000
-    WHEN 'enterprise' THEN 50000
+    WHEN 'starter' THEN 5000
+    WHEN 'pro' THEN 50000
+    WHEN 'enterprise' THEN 500000
     ELSE 100
   END;
 $$;

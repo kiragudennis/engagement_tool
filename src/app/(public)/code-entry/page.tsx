@@ -139,10 +139,10 @@ export default function CodeEntryPage() {
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
-                  className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm"
+                  className="flex gap-1 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs"
                 >
                   <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                  {error}
+                  <>{error}</>
                 </motion.div>
               )}
 

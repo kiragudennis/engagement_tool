@@ -256,10 +256,10 @@ export default function BusinessCodeEntryPage() {
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm"
+                  className="flex gap-1 p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs"
                 >
                   <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                  {error}
+                  <>{error}</>
                 </motion.div>
               )}
 
@@ -268,22 +268,22 @@ export default function BusinessCodeEntryPage() {
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="space-y-3"
+                  className="space-y-3 text-xs"
                 >
                   <div
-                    className={cn("p-4 rounded-lg border", destConfig?.bgGlow)}
+                    className={cn("p-2 rounded-lg border", destConfig?.bgGlow)}
                   >
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex gap-1 mb-2">
                       {destConfig && (
-                        <destConfig.icon className="h-5 w-5 text-purple-500" />
+                        <destConfig.icon className="h-4 w-4 text-purple-500" />
                       )}
-                      <span className="font-medium text-white text-center">
+                      <span className="font-medium text-white">
                         {destConfig?.description}
                       </span>
                     </div>
 
                     {codeResult.draw_name && (
-                      <div className="mt-2 text-sm text-amber-300">
+                      <div className="mt-2 text-amber-300">
                         <Trophy className="h-3.5 w-3.5 inline mr-1" />
                         {codeResult.draw_name}
                         {codeResult.draw_prize && (

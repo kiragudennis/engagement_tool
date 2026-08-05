@@ -14,6 +14,12 @@ ALTER TABLE referrals
   ADD COLUMN IF NOT EXISTS referral_plan TEXT,
   ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
 
+-- 1.a. Add referral enrollment preference to users table
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS referral_enrolled BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS referral_commission_type TEXT DEFAULT 'one_time'
+    CHECK (referral_commission_type IN ('one_time', 'recurring'));
+
 -- 2. Referral commissions table
 CREATE TABLE IF NOT EXISTS referral_commissions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -371,6 +377,66 @@ BEGIN
     LEFT JOIN businesses b ON b.id = rc.referred_business_id
     WHERE r.referrer_id = p_user_id
     ORDER BY rc.created_at DESC;
+END;
+$$;
+
+-- 7a. Enroll a customer in the referral program
+CREATE OR REPLACE FUNCTION enroll_in_referral_program(
+    p_user_id UUID,
+    p_commission_type TEXT DEFAULT 'one_time'
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    IF p_commission_type NOT IN ('one_time', 'recurring') THEN
+        RETURN json_build_object('success', false, 'error', 'Invalid commission type. Use one_time or recurring');
+    END IF;
+
+    UPDATE users
+    SET referral_enrolled = TRUE,
+        referral_commission_type = p_commission_type,
+        updated_at = NOW()
+    WHERE id = p_user_id;
+
+    IF NOT FOUND THEN
+        RETURN json_build_object('success', false, 'error', 'User not found');
+    END IF;
+
+    RETURN json_build_object(
+        'success', true,
+        'commission_type', p_commission_type,
+        'message', 'Successfully enrolled in referral program'
+    );
+END;
+$$;
+
+-- 7b. Check if a user is enrolled in the referral program
+CREATE OR REPLACE FUNCTION check_referral_enrollment(p_user_id UUID)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_enrolled BOOLEAN;
+    v_commission_type TEXT;
+    v_referral_code TEXT;
+BEGIN
+    SELECT referral_enrolled, referral_commission_type, referral_code
+    INTO v_enrolled, v_commission_type, v_referral_code
+    FROM users
+    WHERE id = p_user_id;
+
+    IF NOT FOUND THEN
+        RETURN json_build_object('success', false, 'error', 'User not found');
+    END IF;
+
+    RETURN json_build_object(
+        'enrolled', v_enrolled,
+        'commission_type', v_commission_type,
+        'referral_code', v_referral_code
+    );
 END;
 $$;
 

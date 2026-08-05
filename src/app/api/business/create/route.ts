@@ -165,18 +165,28 @@ export async function POST(req: NextRequest) {
       try {
         const { data: referrer } = await supabaseAdmin
           .from("users")
-          .select("id, referral_code")
+          .select("id, referral_code, referral_commission_type")
           .eq("referral_code", referralCode)
           .maybeSingle();
 
         if (referrer) {
+          const commissionType =
+            referrer.referral_commission_type || "one_time";
+
+          // Ensure referrer is marked as enrolled (enrollment is auto-triggered
+          // if they haven't explicitly enrolled yet via the dashboard)
+          await supabaseAdmin
+            .from("users")
+            .update({ referral_enrolled: true })
+            .eq("id", referrer.id);
+
           await supabaseAdmin.from("referrals").insert({
             referrer_id: referrer.id,
             referred_business_id: business.id,
             referral_code: referralCode,
             referral_type: "business",
             conversion_type: "signup",
-            commission_type: "one_time",
+            commission_type: commissionType,
             commission_rate: 0.50,
             status: "joined",
             metadata: {

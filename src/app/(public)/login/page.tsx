@@ -195,7 +195,13 @@ function SignupFormContent() {
     e.preventDefault();
     setErrors({});
 
-    const parsed = signupSchema.safeParse({ fullName, email, password });
+    const parsed = signupSchema.safeParse({
+      fullName,
+      email,
+      phone,
+      idNumber,
+      password,
+    });
     if (!parsed.success) {
       const fieldErrors: Record<string, string> = {};
       const flat = parsed.error.flatten().fieldErrors;
@@ -214,7 +220,7 @@ function SignupFormContent() {
         body: JSON.stringify({
           ...parsed.data,
           phone,
-          idNumber: idNumber || undefined,
+          idNumber: idNumber,
           referralCode: referralCode || undefined,
         }),
       });
@@ -550,47 +556,77 @@ export default function LoginPage() {
                     </TabsContent>
                   </Tabs>
 
-                  <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-800 space-y-3 text-center">
-                    {activeTab === "login" && (
+                  {/* Mobile app style bottom bar */}
+                  <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
+                    {/* Main links */}
+                    <div className="space-y-3 text-center">
+                      {activeTab === "login" && (
+                        <p className="text-gray-500 dark:text-gray-400 text-sm">
+                          Don't have an account?{" "}
+                          <button
+                            onClick={() => setActiveTab("signup")}
+                            className="text-purple-600 dark:text-purple-400 hover:underline"
+                          >
+                            Create one
+                          </button>
+                        </p>
+                      )}
+                      {activeTab === "signup" && (
+                        <p className="text-gray-500 dark:text-gray-400 text-sm">
+                          Already have an account?{" "}
+                          <button
+                            onClick={() => setActiveTab("login")}
+                            className="text-purple-600 dark:text-purple-400 hover:underline"
+                          >
+                            Sign in
+                          </button>
+                        </p>
+                      )}
                       <p className="text-gray-500 dark:text-gray-400 text-sm">
-                        Don't have an account?{" "}
-                        <button
-                          onClick={() => setActiveTab("signup")}
+                        Have a code?{" "}
+                        <Link
+                          href="/code-entry"
                           className="text-purple-600 dark:text-purple-400 hover:underline"
                         >
-                          Create one
-                        </button>
+                          Enter it here
+                        </Link>
                       </p>
-                    )}
-                    {activeTab === "signup" && (
-                      <p className="text-gray-500 dark:text-gray-400 text-sm">
-                        Already have an account?{" "}
-                        <button
-                          onClick={() => setActiveTab("login")}
+                      <p className="text-gray-400 dark:text-gray-500 text-xs">
+                        Running a business?{" "}
+                        <Link
+                          href="/business/signup"
                           className="text-purple-600 dark:text-purple-400 hover:underline"
                         >
-                          Sign in
-                        </button>
+                          Start free trial
+                        </Link>
                       </p>
-                    )}
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">
-                      Have a code?{" "}
+                    </div>
+
+                    {/* Legal links row - mobile app style */}
+                    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-4 pt-3 border-t border-gray-100 dark:border-gray-800/50 text-[11px] text-gray-400 dark:text-gray-500">
                       <Link
-                        href="/code-entry"
-                        className="text-purple-600 dark:text-purple-400 hover:underline"
+                        href="/terms"
+                        className="hover:text-purple-400 transition-colors"
                       >
-                        Enter it here
+                        Terms
                       </Link>
-                    </p>
-                    <p className="text-gray-400 dark:text-gray-500 text-xs">
-                      Running a business?{" "}
                       <Link
-                        href="/business/signup"
-                        className="text-purple-600 dark:text-purple-400 hover:underline"
+                        href="/privacy"
+                        className="hover:text-purple-400 transition-colors"
                       >
-                        Start free trial
+                        Privacy
                       </Link>
-                    </p>
+                      <Link
+                        href="/cookies"
+                        className="hover:text-purple-400 transition-colors"
+                      >
+                        Cookies
+                      </Link>
+                      <span className="text-gray-300 dark:text-gray-700">
+                        |
+                      </span>
+                      <span>© {new Date().getFullYear()}</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

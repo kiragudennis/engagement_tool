@@ -3,7 +3,12 @@ export interface Business {
   id: string;
   name: string;
   slug: string;
+  description: string | null;
+  phone: string | null;
+  website: string | null;
+  location: string | null;
   logo_url: string;
+  cover_image_url: string;
   brand_color: string;
   brand_secondary_color: string;
   favicon_url: string;

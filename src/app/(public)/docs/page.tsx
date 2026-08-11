@@ -33,17 +33,22 @@ import {
   ArrowRight,
   TriangleAlert,
   BadgeDollarSign,
+  Info,
+  Scale,
+  Timer,
+  BicepsFlexed,
+  Puzzle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 const SECTIONS = [
   { id: "overview", label: "Overview", icon: Sparkles },
-  { id: "business", label: "For Businesses", icon: Store },
   { id: "verification", label: "Verification", icon: Shield },
-  { id: "customer-profile", label: "Customer Profile", icon: CreditCard },
-  { id: "notifications", label: "Notifications", icon: Bell },
+  { id: "rules", label: "Rules & Fair Play", icon: Scale },
+  { id: "business", label: "For Businesses", icon: Store },
   { id: "customer", label: "For Customers", icon: Users },
+  { id: "notifications", label: "Notifications", icon: Bell },
   { id: "codes", label: "How Codes Work", icon: Ticket },
   { id: "stickers", label: "Sticker System", icon: Printer },
   { id: "pos", label: "POS Integration", icon: ShoppingBag },
@@ -119,7 +124,7 @@ export default function DocsPage() {
             {/* Content - Full width on mobile, constrained on desktop */}
             <div className="flex-1 min-w-0 space-y-20">
               {/* ─── OVERVIEW ─────────────────────────────── */}
-              <section id="overview">
+              <section id="overview" className="scroll-mt-20">
                 <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
                   <Sparkles className="h-6 w-6 text-purple-400" /> Overview
                 </h2>
@@ -243,57 +248,8 @@ export default function DocsPage() {
                 </div>
               </section>
 
-              {/* ─── FOR BUSINESSES ───────────────────────── */}
-              <section id="business">
-                <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
-                  <Store className="h-6 w-6 text-purple-400" /> For Businesses
-                </h2>
-                <div className="space-y-6">
-                  <StepCard
-                    number={1}
-                    title="Create Your Business Account"
-                    description="Sign up at engagespin.com/business/signup. You'll get a 14-day free trial with full access to all features."
-                  />
-                  <StepCard
-                    number={2}
-                    title="Configure Your Spin Wheel"
-                    description="Set up prizes on your spin wheel — free coffee, discounts, products. Choose what customers can win."
-                  />
-                  <StepCard
-                    number={3}
-                    title="Generate Codes"
-                    description={
-                      <span>
-                        <strong className="text-white">Sticker model:</strong>{" "}
-                        Use the Sticker Batch Generator to create rarity-tiered
-                        codes (Bronze, Silver, Gold, Diamond). Print them on
-                        thermal labels and stick them on your products.
-                        <br />
-                        <br />
-                        <strong className="text-white">
-                          POS model (Pro/Enterprise):
-                        </strong>{" "}
-                        Use our API to generate receipt codes automatically.
-                        Send the cart total, get a code back with calculated
-                        points.
-                      </span>
-                    }
-                  />
-                  <StepCard
-                    number={4}
-                    title="Share With Customers"
-                    description="Customers discover codes on your products or receipts. They visit your Engage page, enter the code, and start playing."
-                  />
-                  <StepCard
-                    number={5}
-                    title="Watch Your Customer List Grow"
-                    description="Every code redemption captures customer data. Export your list anytime. These are your customers — we never market to them."
-                  />
-                </div>
-              </section>
-
               {/* ─── VERIFICATION & SECURITY ───────────────── */}
-              <section id="verification">
+              <section id="verification" className="scroll-mt-20">
                 <h2 className="text-2xl font-bold text-white mb-4 flex gap-2">
                   <Shield className="h-6 w-6 text-purple-400 mt-1" />{" "}
                   <>Verification & Security</>
@@ -458,12 +414,567 @@ export default function DocsPage() {
                 </div>
               </section>
 
+              {/* ─── RULES & FAIR PLAY ────────────────────────── */}
+              <section id="rules" className="scroll-mt-20">
+                <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                  <Scale className="h-6 w-6 text-purple-400" /> Rules & Fair
+                  Play
+                </h2>
+
+                <div className="space-y-6">
+                  {/* Intro */}
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="space-y-4">
+                      <h3 className="text-white font-semibold text-lg">
+                        Our Commitment to Fair Play
+                      </h3>
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        Every spin, trivia answer, and draw entry is recorded
+                        permanently on our servers. In case of any dispute,
+                        businesses and customers can request a full audit of any
+                        game session. We take fairness seriously, here's exactly
+                        how each game type works.
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  {/* Spin Wheel Rules */}
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="space-y-4">
+                      <h3 className="text-white font-semibold text-lg flex items-center gap-2">
+                        <span className="text-2xl">🎡</span> Spin Wheel Rules
+                      </h3>
+
+                      <div className="space-y-4">
+                        {/* How It Works */}
+                        <div>
+                          <h4 className="text-white/80 font-medium mb-2">
+                            How Spinning Works
+                          </h4>
+                          <ol className="space-y-2 text-white/50 text-sm list-decimal list-inside">
+                            <li>
+                              <strong className="text-white">
+                                Prize Selection:
+                              </strong>{" "}
+                              When you spin, our server instantly selects your
+                              prize based on the odds the business has
+                              configured. Each prize has a probability
+                              percentage, for example, "10% Off" might have a
+                              30% chance, while "VIP Pass" might have a 5%
+                              chance.
+                            </li>
+                            <li>
+                              <strong className="text-white">
+                                Visual Display:
+                              </strong>{" "}
+                              What you see on the wheel is a shuffled version of
+                              the prizes. This is a security measure that
+                              prevents anyone from predicting or manipulating
+                              where the wheel will land.
+                            </li>
+                            <li>
+                              <strong className="text-white">
+                                Result Reveal:
+                              </strong>{" "}
+                              After the wheel stops, you'll see what you've won.
+                              The prize you see is your actual prize, the system
+                              has already recorded it permanently.
+                            </li>
+                          </ol>
+                        </div>
+
+                        {/* Why We Shuffle */}
+                        <div className="p-4 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                          <h4 className="text-blue-400 font-medium mb-2 flex items-center gap-2">
+                            <Info className="h-4 w-4" /> Why Does the Wheel Look
+                            Different?
+                          </h4>
+                          <p className="text-blue-300/80 text-sm leading-relaxed">
+                            You may notice that the prizes on the wheel don't
+                            match their original positions. This is intentional,
+                            we shuffle the display of prizes on every spin to
+                            prevent cheating. Think of it like a deck of cards
+                            being shuffled before each hand.
+                          </p>
+                          <p className="text-blue-300/80 text-sm leading-relaxed mt-2">
+                            <strong>Important:</strong> The prize you win is
+                            determined before the wheel even starts spinning.
+                            The wheel animation is purely visual, it always
+                            lands on the correct display slot that corresponds
+                            to your actual prize.
+                          </p>
+                        </div>
+
+                        {/* Prize Guarantee */}
+                        <div className="p-4 rounded-lg bg-green-500/5 border border-green-500/20">
+                          <h4 className="text-green-400 font-medium mb-2 flex items-center gap-2">
+                            <Shield className="h-4 w-4" /> Prize Guarantee
+                          </h4>
+                          <ul className="space-y-2 text-green-300/80 text-sm">
+                            <li className="flex items-start gap-2">
+                              <Check className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
+                              <span>
+                                <strong>Your prize is locked in</strong> the
+                                moment you press spin. No amount of refreshing,
+                                closing the browser, or connection issues won't
+                                change what you've won.
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <Check className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
+                              <span>
+                                <strong>Every spin is recorded</strong> with a
+                                unique ID and timestamp. Both you and the
+                                business can verify any spin result.
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <Check className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
+                              <span>
+                                <strong>
+                                  Points and prizes are awarded instantly
+                                </strong>{" "}
+                                - if you win points, they're added to your
+                                balance immediately. If you win a physical
+                                prize, it's reserved for you.
+                              </span>
+                            </li>
+                          </ul>
+                        </div>
+
+                        <div className="p-4 rounded-lg bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20">
+                          <h3 className="text-purple-400 font-medium mb-2 flex items-center gap-2">
+                            <Zap className="h-4 w-4" /> Master the Spin
+                          </h3>
+                          <p className="text-purple-300/80 text-sm leading-relaxed">
+                            While our wheel uses advanced physics and
+                            cryptographic randomness to ensure fair play,
+                            skilled spinners can develop techniques to improve
+                            their experience:
+                          </p>
+                          <ul className="space-y-2 text-purple-300/80 text-sm mt-2">
+                            <li className="flex items-start gap-2">
+                              <BicepsFlexed className="h-4 w-4 text-purple-400 mt-0.5" />
+                              <span>
+                                <strong>Strength Control:</strong> Learn to
+                                apply consistent pressure for your preferred
+                                spin speed. Different strengths create different
+                                visual experiences!
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <Timer className="h-4 w-4 text-purple-400 mt-0.5" />
+                              <span>
+                                <strong>Timing Awareness:</strong> While
+                                outcomes are determined by fair RNG, your spin
+                                strength affects the animation duration and
+                                reveal timing. Find your signature style!
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <Puzzle className="h-4 w-4 text-purple-400 mt-0.5" />
+                              <span>
+                                <strong>Pattern Recognition:</strong> Study the
+                                wheel's behavior to understand probability
+                                distribution. Knowledge is power!
+                              </span>
+                            </li>
+                          </ul>
+                          <p className="text-purple-300/60 text-xs mt-2 italic">
+                            Note: All outcomes are determined by
+                            cryptographically-secure random number generation.
+                            Skill affects the experience, not the outcome. This
+                            ensures fair play for everyone.
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Trivia Rules */}
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="space-y-4">
+                      <h3 className="text-white font-semibold text-lg flex items-center gap-2">
+                        <span className="text-2xl">🧠</span> Trivia Challenge
+                        Rules
+                      </h3>
+
+                      <div className="space-y-4">
+                        <ol className="space-y-3 text-white/50 text-sm list-decimal list-inside">
+                          <li>
+                            <strong className="text-white">Entry:</strong> You
+                            need a trivia ticket to participate. Tickets are won
+                            through spin wheels or given out by businesses
+                            directly.
+                          </li>
+                          <li>
+                            <strong className="text-white">Timing:</strong>{" "}
+                            Trivia challenges have a specific start time and
+                            duration. You must be present and active during the
+                            challenge window to participate.
+                          </li>
+                          <li>
+                            <strong className="text-white">Scoring:</strong>{" "}
+                            Each question has a time limit. Points are awarded
+                            based on correct answers AND speed. The faster you
+                            answer correctly, the more points you earn.
+                          </li>
+                          <li>
+                            <strong className="text-white">Tiebreakers:</strong>{" "}
+                            If multiple participants have the same score, the
+                            tiebreaker is based on total response time — whoever
+                            answered faster overall ranks higher.
+                          </li>
+                          <li>
+                            <strong className="text-white">Anti-Cheat:</strong>{" "}
+                            We monitor for automated responses, multiple
+                            accounts, and suspicious patterns. Violations result
+                            in disqualification and potential account
+                            suspension.
+                          </li>
+                        </ol>
+
+                        <div className="p-4 rounded-lg bg-yellow-500/5 border border-yellow-500/20">
+                          <h4 className="text-yellow-400 font-medium mb-2 flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4" /> Important
+                            Notes
+                          </h4>
+                          <ul className="space-y-2 text-yellow-300/80 text-sm">
+                            <li className="flex items-start gap-2">
+                              <span className="text-yellow-400 mt-0.5">•</span>
+                              <span>
+                                Once a trivia challenge starts, you cannot join
+                                late. Make sure you're registered and present
+                                before the start time.
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="text-yellow-400 mt-0.5">•</span>
+                              <span>
+                                If you lose internet connection during a
+                                challenge, you can reconnect and continue, but
+                                the timer on the current question continues
+                                running.
+                              </span>
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Prize Draws Rules */}
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="space-y-4">
+                      <h3 className="text-white font-semibold text-lg flex items-center gap-2">
+                        <span className="text-2xl">🎟️</span> Prize Draw Rules
+                      </h3>
+
+                      <div className="space-y-4">
+                        <ol className="space-y-3 text-white/50 text-sm list-decimal list-inside">
+                          <li>
+                            <strong className="text-white">
+                              Entry Tickets:
+                            </strong>{" "}
+                            You earn draw entries by redeeming codes, spinning
+                            the wheel, or purchasing entries with points. Each
+                            ticket is one entry into the draw.
+                          </li>
+                          <li>
+                            <strong className="text-white">
+                              Multiple Entries:
+                            </strong>{" "}
+                            You can have multiple entries in the same draw. Each
+                            entry increases your chances of winning
+                            proportionally.
+                          </li>
+                          <li>
+                            <strong className="text-white">
+                              Draw Process:
+                            </strong>{" "}
+                            When the draw date arrives, winners are selected
+                            randomly by our system. The selection is verifiable
+                            and uses cryptographic randomness.
+                          </li>
+                          <li>
+                            <strong className="text-white">
+                              Winner Notification:
+                            </strong>{" "}
+                            Winners are notified via email and phone immediately
+                            after the draw. Results are also published on the
+                            business's Engage page.
+                          </li>
+                          <li>
+                            <strong className="text-white">
+                              Prize Collection:
+                            </strong>{" "}
+                            You have 30 days from the draw date to claim your
+                            prize. Unclaimed prizes may be redrawn or forfeited
+                            based on the business's policy.
+                          </li>
+                        </ol>
+
+                        <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
+                          <h4 className="text-purple-400 font-medium mb-2">
+                            Draw Transparency
+                          </h4>
+                          <p className="text-purple-300/80 text-sm leading-relaxed">
+                            Every draw result includes a verification hash that
+                            proves the winner was selected fairly. You can
+                            verify any draw result using our public verifier
+                            tool — ask the business for the draw verification
+                            code.
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* General Rules */}
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="space-y-4">
+                      <h3 className="text-white font-semibold text-lg flex items-center gap-2">
+                        <span className="text-2xl">📋</span> General Rules
+                      </h3>
+
+                      <div className="space-y-4">
+                        {/* Account Rules */}
+                        <div>
+                          <h4 className="text-white/80 font-medium mb-2">
+                            Account & Identity
+                          </h4>
+                          <ul className="space-y-2 text-white/50 text-sm">
+                            <li className="flex items-start gap-2">
+                              <Check className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
+                              <span>
+                                One person, one account. Multiple accounts per
+                                person are not allowed and will result in all
+                                associated accounts being banned.
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <Check className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
+                              <span>
+                                You must provide accurate information during
+                                signup. False information may result in prize
+                                forfeiture.
+                              </span>
+                            </li>
+                          </ul>
+                        </div>
+
+                        {/* Business Rules */}
+                        <div>
+                          <h4 className="text-white/80 font-medium mb-2">
+                            Business Rules
+                          </h4>
+                          <ul className="space-y-2 text-white/50 text-sm">
+                            <li className="flex items-start gap-2">
+                              <Check className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
+                              <span>
+                                Businesses set their own prize odds, point
+                                values, and game durations. These are locked
+                                once a game goes live and cannot be changed.
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <Check className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
+                              <span>
+                                Businesses are responsible for honoring all
+                                prizes. Engage records all transactions as proof
+                                of what was won.
+                              </span>
+                            </li>
+                          </ul>
+                        </div>
+
+                        {/* Dispute Resolution */}
+                        <div className="p-4 rounded-lg bg-red-500/5 border border-red-500/20">
+                          <h4 className="text-red-400 font-medium mb-2 flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4" /> Disputes &
+                            Verification
+                          </h4>
+                          <p className="text-red-300/80 text-sm leading-relaxed">
+                            All game activities — spins, trivia answers, draw
+                            entries, and prize awards — are permanently recorded
+                            with timestamps and unique identifiers. In case of
+                            any dispute:
+                          </p>
+                          <ul className="space-y-2 text-red-300/80 text-sm mt-2">
+                            <li className="flex items-start gap-2">
+                              <span className="text-red-400 mt-0.5">1.</span>
+                              <span>
+                                <strong>Customers:</strong> Contact the business
+                                with your spin/draw ID or the date and time of
+                                the activity. The business can verify everything
+                                in their admin panel.
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="text-red-400 mt-0.5">2.</span>
+                              <span>
+                                <strong>Businesses:</strong> You have full
+                                access to all customer activity logs. Every
+                                spin, win, and point transaction is recorded and
+                                cannot be modified.
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="text-red-400 mt-0.5">3.</span>
+                              <span>
+                                <strong>Escalation:</strong> If a dispute cannot
+                                be resolved between customer and business,
+                                Engage support can provide verified activity
+                                records as an impartial third party.
+                              </span>
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* For Businesses: Setting Fair Odds */}
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="space-y-4">
+                      <h3 className="text-white font-semibold text-lg flex items-center gap-2">
+                        <span className="text-2xl">⚖️</span> For Businesses:
+                        Setting Fair Odds
+                      </h3>
+
+                      <div className="space-y-4">
+                        <p className="text-white/50 text-sm leading-relaxed">
+                          When you configure a spin wheel, you control the
+                          probability of each prize. Here are best practices for
+                          fair and engaging games:
+                        </p>
+
+                        <ul className="space-y-3 text-white/50 text-sm">
+                          <li className="flex items-start gap-2">
+                            <Check className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
+                            <span>
+                              <strong className="text-white">
+                                Probabilities must total 100%:
+                              </strong>
+                              The sum of all prize probabilities must equal
+                              exactly 100%. Our system validates this before
+                              your game goes live.
+                            </span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <Check className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
+                            <span>
+                              <strong className="text-white">
+                                Common prizes should have higher odds:
+                              </strong>
+                              Small discounts (10% off) or low-point rewards
+                              should appear more frequently (30-40%). Big prizes
+                              (VIP Passes) should be rare (2-5%).
+                            </span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <Check className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
+                            <span>
+                              <strong className="text-white">
+                                Include a "Try Again" segment:
+                              </strong>
+                              Not every spin needs to win. A "Try Again" with
+                              20-30% probability keeps the game sustainable.
+                            </span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <Check className="h-4 w-4 text-green-400 mt-0.5 shrink-0" />
+                            <span>
+                              <strong className="text-white">
+                                Odds are locked once live:
+                              </strong>
+                              After your game goes live, you cannot change the
+                              probabilities. Plan carefully and test with demo
+                              spins first.
+                            </span>
+                          </li>
+                        </ul>
+
+                        <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+                          <p className="text-white/40 text-xs font-mono">
+                            Example: Good Prize Distribution
+                            <br />
+                            • 10% Off — 35% probability
+                            <br />
+                            • 25 Points — 25% probability
+                            <br />
+                            • Free Drink — 15% probability
+                            <br />
+                            • Try Again — 20% probability
+                            <br />
+                            • VIP Pass — 5% probability
+                            <br />
+                            <span className="text-green-400">
+                              Total: 100% ✓
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </section>
+
+              {/* ─── FOR BUSINESSES ───────────────────────── */}
+              <section id="business" className="scroll-mt-20">
+                <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                  <Store className="h-6 w-6 text-purple-400" /> For Businesses
+                </h2>
+                <div className="space-y-6">
+                  <StepCard
+                    number={1}
+                    title="Create Your Business Account"
+                    description="Sign up at engagespin.com/business/signup. You'll get a 14-day free trial with full access to all features."
+                  />
+                  <StepCard
+                    number={2}
+                    title="Configure Your Spin Wheel"
+                    description="Set up prizes on your spin wheel — free coffee, discounts, products. Choose what customers can win."
+                  />
+                  <StepCard
+                    number={3}
+                    title="Generate Codes"
+                    description={
+                      <span>
+                        <strong className="text-white">Sticker model:</strong>{" "}
+                        Use the Sticker Batch Generator to create rarity-tiered
+                        codes (Bronze, Silver, Gold, Diamond). Print them on
+                        thermal labels and stick them on your products.
+                        <br />
+                        <br />
+                        <strong className="text-white">
+                          POS model (Pro/Enterprise):
+                        </strong>{" "}
+                        Use our API to generate receipt codes automatically.
+                        Send the cart total, get a code back with calculated
+                        points.
+                      </span>
+                    }
+                  />
+                  <StepCard
+                    number={4}
+                    title="Share With Customers"
+                    description="Customers discover codes on your products or receipts. They visit your Engage page, enter the code, and start playing."
+                  />
+                  <StepCard
+                    number={5}
+                    title="Watch Your Customer List Grow"
+                    description="Every code redemption captures customer data. Export your list anytime. These are your customers — we never market to them."
+                  />
+                </div>
+              </section>
+
               {/* ─── FOR CUSTOMERS ────────────────────────── */}
-              <section id="customer">
+              <section id="customer" className="scroll-mt-20">
                 <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
                   <Users className="h-6 w-6 text-purple-400" /> For Customers
                 </h2>
-                <div className="space-y-6">
+                <div className="space-y-6 mb-6">
                   <StepCard
                     number={1}
                     title="Get a Code"
@@ -485,14 +996,7 @@ export default function DocsPage() {
                     description="Redeem points or claim prizes in-store. The business verifies your identity (email, phone, ID) and follows up using your contact info. The more you engage, the more points you earn."
                   />
                 </div>
-              </section>
 
-              {/* ─── CUSTOMER PROFILE & POINTS ─────────────── */}
-              <section id="customer-profile">
-                <h2 className="text-2xl font-bold text-white mb-4 flex gap-2">
-                  <Users className="h-6 w-6 text-purple-400" />{" "}
-                  <>Customer Profile & Points</>
-                </h2>
                 <div className="space-y-6">
                   <Card className="bg-white/5 border-white/10">
                     <CardContent className="space-y-4">
@@ -637,7 +1141,7 @@ export default function DocsPage() {
               </section>
 
               {/* ─── NOTIFICATIONS ────────────────────────── */}
-              <section id="notifications">
+              <section id="notifications" className="scroll-mt-20">
                 <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
                   <Bell className="h-6 w-6 text-purple-400" /> Notifications
                 </h2>
@@ -754,7 +1258,7 @@ export default function DocsPage() {
               </section>
 
               {/* ─── HOW CODES WORK ───────────────────────── */}
-              <section id="codes">
+              <section id="codes" className="scroll-mt-20">
                 <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
                   <Ticket className="h-6 w-6 text-purple-400" /> How Codes Work
                 </h2>
@@ -976,7 +1480,7 @@ export default function DocsPage() {
               </section>
 
               {/* ─── STICKER SYSTEM ───────────────────────── */}
-              <section id="stickers">
+              <section id="stickers" className="scroll-mt-20">
                 <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
                   <Printer className="h-6 w-6 text-purple-400" /> Sticker System
                 </h2>
@@ -1289,7 +1793,7 @@ export default function DocsPage() {
               </section>
 
               {/* ─── POS INTEGRATION ──────────────────────── */}
-              <section id="pos">
+              <section id="pos" className="scroll-mt-20">
                 <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
                   <ShoppingBag className="h-6 w-6 text-purple-400" /> POS
                   Integration
@@ -1728,7 +2232,7 @@ export default function DocsPage() {
               </section>
 
               {/* ─── ENGAGEMENT ───────────────────────────────────── */}
-              <section id="engagement">
+              <section id="engagement" className="scroll-mt-20">
                 <h2 className="text-2xl font-bold text-white mb-6 flex gap-2">
                   <FunnelPlus className="h-6 w-6 text-purple-400" />{" "}
                   <>The Full Engagement Flow</>
@@ -2007,7 +2511,7 @@ export default function DocsPage() {
                 </Card>
               </section>
 
-              <section id="limits">
+              <section id="limits" className="scroll-mt-20">
                 <h2 className="text-2xl font-bold text-white mb-6 flex gap-2">
                   <CirclePause className="h-8 w-8 text-purple-400 mt-1" />{" "}
                   <>Engagement Limits & Game Capacity</>
@@ -2730,7 +3234,7 @@ export default function DocsPage() {
               </section>
 
               {/* ─── FAQ ───────────────────────────────────── */}
-              <section id="faq">
+              <section id="faq" className="scroll-mt-20">
                 <h2 className="text-2xl font-bold text-white mb-4 flex gap-2">
                   <Shield className="h-6 w-6 text-purple-400 mt-1" />{" "}
                   <>Frequently Asked Questions</>

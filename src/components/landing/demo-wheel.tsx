@@ -3,23 +3,87 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Volume2, VolumeX } from "lucide-react";
+import { Sparkles, Volume2, VolumeX, Zap, Gauge } from "lucide-react";
 import confetti from "canvas-confetti";
 import spinAnimation from "@/assets/lottie/spin-1.json";
 import { LottieIcon } from "../ui/lottie-icon";
 
 const SEGMENTS = [
-  { label: "Free Coffee", color: "#8B5CF6", icon: "☕", value: "coffee" },
-  { label: "10% Off", color: "#EC4899", icon: "🏷️", value: "10percent" },
-  { label: "Free Donut", color: "#F59E0B", icon: "🍩", value: "donut" },
-  { label: "Try Again", color: "#10B981", icon: "🔄", value: "tryagain" },
-  { label: "Free Latte", color: "#3B82F6", icon: "🥤", value: "latte" },
-  { label: "20% Off", color: "#EF4444", icon: "💵", value: "20percent" },
-  { label: "VIP Pass", color: "#A855F7", icon: "👑", value: "vip" },
-  { label: "Mystery", color: "#06B6D4", icon: "🎁", value: "mystery" },
+  {
+    label: "Free Coffee",
+    color: "#8B5CF6",
+    icon: "☕",
+    value: "coffee",
+    probability: 13,
+  },
+  {
+    label: "10% Off",
+    color: "#EC4899",
+    icon: "🏷️",
+    value: "10percent",
+    probability: 10,
+  },
+  {
+    label: "Free Donut",
+    color: "#F59E0B",
+    icon: "🍩",
+    value: "donut",
+    probability: 10,
+  },
+  {
+    label: "Try Again",
+    color: "#10B981",
+    icon: "🔄",
+    value: "tryagain",
+    probability: 32,
+  },
+  {
+    label: "Free Latte",
+    color: "#3B82F6",
+    icon: "🥤",
+    value: "latte",
+    probability: 13,
+  },
+  {
+    label: "20% Off",
+    color: "#EF4444",
+    icon: "💵",
+    value: "20percent",
+    probability: 10,
+  },
+  {
+    label: "VIP Pass",
+    color: "#A855F7",
+    icon: "👑",
+    value: "vip",
+    probability: 5,
+  },
+  {
+    label: "Mystery",
+    color: "#06B6D4",
+    icon: "🎁",
+    value: "mystery",
+    probability: 7,
+  },
 ] as const;
 
-// Prize announcements for each segment
+type Segment = (typeof SEGMENTS)[number];
+
+// Fisher-Yates shuffle with seed
+function shuffleSegments(
+  segments: readonly Segment[],
+  seed: number,
+): Segment[] {
+  const shuffled = [...segments];
+  let hash = seed;
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    hash = (hash * 1103515245 + 12345) & 0x7fffffff;
+    const j = hash % (i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 const ANNOUNCEMENTS: Record<
   string,
   { message: string; audio: string; encouragement: string }
@@ -69,13 +133,10 @@ const ANNOUNCEMENTS: Record<
 function fireConfettiBurst(prizeType: string) {
   const end = Date.now() + 2000;
   const colors = ["#8B5CF6", "#EC4899", "#F59E0B", "#10B981", "#3B82F6"];
-
-  // Different intensity based on prize
   let intensity = 3;
   if (prizeType === "vip") intensity = 6;
   if (prizeType === "mystery") intensity = 5;
   if (prizeType === "tryagain") intensity = 1;
-
   (function frame() {
     confetti({
       particleCount: intensity,
@@ -95,202 +156,350 @@ function fireConfettiBurst(prizeType: string) {
   })();
 }
 
+function StrengthMeter({
+  strength,
+  isPressed,
+}: {
+  strength: number;
+  isPressed: boolean;
+}) {
+  const getStrengthColor = () => {
+    if (strength < 25) return "from-green-400 to-green-500";
+    if (strength < 50) return "from-yellow-400 to-yellow-500";
+    if (strength < 75) return "from-orange-400 to-orange-500";
+    return "from-red-400 to-red-500";
+  };
+  const getStrengthLabel = () => {
+    if (strength < 25) return "Gentle";
+    if (strength < 50) return "Moderate";
+    if (strength < 75) return "Strong";
+    return "Maximum!";
+  };
+  return (
+    <AnimatePresence>
+      {isPressed && (
+        <motion.div
+          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+          className="absolute -top-8 left-1/2 -translate-x-1/2 w-56"
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5">
+              <Gauge className="w-3.5 h-3.5 text-purple-400" />
+              <span className="text-xs font-medium text-purple-300">
+                {getStrengthLabel()}
+              </span>
+            </div>
+            <span className="text-xs text-purple-400/70">
+              {strength < 25
+                ? "1-2 spins"
+                : strength < 50
+                  ? "3-5 spins"
+                  : strength < 75
+                    ? "6-8 spins"
+                    : "9-12 spins"}
+            </span>
+          </div>
+          <div className="relative h-2.5 bg-gray-800/60 rounded-full overflow-hidden backdrop-blur-sm border border-white/5">
+            <motion.div
+              className={`h-full bg-gradient-to-r ${getStrengthColor()} rounded-full`}
+              initial={{ width: 0 }}
+              animate={{ width: `${strength}%` }}
+              transition={{ duration: 0.1 }}
+            />
+          </div>
+          <motion.div
+            className="text-center mt-1.5"
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ duration: 0.5, repeat: Infinity }}
+          >
+            <span
+              className={`text-xl font-bold bg-gradient-to-r ${getStrengthColor()} bg-clip-text text-transparent`}
+            >
+              {Math.round(strength)}%
+            </span>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 export function DemoWheel() {
   const [spinning, setSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
-  const [result, setResult] = useState<(typeof SEGMENTS)[number] | null>(null);
+  const [result, setResult] = useState<Segment | null>(null);
   const [showAnnouncement, setShowAnnouncement] = useState(false);
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
+
+  const [isPressed, setIsPressed] = useState(false);
+  const [strength, setStrength] = useState(0);
+
+  // Shuffle & Reveal
+  const [phase, setPhase] = useState<
+    "idle" | "spinning" | "stopping" | "shuffling" | "revealing" | "complete"
+  >("idle");
+  const [displaySegments, setDisplaySegments] = useState<Segment[]>([
+    ...SEGMENTS,
+  ]);
+  const [shuffledSegments, setShuffledSegments] = useState<Segment[] | null>(
+    null,
+  );
+  const [winningIndex, setWinningIndex] = useState<number | null>(null);
+  const [isShuffling, setIsShuffling] = useState(false);
+
   const wheelRef = useRef<HTMLDivElement>(null);
   const spinTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const spinAudioRef = useRef<HTMLAudioElement | null>(null);
+  const strengthIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const rotationAccumulator = useRef(0);
 
   const segmentAngle = 360 / SEGMENTS.length;
 
-  // Initialize audio element
   useEffect(() => {
-    // Create audio element for spin sound
     spinAudioRef.current = new Audio("/sounds/wheel-spin.mp3");
-    spinAudioRef.current.volume = 0.3; // Adjust volume as needed
-
+    spinAudioRef.current.volume = 0.3;
     return () => {
-      if (spinTimeoutRef.current) {
-        clearTimeout(spinTimeoutRef.current);
-      }
-      if (spinAudioRef.current) {
-        spinAudioRef.current.pause();
-        spinAudioRef.current = null;
-      }
-      // Cancel any ongoing speech
-      if (typeof window !== "undefined" && window.speechSynthesis) {
+      if (spinTimeoutRef.current) clearTimeout(spinTimeoutRef.current);
+      if (strengthIntervalRef.current)
+        clearInterval(strengthIntervalRef.current);
+      spinAudioRef.current?.pause();
+      if (typeof window !== "undefined" && window.speechSynthesis)
         window.speechSynthesis.cancel();
-      }
     };
   }, []);
 
-  // Function to determine which segment is under the pointer
-  const getCurrentSegment = useCallback(
-    (currentRotation: number): (typeof SEGMENTS)[number] => {
-      // Pointer is at top (12 o'clock position = -90 degrees)
-      const pointerAngle = 90; // degrees from right, so top is 90
-      const normalizedRotation = ((currentRotation % 360) + 360) % 360;
-      const effectiveAngle = (pointerAngle - normalizedRotation + 360) % 360;
-      const segmentIndex =
-        Math.floor(effectiveAngle / segmentAngle) % SEGMENTS.length;
-      return SEGMENTS[segmentIndex];
-    },
-    [segmentAngle],
-  );
+  useEffect(() => {
+    if (phase === "complete") {
+      const timer = setTimeout(() => {
+        setPhase("idle");
+        setDisplaySegments([...SEGMENTS]);
+        setWinningIndex(null);
+        setShuffledSegments(null);
+        setIsShuffling(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [phase]);
 
-  // Play spinning sound from file
   const playSpinSound = useCallback(() => {
     if (!soundEnabled || !spinAudioRef.current) return;
-
     try {
-      // Reset and play the audio
       spinAudioRef.current.currentTime = 0;
-      spinAudioRef.current.play().catch((error) => {
-        console.log("Audio playback failed:", error);
-      });
-    } catch (error) {
-      console.log("Audio not supported or user interaction required");
-    }
+      spinAudioRef.current.play().catch(() => {});
+    } catch {}
   }, [soundEnabled]);
 
-  // Announce the result with sound and visual effects
   const announceResult = useCallback(
-    (segment: (typeof SEGMENTS)[number]) => {
-      // Safety check with proper null/undefined handling
-      if (!segment || !segment.value) {
-        console.error("Invalid segment:", segment);
-        return;
-      }
-
+    (segment: Segment) => {
+      if (!segment?.value) return;
       const announcement = ANNOUNCEMENTS[segment.value];
-
-      // Safety check for announcement
-      if (!announcement) {
-        console.error("No announcement found for segment:", segment.value);
-        // Set default values if announcement is missing
-        setShowAnnouncement(true);
-        setTimeout(() => setShowAnnouncement(false), 4000);
-        return;
-      }
-
-      // Create a spoken announcement using Web Speech API
+      if (!announcement) return;
       if (
         typeof window !== "undefined" &&
         "speechSynthesis" in window &&
         soundEnabled
       ) {
         try {
-          // Cancel any ongoing speech
           window.speechSynthesis.cancel();
-
           const utterance = new SpeechSynthesisUtterance(announcement.audio);
           utterance.rate = 0.9;
           utterance.pitch = 1.1;
           utterance.volume = 1;
-
           window.speechSynthesis.speak(utterance);
-        } catch (error) {
-          console.log("Speech synthesis not supported");
-        }
+        } catch {}
       }
-
-      // Show visual announcement
       setShowAnnouncement(true);
       setTimeout(() => setShowAnnouncement(false), 4000);
     },
     [soundEnabled],
   );
 
-  const handleSpin = useCallback(() => {
-    if (spinning) return;
+  const handlePressStart = useCallback(() => {
+    if (spinning || phase !== "idle") return;
+    setIsPressed(true);
+    setStrength(0);
+    strengthIntervalRef.current = setInterval(
+      () => setStrength((prev) => Math.min(prev + 2, 100)),
+      30,
+    );
+  }, [spinning, phase]);
 
-    setSpinning(true);
-    setShowAnnouncement(false);
-    setResult(null);
-
-    // Play spinning sound
-    playSpinSound();
-
-    // Randomize the result with weighted probabilities for demo
-    const random = Math.random();
-    let targetIndex: number;
-    if (random < 0.05) {
-      targetIndex = 6; // VIP (rare - 5%)
-    } else if (random < 0.12) {
-      targetIndex = 7; // Mystery (rare - 7%)
-    } else if (random < 0.25) {
-      targetIndex = 0; // Free Coffee (common - 13%)
-    } else if (random < 0.38) {
-      targetIndex = 4; // Free Latte (common - 13%)
-    } else if (random < 0.48) {
-      targetIndex = 1; // 10% Off (common - 10%)
-    } else if (random < 0.58) {
-      targetIndex = 5; // 20% Off (common - 10%)
-    } else if (random < 0.68) {
-      targetIndex = 2; // Free Donut (common - 10%)
-    } else {
-      targetIndex = 3; // Try Again (common - 32%)
+  const handlePressEnd = useCallback(() => {
+    if (!isPressed) return;
+    setIsPressed(false);
+    if (strengthIntervalRef.current) {
+      clearInterval(strengthIntervalRef.current);
+      strengthIntervalRef.current = null;
     }
-
-    const fullSpins = 8 + Math.floor(Math.random() * 5); // 8-12 full rotations
-    const targetAngle =
-      360 * fullSpins + (360 - (targetIndex * segmentAngle + segmentAngle / 2));
-
-    const newRotation = rotation + targetAngle;
-    setRotation(newRotation);
-
-    // Clear any existing timeout
-    if (spinTimeoutRef.current) {
-      clearTimeout(spinTimeoutRef.current);
+    if (strength > 0 && !spinning && phase === "idle") {
+      executeSpin(strength);
+      setStrength(0);
     }
+  }, [isPressed, strength, spinning, phase]);
 
-    // Calculate final segment after animation
-    spinTimeoutRef.current = setTimeout(() => {
-      const finalSegment = getCurrentSegment(newRotation);
+  const handleCancel = useCallback(() => {
+    setIsPressed(false);
+    setStrength(0);
+    if (strengthIntervalRef.current) {
+      clearInterval(strengthIntervalRef.current);
+      strengthIntervalRef.current = null;
+    }
+  }, []);
 
-      // Additional safety check
-      if (!finalSegment) {
-        console.error("Failed to get final segment");
-        setSpinning(false);
-        return;
+  // ─── CORRECTED POINTER ALIGNMENT ──────────────────
+  const executeSpin = useCallback(
+    (spinStrength: number) => {
+      if (spinning || phase !== "idle") return;
+
+      setSpinning(true);
+      setPhase("spinning");
+      setShowAnnouncement(false);
+      setResult(null);
+      setDisplaySegments([...SEGMENTS]); // Show original segments during spin
+      setWinningIndex(null);
+      setShuffledSegments(null);
+      setIsShuffling(false);
+
+      playSpinSound();
+
+      // Select prize
+      const random = Math.random() * 100;
+      let cumulative = 0;
+      let selectedIndex = 0;
+      for (let i = 0; i < SEGMENTS.length; i++) {
+        cumulative += SEGMENTS[i].probability;
+        if (random <= cumulative) {
+          selectedIndex = i;
+          break;
+        }
       }
+      const selectedPrize = SEGMENTS[selectedIndex];
 
-      setResult(finalSegment);
-      setSpinning(false);
+      // Shuffle segments
+      const shuffleSeed = Date.now();
+      const shuffled = shuffleSegments(SEGMENTS, shuffleSeed);
+      const displayIndex = shuffled.findIndex(
+        (s) => s.value === selectedPrize.value,
+      );
 
-      // Announce the result (this will work for "Try Again" too)
-      announceResult(finalSegment);
+      setShuffledSegments(shuffled);
+      setWinningIndex(displayIndex);
 
-      // Fire confetti for good prizes (not for "Try Again")
-      if (finalSegment.value !== "tryagain") {
-        fireConfettiBurst(finalSegment.value);
-      }
-    }, 4500);
-  }, [
-    spinning,
-    rotation,
-    segmentAngle,
-    getCurrentSegment,
-    announceResult,
-    playSpinSound,
-  ]);
+      // ─── FIXED POINTER MATH ──────────────────────────
+      // The pointer is at TOP (12 o'clock).
+      // In our SVG coordinate system, angles start from 3 o'clock (0°) and go clockwise.
+      // So 12 o'clock = -90° or 270°.
+      //
+      // Each segment i starts at angle: i * segmentAngle
+      // The center of segment i is at: i * segmentAngle + segmentAngle / 2
+      //
+      // To bring segment i's center to the pointer (270°), we need to rotate:
+      // 270° - (i * segmentAngle + segmentAngle / 2)
+      //
+      // But framer-motion rotates clockwise, so we use positive rotation.
+      // If we're currently at rotation R, and we want to end at rotation R + total,
+      // after rotating by 'total', the segment that was at angle A will be at angle A - total.
+      //
+      // We want: (segmentCenter - totalRotation) % 360 = 270° (pointer position)
+      // Therefore: totalRotation = (segmentCenter - 270°) % 360
+      // But we need totalRotation to be positive, so we do:
+      // angleToTarget = ((segmentCenter - 270) % 360 + 360) % 360
 
-  // Toggle sound
+      const minSpins = 5;
+      const maxSpins = 12;
+      const strengthFactor = spinStrength / 100;
+      const totalSpins = minSpins + strengthFactor * (maxSpins - minSpins);
+      const randomOffset = (Math.random() - 0.5) * 0.3;
+      const finalSpins = totalSpins + randomOffset;
+
+      const targetSegmentCenter =
+        displayIndex * segmentAngle + segmentAngle / 2;
+
+      // Calculate how much we need to rotate so the target segment's center aligns with the pointer (270°)
+      const angleToTarget = (((targetSegmentCenter - 270) % 360) + 360) % 360;
+
+      // Total rotation = full spins + alignment
+      const totalRotation = finalSpins * 360 + angleToTarget;
+
+      rotationAccumulator.current += totalRotation;
+      setRotation(rotationAccumulator.current);
+
+      // Handle wheel stop
+      if (spinTimeoutRef.current) clearTimeout(spinTimeoutRef.current);
+      spinTimeoutRef.current = setTimeout(() => {
+        setPhase("stopping");
+
+        // ─── SHELL GAME SHUFFLE ANIMATION ──────────────
+        // After stopping, start the shuffle animation
+        setTimeout(() => {
+          setPhase("shuffling");
+          setIsShuffling(true);
+
+          // Do a rapid spin (just the segments visually swap, not the wheel)
+          // We'll simulate this with multiple rapid segment swaps
+          let swapCount = 0;
+          const maxSwaps = 8;
+          const swapInterval = setInterval(() => {
+            if (swapCount >= maxSwaps) {
+              clearInterval(swapInterval);
+              // Final reveal - show shuffled segments
+              setTimeout(() => {
+                setIsShuffling(false);
+                setPhase("revealing");
+                setDisplaySegments(shuffled);
+
+                // Reset rotation to point at the winning segment in the shuffled wheel
+                // After swapping to shuffled, we need to rotate so winning index is at pointer
+                const newTargetCenter =
+                  displayIndex * segmentAngle + segmentAngle / 2;
+                const newAngleToTarget =
+                  (((newTargetCenter - 270) % 360) + 360) % 360;
+                const newTotalRotation =
+                  rotationAccumulator.current -
+                  (rotationAccumulator.current % 360) +
+                  newAngleToTarget;
+                rotationAccumulator.current = newTotalRotation;
+                setRotation(newTotalRotation);
+
+                setTimeout(() => {
+                  setPhase("complete");
+                  setSpinning(false);
+                  setResult(selectedPrize);
+                  announceResult(selectedPrize);
+                  if (selectedPrize.value !== "tryagain") {
+                    fireConfettiBurst(selectedPrize.value);
+                  }
+                }, 800);
+              }, 300);
+              return;
+            }
+            swapCount++;
+            // Visual jitter - briefly show different segments
+            if (swapCount % 2 === 0) {
+              setDisplaySegments([...SEGMENTS].sort(() => Math.random() - 0.5));
+            } else {
+              setDisplaySegments([...SEGMENTS]);
+            }
+          }, 150);
+        }, 600);
+      }, 4500);
+    },
+    [spinning, phase, segmentAngle, announceResult, playSpinSound],
+  );
+
   const toggleSound = () => {
     setSoundEnabled(!soundEnabled);
-    if (soundEnabled) {
-      if (typeof window !== "undefined" && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-      if (spinAudioRef.current) {
-        spinAudioRef.current.pause();
-      }
+    if (
+      soundEnabled &&
+      typeof window !== "undefined" &&
+      window.speechSynthesis
+    ) {
+      window.speechSynthesis.cancel();
     }
+    spinAudioRef.current?.pause();
   };
 
   return (
@@ -298,7 +507,7 @@ export function DemoWheel() {
       {/* Ambient glow */}
       <div className="absolute -inset-20 bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-purple-500/20 rounded-full blur-3xl animate-pulse" />
 
-      {/* Sound Toggle Button */}
+      {/* Sound Toggle */}
       <button
         onClick={toggleSound}
         className="absolute -top-8 right-0 z-30 p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
@@ -312,56 +521,86 @@ export function DemoWheel() {
       </button>
 
       {/* Outer ring */}
-      <div className="relative w-72 h-72 md:w-80 md:h-80">
-        {/* Decorative dots around wheel */}
+      <div className="relative w-[350px] h-[350px] sm:w-[400px] sm:h-[400px]">
         {Array.from({ length: 24 }).map((_, i) => {
           const angle = (i * 15 * Math.PI) / 180;
           const radius = 44;
-          const x = 50 + radius * Math.cos(angle);
-          const y = 50 + radius * Math.sin(angle);
           return (
-            <div
+            <motion.div
               key={i}
-              className="absolute w-1.5 h-1.5 rounded-full bg-purple-400/30"
+              className="absolute w-2 h-2 rounded-full bg-purple-400/30"
               style={{
-                left: `${x}%`,
-                top: `${y}%`,
+                left: `${50 + radius * Math.cos(angle)}%`,
+                top: `${50 + radius * Math.sin(angle)}%`,
                 transform: "translate(-50%, -50%)",
+              }}
+              animate={
+                phase === "spinning"
+                  ? { opacity: [0.3, 0.8, 0.3] }
+                  : { opacity: 0.3 }
+              }
+              transition={{
+                duration: 0.5,
+                delay: i * 0.02,
+                repeat: phase === "spinning" ? Infinity : 0,
               }}
             />
           );
         })}
 
-        {/* Spinning shadow */}
         <motion.div
           className="absolute inset-0 rounded-full"
           animate={{
-            boxShadow: spinning
-              ? [
-                  "0 0 60px rgba(139, 92, 246, 0.3), 0 0 120px rgba(236, 72, 153, 0.15)",
-                  "0 0 80px rgba(236, 72, 153, 0.4), 0 0 160px rgba(139, 92, 246, 0.25)",
-                  "0 0 60px rgba(139, 92, 246, 0.3), 0 0 120px rgba(236, 72, 153, 0.15)",
-                ]
-              : "0 0 40px rgba(139, 92, 246, 0.2)",
+            boxShadow:
+              phase === "spinning"
+                ? [
+                    "0 0 80px rgba(139, 92, 246, 0.3), 0 0 160px rgba(236, 72, 153, 0.15)",
+                    "0 0 120px rgba(236, 72, 153, 0.4), 0 0 200px rgba(139, 92, 246, 0.25)",
+                    "0 0 80px rgba(139, 92, 246, 0.3), 0 0 160px rgba(236, 72, 153, 0.15)",
+                  ]
+                : phase === "shuffling"
+                  ? "0 0 120px rgba(139, 92, 246, 0.6), 0 0 200px rgba(236, 72, 153, 0.4)"
+                  : phase === "revealing"
+                    ? "0 0 120px rgba(139, 92, 246, 0.5), 0 0 200px rgba(236, 72, 153, 0.3)"
+                    : "0 0 60px rgba(139, 92, 246, 0.2)",
           }}
-          transition={{ duration: 1, repeat: spinning ? Infinity : 0 }}
+          transition={{
+            duration: 1,
+            repeat: phase === "spinning" ? Infinity : 0,
+          }}
         />
 
-        {/* Pointer Indicator */}
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
+        {/* Pointer */}
+        <div className="absolute -top-4 md:-top-5 left-1/2 -translate-x-1/2 z-20">
           <motion.div
-            animate={spinning ? { y: [0, -3, 0] } : {}}
-            transition={{ duration: 0.3, repeat: spinning ? Infinity : 0 }}
+            animate={
+              phase === "spinning"
+                ? { y: [0, -4, 0] }
+                : phase === "shuffling"
+                  ? { y: [0, -6, 0], scale: [1, 1.1, 1] }
+                  : phase === "revealing"
+                    ? { y: [0, -6, 0], scale: [1, 1.15, 1] }
+                    : {}
+            }
+            transition={{
+              duration: 0.3,
+              repeat:
+                phase === "spinning" ||
+                phase === "shuffling" ||
+                phase === "revealing"
+                  ? Infinity
+                  : 0,
+            }}
           >
-            <svg width="24" height="32" viewBox="0 0 24 32">
+            <svg width="32" height="44" viewBox="0 0 32 44">
               <defs>
                 <filter id="pointer-shadow">
                   <feDropShadow
                     dx="0"
-                    dy="2"
-                    stdDeviation="2"
+                    dy="3"
+                    stdDeviation="3"
                     floodColor="#000"
-                    floodOpacity="0.3"
+                    floodOpacity="0.4"
                   />
                 </filter>
                 <linearGradient id="pointer-grad" x1="0" y1="0" x2="0" y2="1">
@@ -370,7 +609,7 @@ export function DemoWheel() {
                 </linearGradient>
               </defs>
               <polygon
-                points="12,32 0,0 24,0"
+                points="16,44 0,0 32,0"
                 fill="url(#pointer-grad)"
                 filter="url(#pointer-shadow)"
               />
@@ -378,102 +617,222 @@ export function DemoWheel() {
           </motion.div>
         </div>
 
-        {/* Wheel Container with Glowing Border */}
+        {/* Wheel Container */}
         <div className="relative w-full h-full">
-          {/* Animated glowing border */}
           <div
-            className="absolute -inset-1 rounded-full"
+            className="absolute -inset-[6px] md:-inset-[8px] rounded-full"
             style={
               {
                 background:
                   "conic-gradient(from var(--a, 0deg), #8b5cf6, #ec4899, #3b82f6)",
-                animation: "spin 3s linear infinite",
-                "--a": "0deg",
+                animation: `spin ${phase === "spinning" || phase === "shuffling" ? "1.5s" : "3s"} linear infinite`,
               } as React.CSSProperties
             }
           />
-
-          {/* Glow blur effect */}
           <div
-            className="absolute -inset-2 rounded-full blur-xl opacity-50"
+            className="absolute -inset-[8px] md:-inset-[10px] rounded-full blur-xl md:blur-2xl opacity-50"
             style={
               {
                 background:
                   "conic-gradient(from var(--a, 0deg), #8b5cf6, #ec4899, #3b82f6)",
-                animation: "spin 3s linear infinite",
-                "--a": "0deg",
+                animation: `spin ${phase === "spinning" || phase === "shuffling" ? "1.5s" : "3s"} linear infinite`,
               } as React.CSSProperties
             }
           />
 
-          {/* The Wheel */}
           <motion.div
             ref={wheelRef}
             className="w-full h-full rounded-full relative overflow-hidden bg-gray-900"
             style={{
               border: "4px solid rgba(139, 92, 246, 0.3)",
-              boxShadow: "inset 0 0 30px rgba(0,0,0,0.3)",
+              boxShadow: "inset 0 0 40px rgba(0,0,0,0.3)",
               position: "relative",
               zIndex: 1,
             }}
-            animate={{ rotate: rotation }}
+            animate={{
+              rotate: rotation,
+            }}
             transition={{
-              duration: 4.5,
-              ease: [0.08, 0.82, 0.17, 1.01],
+              duration:
+                phase === "spinning" ? 4.5 : phase === "shuffling" ? 0.3 : 0.5,
+              ease:
+                phase === "spinning" ? [0.08, 0.82, 0.17, 1.01] : "easeInOut",
             }}
           >
-            {SEGMENTS.map((segment, i) => {
-              const startAngle = i * segmentAngle;
-              const endAngle = (i + 1) * segmentAngle;
-              const startRad = (startAngle * Math.PI) / 180;
-              const endRad = (endAngle * Math.PI) / 180;
-              const midAngle = (startAngle + endAngle) / 2;
-              const midRad = (midAngle * Math.PI) / 180;
-              const textRadius = 34;
+            <motion.svg
+              className="w-full h-full"
+              viewBox="0 0 100 100"
+              animate={
+                isShuffling
+                  ? {
+                      filter: [
+                        "blur(0px)",
+                        "blur(3px)",
+                        "blur(0px)",
+                        "blur(3px)",
+                        "blur(0px)",
+                      ],
+                    }
+                  : {}
+              }
+              transition={{ duration: 0.8, repeat: isShuffling ? Infinity : 0 }}
+            >
+              {displaySegments.map((segment, i) => {
+                const startAngle = i * segmentAngle;
+                const endAngle = (i + 1) * segmentAngle;
+                const startRad = (startAngle * Math.PI) / 180;
+                const endRad = (endAngle * Math.PI) / 180;
+                const midAngle = (startAngle + endAngle) / 2;
+                const midRad = (midAngle * Math.PI) / 180;
 
-              return (
-                <div
-                  key={i}
-                  className="absolute inset-0 transition-opacity duration-200 cursor-pointer"
-                  style={{
-                    clipPath: `polygon(50% 50%, ${50 + 50 * Math.cos(startRad)}% ${50 + 50 * Math.sin(startRad)}%, ${50 + 50 * Math.cos(endRad)}% ${50 + 50 * Math.sin(endRad)}%)`,
-                    background: `linear-gradient(135deg, ${segment.color}, ${segment.color}DD)`,
-                    opacity: hoveredSegment === i ? 0.9 : 0.85,
-                  }}
-                  onMouseEnter={() => !spinning && setHoveredSegment(i)}
-                  onMouseLeave={() => setHoveredSegment(null)}
-                >
-                  <span
-                    className="absolute text-white font-bold whitespace-nowrap select-none"
-                    style={{
-                      left: `${50 + textRadius * Math.cos(midRad)}%`,
-                      top: `${50 + textRadius * Math.sin(midRad)}%`,
-                      transform: `translate(-50%, -50%) rotate(${midAngle}deg)`,
-                      fontSize: "11px",
-                      textShadow: "0 1px 3px rgba(0,0,0,0.5)",
-                      maxWidth: "55px",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      textAlign: "center",
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    {segment.icon} {segment.label}
-                  </span>
-                </div>
-              );
-            })}
+                const centerX = 50;
+                const centerY = 50;
+                const radius = 50;
+
+                const x1 = centerX + radius * Math.cos(startRad);
+                const y1 = centerY + radius * Math.sin(startRad);
+                const x2 = centerX + radius * Math.cos(endRad);
+                const y2 = centerY + radius * Math.sin(endRad);
+
+                const isWinning = i === winningIndex;
+                const textRadius = 28;
+                const textX = centerX + textRadius * Math.cos(midRad);
+                const textY = centerY + textRadius * Math.sin(midRad);
+
+                return (
+                  <motion.g key={i}>
+                    <motion.polygon
+                      points={`${centerX},${centerY} ${x1},${y1} ${x2},${y2}`}
+                      fill={`url(#grad${i})`}
+                      opacity={hoveredSegment === i ? 0.9 : 0.85}
+                      stroke="rgba(255,255,255,0.15)"
+                      strokeWidth="0.8"
+                      onMouseEnter={() => !spinning && setHoveredSegment(i)}
+                      onMouseLeave={() => setHoveredSegment(null)}
+                      animate={
+                        phase === "revealing" && isWinning
+                          ? { fillOpacity: [1, 0.7, 1, 0.7, 1] }
+                          : phase === "complete" && isWinning
+                            ? { fillOpacity: [1, 0.8, 1] }
+                            : {}
+                      }
+                      transition={
+                        phase === "revealing" && isWinning
+                          ? { duration: 1, repeat: 2 }
+                          : phase === "complete" && isWinning
+                            ? { duration: 1.5, repeat: Infinity }
+                            : {}
+                      }
+                    />
+
+                    <defs>
+                      <linearGradient
+                        id={`grad${i}`}
+                        x1="0%"
+                        y1="0%"
+                        x2="100%"
+                        y2="100%"
+                      >
+                        <stop offset="0%" stopColor={segment.color} />
+                        <stop
+                          offset="100%"
+                          stopColor={segment.color}
+                          stopOpacity="0.8"
+                        />
+                      </linearGradient>
+                    </defs>
+
+                    <motion.g
+                      style={{ pointerEvents: "none" }}
+                      initial={
+                        phase === "revealing" ? { opacity: 0, scale: 0 } : {}
+                      }
+                      animate={
+                        phase === "revealing"
+                          ? { opacity: 1, scale: [0, 1.2, 1] }
+                          : { opacity: 1, scale: 1 }
+                      }
+                      transition={
+                        phase === "revealing"
+                          ? { delay: i * 0.05, duration: 0.5 }
+                          : {}
+                      }
+                    >
+                      <text
+                        x={textX}
+                        y={textY - 5}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fill="white"
+                        fontSize="7"
+                        fontWeight="bold"
+                        style={{ textShadow: "0 2px 4px rgba(0,0,0,0.6)" }}
+                      >
+                        {segment.icon}
+                      </text>
+                      <text
+                        x={textX}
+                        y={textY + 8}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fill="white"
+                        fontSize="3.5"
+                        fontWeight="bold"
+                        style={{ textShadow: "0 2px 4px rgba(0,0,0,0.6)" }}
+                      >
+                        {segment.label}
+                      </text>
+                    </motion.g>
+
+                    {isWinning && phase === "complete" && (
+                      <motion.polygon
+                        points={`${centerX},${centerY} ${x1},${y1} ${x2},${y2}`}
+                        fill="none"
+                        stroke="rgba(255,255,255,0.6)"
+                        strokeWidth="2"
+                        animate={{ opacity: [0, 1, 0] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                      />
+                    )}
+                  </motion.g>
+                );
+              })}
+            </motion.svg>
 
             {/* Center hub */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
               <motion.div
-                className="w-16 h-16 rounded-full bg-gradient-to-br from-white to-gray-100 flex items-center justify-center shadow-lg"
-                animate={spinning ? { scale: [1, 1.05, 1] } : { scale: 1 }}
-                transition={{ duration: 0.5, repeat: spinning ? Infinity : 0 }}
+                className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-white to-gray-100 flex items-center justify-center shadow-xl"
+                animate={
+                  phase === "spinning"
+                    ? { scale: [1, 1.05, 1] }
+                    : phase === "shuffling"
+                      ? { scale: [1, 1.15, 1], rotate: [0, 15, -15, 0] }
+                      : phase === "revealing"
+                        ? { scale: [1, 1.15, 1] }
+                        : { scale: 1 }
+                }
+                transition={{
+                  duration: 0.5,
+                  repeat:
+                    phase === "spinning" ||
+                    phase === "shuffling" ||
+                    phase === "revealing"
+                      ? Infinity
+                      : 0,
+                }}
               >
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                  <Sparkles className="h-5 w-5 text-white" />
-                </div>
+                <motion.div
+                  className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center"
+                  animate={
+                    phase === "shuffling" || phase === "revealing"
+                      ? { rotate: [0, 360] }
+                      : {}
+                  }
+                  transition={{ duration: 0.8 }}
+                >
+                  <Sparkles className="h-5 w-5 md:h-6 md:w-6 text-white" />
+                </motion.div>
               </motion.div>
             </div>
           </motion.div>
@@ -481,41 +840,87 @@ export function DemoWheel() {
       </div>
 
       {/* Spin Button */}
-      <motion.button
-        onClick={handleSpin}
-        disabled={spinning}
-        className="relative mt-12 px-16 py-3 rounded-lg font-bold text-lg text-white shadow-2xl transition-all disabled:opacity-60 disabled:cursor-not-allowed overflow-hidden group"
-        style={{ background: "linear-gradient(135deg, #F59E0B, #D97706)" }}
-        whileHover={!spinning ? { scale: 1.05 } : {}}
-        whileTap={!spinning ? { scale: 0.95 } : {}}
-      >
-        <motion.div
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-          animate={{ x: ["-100%", "200%"] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-        />
-        <span className="relative z-10 flex items-center gap-2">
-          {spinning ? (
-            <>
-              <motion.span
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-              >
-                ⚡
-              </motion.span>
-              Spinning...
-            </>
-          ) : (
-            <div className="flex items-center gap-2">
-              <LottieIcon animation={spinAnimation} isCategory={false} />
-              Spin to Win!
-              {/* <LottieIcon animation={spinAnimation} isCategory={false} /> */}
-            </div>
-          )}
-        </span>
-      </motion.button>
+      <div className="relative mt-12">
+        <StrengthMeter strength={strength} isPressed={isPressed} />
 
-      {/* Full Announcement Banner */}
+        <motion.button
+          onMouseDown={handlePressStart}
+          onMouseUp={handlePressEnd}
+          onMouseLeave={handleCancel}
+          onTouchStart={handlePressStart}
+          onTouchEnd={handlePressEnd}
+          onTouchCancel={handleCancel}
+          disabled={spinning || phase !== "idle"}
+          className={`
+            relative px-16 py-3 rounded-lg font-bold text-lg text-white 
+            shadow-2xl transition-all select-none
+            disabled:opacity-60 disabled:cursor-not-allowed overflow-hidden group
+            ${isPressed ? "scale-95" : "scale-100"}
+          `}
+          style={{
+            background: isPressed
+              ? "linear-gradient(135deg, #D97706, #B45309)"
+              : "linear-gradient(135deg, #F59E0B, #D97706)",
+          }}
+          whileHover={!spinning && phase === "idle" ? { scale: 1.05 } : {}}
+          whileTap={!spinning && phase === "idle" ? { scale: 0.95 } : {}}
+        >
+          <motion.div
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+            animate={{ x: ["-100%", "200%"] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          />
+          <span className="relative z-10 flex items-center gap-2">
+            {phase === "spinning" ? (
+              <>
+                <motion.span
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                >
+                  ⚡
+                </motion.span>
+                Spinning...
+              </>
+            ) : phase === "stopping" || phase === "shuffling" ? (
+              <>
+                <motion.span
+                  animate={{ rotate: 360 }}
+                  transition={{
+                    duration: 0.5,
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
+                >
+                  ⚡
+                </motion.span>
+                Shuffling...
+              </>
+            ) : phase === "revealing" ? (
+              <>
+                <Sparkles className="w-5 h-5" />
+                Revealing...
+              </>
+            ) : phase === "complete" ? (
+              <>
+                <Sparkles className="w-5 h-5" />
+                Spin Again!
+              </>
+            ) : isPressed ? (
+              <>
+                <Zap className="w-5 h-5" />
+                Release to Spin!
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                <LottieIcon animation={spinAnimation} isCategory={false} />
+                Press & Hold to Spin!
+              </div>
+            )}
+          </span>
+        </motion.button>
+      </div>
+
+      {/* Result Banner */}
       <AnimatePresence>
         {showAnnouncement && result && result.value && (
           <motion.div
@@ -526,7 +931,7 @@ export function DemoWheel() {
             className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-lg"
           >
             <div
-              className="p-2 sm:p-4 rounded-2xl shadow-2xl text-white font-bold text-center text-xs sm:text-sm"
+              className="p-2 sm:p-4 rounded-2xl shadow-2xl font-bold text-center text-xs sm:text-sm text-white"
               style={{
                 background: `linear-gradient(135deg, ${result.color}, ${result.color}CC)`,
               }}
@@ -552,8 +957,21 @@ export function DemoWheel() {
         )}
       </AnimatePresence>
 
-      {/* Instruction text */}
-      <p className="text-xs mt-3">Try spinning the demo wheel!</p>
+      <p className="text-xs text-white/50 mt-3">
+        {phase === "idle"
+          ? "Press and hold to build strength, then release!"
+          : phase === "spinning"
+            ? "Spinning with your strength..."
+            : phase === "stopping"
+              ? "Wheel stopped! Now watch closely..."
+              : phase === "shuffling"
+                ? "Shuffling the prizes..."
+                : phase === "revealing"
+                  ? "Here's what you actually won!"
+                  : phase === "complete"
+                    ? "🎉 Check your prize!"
+                    : ""}
+      </p>
     </div>
   );
 }

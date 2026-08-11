@@ -322,9 +322,9 @@ export default function BusinessAdminDashboard() {
                   <p className="text-2xl font-bold">
                     {stat.value.toLocaleString()}
                   </p>
-                  <p className="text-xs text-white/60">{stat.label}</p>
+                  <p className="text-xs">{stat.label}</p>
                   {stat.limit !== null && !isUnlimited(stat.limit) && (
-                    <p className="text-[10px] text-white/30 mt-0.5">
+                    <p className="text-[10px] mt-0.5">
                       / {stat.limit.toLocaleString()}
                     </p>
                   )}
@@ -339,14 +339,12 @@ export default function BusinessAdminDashboard() {
           <Card className="border-white/10 mb-8">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-white/70">
-                  Public Codes Usage
-                </span>
-                <span className="text-xs text-white/40">
+                <span className="text-sm">Public Codes Usage</span>
+                <span className="text-xs">
                   {publicCodesUsed} / {publicCodesLimit}
                 </span>
               </div>
-              <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+              <div className="w-full h-2 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
                   style={{
@@ -448,7 +446,7 @@ export default function BusinessAdminDashboard() {
                   <Globe className="h-5 w-5 text-orange-400" /> Generate Public
                   Code
                 </h3>
-                <p className="text-white/40 text-xs mb-3">
+                <p className="text-xs mb-3">
                   Create a public marketing code for social media.{" "}
                   {publicCodeRequireActivation
                     ? "Requires customer to be active."
@@ -465,7 +463,7 @@ export default function BusinessAdminDashboard() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="mt-2 text-white/60"
+                      className="mt-2"
                       onClick={() => setGeneratedPublicCode(null)}
                     >
                       Generate Another
@@ -474,23 +472,21 @@ export default function BusinessAdminDashboard() {
                 ) : (
                   <div className="space-y-3">
                     <div>
-                      <Label className="text-white/60 text-xs">
-                        Label (optional)
-                      </Label>
+                      <Label className="text-xs">Label (optional)</Label>
                       <Input
                         value={publicCodeLabel}
                         onChange={(e) => setPublicCodeLabel(e.target.value)}
                         placeholder="e.g. Instagram promo"
-                        className="mt-1 bg-white/5 border-white/10 text-white"
+                        className="mt-1 border-white/10"
                       />
                     </div>
                     <div>
-                      <Label className="text-white/60 text-xs">Unlocks</Label>
+                      <Label className="text-xs">Unlocks</Label>
                       <Select
                         value={publicCodeUnlocks}
                         onValueChange={setPublicCodeUnlocks}
                       >
-                        <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                        <SelectTrigger className="border-white/10">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -504,10 +500,8 @@ export default function BusinessAdminDashboard() {
                       </Select>
                       <div className="flex items-center justify-between">
                         <div>
-                          <Label className="text-white/60 text-xs">
-                            Require Activation
-                          </Label>
-                          <p className="text-white/30 text-xs mt-1">
+                          <Label className="text-xs">Require Activation</Label>
+                          <p className="text-xs mt-1">
                             When enabled, customers must be an active user of
                             this business to redeem the code
                           </p>

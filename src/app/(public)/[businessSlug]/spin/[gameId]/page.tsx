@@ -20,24 +20,15 @@ import {
   Coins,
   Gift,
   Trophy,
-  Crown,
   Users,
-  TrendingUp,
   Sparkles,
-  Zap,
   Volume2,
   VolumeX,
   Eye,
   Loader2,
-  Ticket,
   RotateCcw,
   Radio,
-  Clock,
-  Star,
-  Flame,
-  AlertCircle,
   Store,
-  ArrowLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -48,6 +39,7 @@ import { SpinGame, UserSpinState, PrizeSegment } from "@/types/spinning-wheel";
 import { useSocket } from "@/lib/socket/useSocket";
 import confetti from "canvas-confetti";
 import { Input } from "@/components/ui/input";
+import { SpinButton, SpinWheel } from "@/components/wheel/spin-wheel";
 
 // ─── Types ──────────────────────────────────────────────
 interface BusinessData {
@@ -58,6 +50,10 @@ interface BusinessData {
   brand_color: string;
   brand_secondary_color: string;
 }
+
+// Wheel related types
+type WheelPhase = "idle" | "spinning" | "stopping" | "revealing" | "complete";
+type WheelSegment = PrizeSegment;
 
 // ─── Helpers ────────────────────────────────────────────
 function fireConfetti() {
@@ -83,127 +79,16 @@ function fireConfetti() {
   })();
 }
 
-// ─── Custom Wheel (replaces react-custom-roulette) ──────
-function BusinessSpinWheel({
-  segments,
-  spinning,
-  targetIndex,
-  onComplete,
-}: {
-  segments: PrizeSegment[];
-  spinning: boolean;
-  targetIndex: number;
-  onComplete: () => void;
-}) {
-  const [rotation, setRotation] = useState(0);
-  const segmentAngle = 360 / (segments.length || 1);
-
-  useEffect(() => {
-    if (!spinning) return;
-    const fullSpins = 5 + Math.floor(Math.random() * 3);
-    const targetAngle =
-      360 * fullSpins + (360 - targetIndex * segmentAngle - segmentAngle / 2);
-    setRotation((prev) => prev + targetAngle);
-  }, [spinning, targetIndex, segmentAngle]);
-
-  return (
-    <div className="relative w-[300px] h-[300px] md:w-[340px] md:h-[340px] mx-auto">
-      {/* Pointer */}
-      <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-20">
-        <motion.div
-          animate={spinning ? { y: [0, -4, 0] } : {}}
-          transition={{ duration: 0.3, repeat: spinning ? Infinity : 0 }}
-        >
-          <svg width="28" height="36" viewBox="0 0 28 36">
-            <defs>
-              <linearGradient id="pointer-grad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#A855F7" />
-                <stop offset="100%" stopColor="#7C3AED" />
-              </linearGradient>
-            </defs>
-            <polygon
-              points="14,36 0,0 28,0"
-              fill="url(#pointer-grad)"
-              filter="drop-shadow(0 2px 3px rgba(0,0,0,0.3))"
-            />
-          </svg>
-        </motion.div>
-      </div>
-
-      {/* Wheel */}
-      <motion.div
-        className="w-full h-full rounded-full relative overflow-hidden border-4 border-white/10 shadow-2xl"
-        style={{
-          boxShadow:
-            "0 0 60px rgba(139, 92, 246, 0.15), inset 0 0 30px rgba(0,0,0,0.2)",
-        }}
-        animate={{ rotate: rotation }}
-        transition={{ duration: 5, ease: [0.08, 0.82, 0.17, 1.01] }}
-        onAnimationComplete={() => {
-          if (spinning) onComplete();
-        }}
-      >
-        {segments.map((seg, i) => {
-          const startAngle = (i * segmentAngle * Math.PI) / 180;
-          const endAngle = ((i + 1) * segmentAngle * Math.PI) / 180;
-          const midAngle = (startAngle + endAngle) / 2;
-          const textRadius = 34;
-
-          return (
-            <div
-              key={i}
-              className="absolute inset-0"
-              style={{
-                clipPath: `polygon(50% 50%, ${50 + 50 * Math.cos(startAngle)}% ${50 + 50 * Math.sin(startAngle)}%, ${50 + 50 * Math.cos(endAngle)}% ${50 + 50 * Math.sin(endAngle)}%)`,
-                background: `linear-gradient(135deg, ${seg.color}, ${seg.color}DD)`,
-              }}
-            >
-              <span
-                className="absolute text-white font-bold whitespace-nowrap text-[11px]"
-                style={{
-                  left: `${50 + textRadius * Math.cos(midAngle)}%`,
-                  top: `${50 + textRadius * Math.sin(midAngle)}%`,
-                  transform: `translate(-50%, -50%) rotate(${i * segmentAngle + segmentAngle / 2}deg)`,
-                  textShadow: "0 1px 3px rgba(0,0,0,0.5)",
-                  maxWidth: "55px",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {seg.label}
-              </span>
-            </div>
-          );
-        })}
-
-        {/* Center hub */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-          <motion.div
-            className="w-14 h-14 rounded-full bg-gradient-to-br from-white to-gray-100 dark:from-gray-200 dark:to-gray-400 flex items-center justify-center shadow-lg"
-            animate={spinning ? { scale: [1, 1.05, 1] } : { scale: 1 }}
-            transition={{ duration: 0.5, repeat: spinning ? Infinity : 0 }}
-          >
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-white" />
-            </div>
-          </motion.div>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
 // ─── Main Component ─────────────────────────────────────
 export default function BusinessSpinPage() {
   const { businessSlug, gameId } = useParams<{
     businessSlug: string;
     gameId: string;
   }>();
-  const { supabase, profile } = useAuth();
+  const { supabase, profile, business } = useAuth();
   const router = useRouter();
 
   // Business & Game state
-  const [business, setBusiness] = useState<BusinessData | null>(null);
   const [game, setGame] = useState<SpinGame | null>(null);
   const [activeGame, setActiveGame] = useState<SpinGame | null>(null);
   const [loading, setLoading] = useState(true);
@@ -223,6 +108,11 @@ export default function BusinessSpinPage() {
     type: string;
   } | null>(null);
 
+  const [wheelPhase, setWheelPhase] = useState<WheelPhase>("idle");
+  const [shuffledSegments, setShuffledSegments] = useState<
+    WheelSegment[] | null
+  >(null);
+
   // User state
   const [userState, setUserState] = useState<UserSpinState>({
     spins_used_today: 0,
@@ -239,6 +129,7 @@ export default function BusinessSpinPage() {
   // Settings
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [spinStrength, setSpinStrength] = useState(50);
 
   // Queue state
   const [queueEnabled, setQueueEnabled] = useState(false);
@@ -337,7 +228,11 @@ export default function BusinessSpinPage() {
   const leaveQueue = async () => {
     if (!gameId || !profile?.id || !supabase) return;
     try {
-      await supabase.from("spin_queue_entries").delete().eq("game_id", gameId).eq("user_id", profile.id);
+      await supabase
+        .from("spin_queue_entries")
+        .delete()
+        .eq("game_id", gameId)
+        .eq("user_id", profile.id);
       setInQueue(false);
       setQueuePosition(null);
       setQueueStatus(null);
@@ -360,24 +255,16 @@ export default function BusinessSpinPage() {
     setLoading(true);
 
     try {
-      // Load business
-      const { data: biz } = await supabase
-        .from("businesses")
-        .select("id, name, slug, logo_url, brand_color, brand_secondary_color")
-        .eq("slug", businessSlug)
-        .single();
-
-      if (!biz) {
+      if (!business) {
         router.push("/spin");
         return;
       }
-      setBusiness(biz);
 
       // Load active spin games for this business
       const { data: gameData } = await supabase
         .from("spin_games")
         .select("*")
-        .eq("business_id", biz.id)
+        .eq("business_id", business.id)
         .eq("is_active", true)
         .eq("id", gameId)
         .maybeSingle();
@@ -391,9 +278,9 @@ export default function BusinessSpinPage() {
           .select("queue_enabled")
           .eq("game_id", gameData.id)
           .maybeSingle();
-        
+
         setQueueEnabled(queueSettings?.queue_enabled || false);
-        
+
         if (queueSettings?.queue_enabled) {
           checkQueueStatus();
         }
@@ -405,7 +292,7 @@ export default function BusinessSpinPage() {
           .from("customer_business_activations")
           .select("*")
           .eq("user_id", profile.id)
-          .eq("business_id", biz.id)
+          .eq("business_id", business.id)
           .eq("is_active", true)
           .gte("expires_at", new Date().toISOString())
           .single();
@@ -486,7 +373,7 @@ export default function BusinessSpinPage() {
   };
 
   // ─── Spin Logic ───────────────────────────────────────
-  const handleSpin = async (usePoints: boolean) => {
+  const handleSpin = async (usePoints: boolean, strength: number) => {
     if (!profile) {
       toast.error("Login to play");
       return;
@@ -511,18 +398,25 @@ export default function BusinessSpinPage() {
       return;
     }
 
-    setSpinning(true);
+    setWheelPhase("spinning");
+    setMustSpin(true);
+
     try {
       const result = await wheelService.spin(
         activeGame.id,
         usePoints ? "points" : "free",
+        strength, // Pass client strength to server
+        Date.now(), // Pass timestamp
       );
+
+      setShuffledSegments(result.shuffled_config);
+      setPrizeNumber(result.display_index);
       setPrizeNumber(result.segment_index);
+
       setLastWin({
         prize: result.prize_display || result.prizeDisplay,
         type: result.prize_type,
       });
-      setMustSpin(true);
 
       if (soundEnabled && activeGame.play_sounds) {
         new Audio("/sounds/claim-chime.mp3").play().catch(() => {});
@@ -531,17 +425,24 @@ export default function BusinessSpinPage() {
       toast.error(err.message || "Spin failed");
       setMustSpin(false);
       setSpinning(false);
+      setWheelPhase("idle");
     }
+  };
+
+  const handleSpinButton = (strength: number) => {
+    setSpinStrength(strength);
+    void handleSpin(strength > 0, strength);
   };
 
   const handleStopSpinning = useCallback(async () => {
     setMustSpin(false);
     setSpinning(false);
 
-    if (
-      (lastWin && lastWin.type !== "points") ||
-      (lastWin?.type === "points" && parseInt(lastWin.prize) > 0)
-    ) {
+    // Phase transitions are handled by the wheel component
+    // This is called when the wheel reaches "complete" phase
+
+    // Fire confetti for wins
+    if (lastWin && lastWin.type !== "tryagain") {
       fireConfetti();
     }
 
@@ -760,12 +661,22 @@ export default function BusinessSpinPage() {
             <Card className="bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 shadow-sm dark:shadow-none">
               <CardContent className="pt-6">
                 {/* Wheel */}
-                <div className="flex justify-center mb-6">
-                  <BusinessSpinWheel
-                    segments={wheelSegments}
-                    spinning={mustSpin}
-                    targetIndex={prizeNumber}
-                    onComplete={handleStopSpinning}
+                <div className="min-h-screen flex flex-col items-center justify-center p-8">
+                  <SpinWheel
+                    segments={activeGame?.prize_config || []}
+                    mustSpin={mustSpin}
+                    prizeNumber={prizeNumber}
+                    onStopSpinning={handleStopSpinning}
+                    brandColor={business?.brand_color || "#8B5CF6"}
+                    shuffledSegments={shuffledSegments}
+                    size={380}
+                  />
+
+                  <SpinButton
+                    onSpin={handleSpinButton}
+                    disabled={spinning || !activeGame}
+                    brandColor={business?.brand_color || "#8B5CF6"}
+                    phase={wheelPhase}
                   />
                 </div>
 
@@ -773,35 +684,39 @@ export default function BusinessSpinPage() {
                 <div className="space-y-3">
                   {queueEnabled ? (
                     <>
+                      <div>
+                        <Gift className="h-5 w-5" />
+                        Free Spin
+                        <Badge className="ml-1 bg-white/20 text-xs">
+                          {userState.free_remaining_today} left
+                        </Badge>
+                        <Coins className="h-5 w-5" />
+                        {activeGame.points_per_paid_spin} Pts
+                      </div>
                       {isMyTurn ? (
                         <div className="grid grid-cols-2 gap-3">
-                          <Button
-                            size="lg"
-                            onClick={() => handleSpin(false)}
+                          <SpinButton
+                            onSpin={handleSpinButton}
                             disabled={
-                              spinning || !isGameLive || !userState?.can_spin_free
+                              spinning ||
+                              !activeGame ||
+                              !isGameLive ||
+                              !userState?.can_spin_free
                             }
-                            className="h-12 gap-2"
-                            style={{ backgroundColor: business.brand_color }}
-                          >
-                            <Gift className="h-5 w-5" />
-                            Free Spin
-                            <Badge className="ml-1 bg-white/20 text-xs">
-                              {userState.free_remaining_today} left
-                            </Badge>
-                          </Button>
-                          <Button
-                            size="lg"
-                            variant="outline"
-                            onClick={() => handleSpin(true)}
+                            brandColor={business?.brand_color || "#8B5CF6"}
+                            phase={wheelPhase}
+                          />
+                          <SpinButton
+                            onSpin={handleSpinButton}
                             disabled={
-                              spinning || !isGameLive || !userState.can_spin_paid
+                              spinning ||
+                              !activeGame ||
+                              !isGameLive ||
+                              !userState.can_spin_paid
                             }
-                            className="h-12 gap-2 border-amber-300 dark:border-amber-500/30 text-amber-600 dark:text-amber-400"
-                          >
-                            <Coins className="h-5 w-5" />
-                            {activeGame.points_per_paid_spin} Pts
-                          </Button>
+                            brandColor={business?.brand_color || "#8B5CF6"}
+                            phase={wheelPhase}
+                          />
                         </div>
                       ) : inQueue ? (
                         <div className="p-4 rounded-xl text-center bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-500/30">
@@ -812,7 +727,9 @@ export default function BusinessSpinPage() {
                             #{queuePosition}
                           </p>
                           <p className="text-xs text-purple-600 dark:text-purple-400 mb-3">
-                            {queueStatus === "current" ? "It's your turn!" : "Waiting to be called..."}
+                            {queueStatus === "current"
+                              ? "It's your turn!"
+                              : "Waiting to be called..."}
                           </p>
                           <Button
                             variant="outline"
@@ -845,40 +762,37 @@ export default function BusinessSpinPage() {
                             )}
                           </Button>
                           {queueError && (
-                            <p className="text-xs text-red-500 mt-2">{queueError}</p>
+                            <p className="text-xs text-red-500 mt-2">
+                              {queueError}
+                            </p>
                           )}
                         </div>
                       )}
                     </>
                   ) : (
                     <div className="grid grid-cols-2 gap-3">
-                      <Button
-                        size="lg"
-                        onClick={() => handleSpin(false)}
+                      <SpinButton
+                        onSpin={handleSpinButton}
                         disabled={
-                          spinning || !isGameLive || !userState?.can_spin_free
+                          spinning ||
+                          !activeGame ||
+                          !isGameLive ||
+                          !userState?.can_spin_free
                         }
-                        className="h-12 gap-2"
-                        style={{ backgroundColor: business.brand_color }}
-                      >
-                        <Gift className="h-5 w-5" />
-                        Free Spin
-                        <Badge className="ml-1 bg-white/20 text-xs">
-                          {userState.free_remaining_today} left
-                        </Badge>
-                      </Button>
-                      <Button
-                        size="lg"
-                        variant="outline"
-                        onClick={() => handleSpin(true)}
+                        brandColor={business?.brand_color || "#8B5CF6"}
+                        phase={wheelPhase}
+                      />
+                      <SpinButton
+                        onSpin={handleSpinButton}
                         disabled={
-                          spinning || !isGameLive || !userState.can_spin_paid
+                          spinning ||
+                          !activeGame ||
+                          !isGameLive ||
+                          !userState.can_spin_paid
                         }
-                        className="h-12 gap-2 border-amber-300 dark:border-amber-500/30 text-amber-600 dark:text-amber-400"
-                      >
-                        <Coins className="h-5 w-5" />
-                        {activeGame.points_per_paid_spin} Pts
-                      </Button>
+                        brandColor={business?.brand_color || "#8B5CF6"}
+                        phase={wheelPhase}
+                      />
                     </div>
                   )}
 

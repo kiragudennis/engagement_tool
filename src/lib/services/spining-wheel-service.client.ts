@@ -54,12 +54,16 @@ export class SpinningWheelClientService {
   async spin(
     gameId: string,
     spinType: "free" | "points" | "purchase" | "bonus",
+    strength: number,
+    timestamp: number,
   ) {
     console.log("Performing spin with params:", { gameId, spinType });
 
     const { data, error } = await this.supabase.rpc("perform_spin", {
       p_game_id: gameId,
       p_spin_type: spinType,
+      p_client_strength: strength,
+      p_client_timestamp: timestamp,
     });
 
     console.log("Spin RPC response:", { data, error });

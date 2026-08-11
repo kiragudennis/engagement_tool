@@ -74,6 +74,21 @@ CREATE TABLE IF NOT EXISTS spin_attempts (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- These fields columns to spin_attemps: p_client_strength, v_total_rotation, v_animation_duration,
+-- v_easing_function, v_drift_factor, v_reveal_delay,
+-- v_rotation_seed, shuffle_seed, shuffled_config and display_index.
+
+ALTER TABLE spin_attempts ADD COLUMN IF NOT EXISTS client_strength FLOAT;
+ALTER TABLE spin_attempts ADD COLUMN IF NOT EXISTS server_rotation FLOAT;
+ALTER TABLE spin_attempts ADD COLUMN IF NOT EXISTS animation_duration FLOAT;
+ALTER TABLE spin_attempts ADD COLUMN IF NOT EXISTS easing_function TEXT;
+ALTER TABLE spin_attempts ADD COLUMN IF NOT EXISTS drift_factor FLOAT;
+ALTER TABLE spin_attempts ADD COLUMN IF NOT EXISTS reveal_delay INTEGER;
+ALTER TABLE spin_attempts ADD COLUMN IF NOT EXISTS rotation_seed TEXT;
+ALTER TABLE spin_attempts ADD COLUMN IF NOT EXISTS shuffle_seed TEXT;
+ALTER TABLE spin_attempts ADD COLUMN IF NOT EXISTS shuffled_config JSONB;
+ALTER TABLE spin_attempts ADD COLUMN IF NOT EXISTS display_index INTEGER;
+
 -- 3. User spin allocations (daily/weekly limits)
 CREATE TABLE IF NOT EXISTS user_spin_allocations (
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -253,7 +268,9 @@ $$;
 -- ============================================
 CREATE OR REPLACE FUNCTION perform_spin(
     p_game_id UUID,
-    p_spin_type TEXT  -- 'free' or 'points'
+    p_spin_type TEXT,  -- 'free' or 'points'
+    p_client_strength FLOAT DEFAULT NULL,  -- 0-100, client's press strength
+    p_client_timestamp BIGINT DEFAULT NULL  -- Unix timestamp in ms
 )
 RETURNS JSON
 LANGUAGE plpgsql
@@ -284,6 +301,29 @@ DECLARE
     v_user_total_spins INTEGER;
     v_spins_used INTEGER;
     v_max_spins_per_activation INTEGER;
+
+     
+    -- Shuffle variables
+    v_shuffle_seed TEXT;
+    v_shuffled_prizes JSONB;
+    v_display_index INT;
+
+    -- Server-controlled spin variables
+    v_total_rotation FLOAT;  -- Total degrees to rotate
+    v_base_spins FLOAT;      -- Minimum spins (5-12 based on strength)
+    v_random_offset FLOAT;   -- Random offset to prevent prediction
+    v_strength_factor FLOAT; -- Normalized strength
+    v_server_timestamp BIGINT;
+    v_rotation_seed TEXT;
+    v_rotation_hash FLOAT;
+    v_animation_duration FLOAT;
+    v_easing_function TEXT;
+    v_reveal_delay INT;
+    
+    -- Anti-prediction variables
+    v_drift_factor FLOAT;
+    v_deceleration_noise FLOAT;
+    v_segment_jitter FLOAT;
 BEGIN
     -- Get current user
     v_user_id := auth.uid();
@@ -422,6 +462,79 @@ BEGIN
     
     v_selected_prize := v_prize_config->v_prize_index;
     
+    -- ─── GENERATE SHUFFLE ─────────────────────────────────
+    v_shuffle_seed := gen_random_uuid()::TEXT;
+    v_shuffled_prizes := shuffle_json_array(v_prize_config, v_shuffle_seed);
+    
+    -- Find display index
+    v_display_index := 0;
+    FOR i IN 0..v_num_prizes - 1 LOOP
+        IF (v_shuffled_prizes->i->>'value' = v_selected_prize->>'value') 
+           AND (v_shuffled_prizes->i->>'type' = v_selected_prize->>'type') THEN
+            v_display_index := i;
+            EXIT;
+        END IF;
+    END LOOP;
+
+     -- ─── SERVER-CONTROLLED SPIN PHYSICS ──────────────
+    -- This is where we make it impossible to predict
+    
+    -- 1. Normalize client strength (with validation)
+    IF p_client_strength IS NULL OR p_client_strength < 0 OR p_client_strength > 100 THEN
+        v_strength_factor := 0.5; -- Default medium strength
+    ELSE
+        v_strength_factor := p_client_strength / 100.0;
+    END IF;
+    
+    -- 2. Calculate base spins based on strength
+    -- Strength affects number of spins (5-15 full rotations)
+    v_base_spins := 5.0 + (v_strength_factor * 10.0);
+    
+    -- 3. Generate cryptographically unpredictable rotation
+    v_server_timestamp := EXTRACT(EPOCH FROM NOW()) * 1000;
+    v_rotation_seed := gen_random_uuid()::TEXT;
+    v_rotation_hash := ABS(hashtext(v_rotation_seed || v_server_timestamp::TEXT)) / 2147483647.0;
+    
+    -- 4. Add random drift (prevents strength→position mapping)
+    -- This varies each spin, so same strength ≠ same position
+    v_drift_factor := (v_rotation_hash - 0.5) * 2.0; -- -1.0 to 1.0
+    v_base_spins := v_base_spins + (v_drift_factor * 2.0); -- Add ±2 spins
+    
+    -- 5. Calculate target position
+    -- We want to land on v_display_index
+    DECLARE
+        v_segment_angle FLOAT := 360.0 / v_num_prizes;
+        v_target_center FLOAT := v_display_index * v_segment_angle + (v_segment_angle / 2.0);
+    BEGIN
+        -- Calculate exact rotation needed to land on target
+        -- The pointer is at top (90 degrees)
+        v_total_rotation := (v_base_spins * 360.0) + (90.0 - v_target_center);
+        
+        -- 6. Add micro-jitter to prevent exact position prediction
+        v_segment_jitter := (RANDOM() - 0.5) * (v_segment_angle * 0.3); -- ±15% of segment
+        v_total_rotation := v_total_rotation + v_segment_jitter;
+        
+        -- Ensure rotation is always positive and substantial
+        IF v_total_rotation < 1800.0 THEN -- At least 5 full spins
+            v_total_rotation := v_total_rotation + 1800.0;
+        END IF;
+    END;
+    
+    -- 7. Calculate animation parameters
+    -- Duration varies based on strength (stronger = slightly longer)
+    v_animation_duration := 4.0 + (v_strength_factor * 2.0) + (RANDOM() * 0.5);
+    
+    -- 8. Random easing function (prevents pattern recognition)
+    v_easing_function := CASE 
+        WHEN v_rotation_hash < 0.25 THEN 'cubic-bezier(0.08, 0.82, 0.17, 1.01)'
+        WHEN v_rotation_hash < 0.50 THEN 'cubic-bezier(0.12, 0.80, 0.20, 0.95)'
+        WHEN v_rotation_hash < 0.75 THEN 'cubic-bezier(0.15, 0.85, 0.18, 0.98)'
+        ELSE 'cubic-bezier(0.10, 0.78, 0.22, 1.00)'
+    END;
+    
+    -- 9. Random reveal delay (adds suspense variation)
+    v_reveal_delay := 500 + FLOOR(RANDOM() * 1000); -- 500-1500ms
+    
     -- Award prize
     CASE v_selected_prize->>'type'
         WHEN 'points' THEN
@@ -462,16 +575,27 @@ BEGIN
         ELSE
             v_prize_display := COALESCE(v_selected_prize->>'label', v_selected_prize->>'value', 'Prize!');
     END CASE;
-    
-    -- Record spin attempt
+
+     -- Record spin attempt WITH shuffle data
     INSERT INTO spin_attempts (
         game_id, user_id, business_id, spin_type, prize_type, prize_value,
-        points_awarded, points_spent, segment_index, landed_at
+        points_awarded, points_spent, segment_index, shuffle_seed, 
+        shuffled_config, display_index,
+         -- New physics columns
+        client_strength, server_rotation, animation_duration,
+        easing_function, drift_factor, reveal_delay,
+        rotation_seed, landed_at
     ) VALUES (
         p_game_id, v_user_id, v_business_id, p_spin_type,
         v_selected_prize->>'type', v_selected_prize->>'value',
-        v_points_awarded, v_points_spent, v_prize_index, NOW()
+        v_points_awarded, v_points_spent, v_prize_index,
+        v_shuffle_seed, v_shuffled_prizes, v_display_index,
+        -- Physics data
+        p_client_strength, v_total_rotation, v_animation_duration,
+        v_easing_function, v_drift_factor, v_reveal_delay,
+        v_rotation_seed, NOW()
     )
+
     RETURNING id INTO v_attempt_id;
     
     -- Update allocation
@@ -542,6 +666,19 @@ BEGIN
         'points_awarded', v_points_awarded,
         'points_spent', v_points_spent,
         'segment_index', v_prize_index,
+        'display_index', v_display_index,
+        'shuffle_seed', v_shuffle_seed,
+        'shuffled_config', v_shuffled_prizes,
+        -- Spin physics (for client animation)
+        'spin_physics', json_build_object(
+            'total_rotation', v_total_rotation,
+            'animation_duration', v_animation_duration,
+            'easing_function', v_easing_function,
+            'reveal_delay', v_reveal_delay,
+            'base_spins', v_base_spins,
+            'drift_factor', v_drift_factor,
+            'strength_factor', v_strength_factor
+        ),
         'trivia_ticket', CASE 
             WHEN v_selected_prize->>'type' = 'trivia_ticket' AND v_trivia_result->>'success' = 'true'
             THEN jsonb_build_object('ticket_number', v_trivia_result->>'ticket_number', 'challenge_id', v_game.linked_challenge_id)

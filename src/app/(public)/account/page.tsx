@@ -32,10 +32,12 @@ import {
   Menu,
   Settings,
   HelpCircle,
+  Undo2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function CustomerAccountPage() {
   const { supabase, profile, signOut } = useAuth();
@@ -48,6 +50,7 @@ export default function CustomerAccountPage() {
   const [totalPoints, setTotalPoints] = useState(0);
   const [selectedTab, setSelectedTab] = useState("businesses");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const router = useRouter();
 
   const loadData = useCallback(async () => {
     if (!profile?.id) return;
@@ -126,7 +129,7 @@ export default function CustomerAccountPage() {
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 border-b border-white/5">
         <div className="container mx-auto px-4 py-6 md:py-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex justify-between gap-4">
             <div className="flex items-center gap-3 md:gap-4 w-full sm:w-auto">
               <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xl md:text-2xl flex-shrink-0">
                 {profile?.full_name?.[0] || "?"}
@@ -234,7 +237,7 @@ export default function CustomerAccountPage() {
                   </Link>
                 </nav>
 
-                <div className="border-t border-white/10 pt-3">
+                <div className="flex justify-between border-t border-white/10 pt-3">
                   <Button
                     variant="ghost"
                     onClick={signOut}
@@ -243,6 +246,19 @@ export default function CustomerAccountPage() {
                     <LogOut className="h-4 w-4 mr-2" />
                     Sign Out
                   </Button>
+
+                  {/* Back home */}
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      router.push("/");
+                      setDialogOpen(false);
+                    }}
+                    className="w-full justify-start text-green/70 hover:text-white hover:bg-white/5 mt-1"
+                  >
+                    <Undo2 className="h-4 w-4 mr-2" />
+                    Back to Home
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -250,15 +266,6 @@ export default function CustomerAccountPage() {
 
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
-            <Card className="bg-white/5 border-white/10">
-              <CardContent className="p-3 md:p-4 text-center">
-                <Brain className="h-4 w-4 md:h-5 md:w-5 text-blue-400 mx-auto mb-1" />
-                <p className="text-xl md:text-2xl font-bold text-white">
-                  {triviaHistory.length}
-                </p>
-                <p className="text-xs text-white/40">Trivia Joined</p>
-              </CardContent>
-            </Card>
             <Card className="bg-white/5 border-white/10">
               <CardContent className="p-3 md:p-4 text-center">
                 <Store className="h-4 w-4 md:h-5 md:w-5 text-purple-400 mx-auto mb-1" />
@@ -279,6 +286,15 @@ export default function CustomerAccountPage() {
             </Card>
             <Card className="bg-white/5 border-white/10">
               <CardContent className="p-3 md:p-4 text-center">
+                <Brain className="h-4 w-4 md:h-5 md:w-5 text-blue-400 mx-auto mb-1" />
+                <p className="text-xl md:text-2xl font-bold text-white">
+                  {triviaHistory.length}
+                </p>
+                <p className="text-xs text-white/40">Trivia Joined</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-white/5 border-white/10">
+              <CardContent className="p-3 md:p-4 text-center">
                 <Trophy className="h-4 w-4 md:h-5 md:w-5 text-amber-400 mx-auto mb-1" />
                 <p className="text-xl md:text-2xl font-bold text-white">
                   {drawEntries.length}
@@ -291,7 +307,11 @@ export default function CustomerAccountPage() {
       </div>
 
       <div className="container mx-auto px-4 py-6 md:py-8">
-        <Tabs value={selectedTab} onValueChange={setSelectedTab} defaultValue="businesses">
+        <Tabs
+          value={selectedTab}
+          onValueChange={setSelectedTab}
+          defaultValue="businesses"
+        >
           {/* Scrollable Tabs */}
           <div className="overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
             <TabsList className="border border-white/10 inline-flex w-max min-w-full text-white">
@@ -744,27 +764,30 @@ export default function CustomerAccountPage() {
                   <ul className="text-sm text-white/70 space-y-1 list-disc list-inside ml-2">
                     <li>
                       <span className="text-green-400 font-medium">
-                        50% one-time commission
+                        One-time: 50% commission
                       </span>{" "}
-                      on their first payment
+                      on their first payment only
                     </li>
                     <li>
                       <span className="text-blue-400 font-medium">
-                        10% recurring commission
+                        Recurring: 10% commission
                       </span>{" "}
-                      on all subsequent payments
+                      on every payment
                     </li>
                     <li>
                       <span className="text-purple-400 font-medium">
                         Loyalty points
                       </span>{" "}
-                      (commission × 100) awarded immediately for Engage
-                      experiences
+                      (commission × 100) awarded immediately regardless of which
+                      option you choose
                     </li>
                   </ul>
                   <p className="text-white/40 text-xs mt-1">
                     💰 Cash payouts via Paystack/M-Pesa (min. $100 threshold) •
                     🎮 Points usable for spins, draws & trivia
+                  </p>
+                  <p className="text-white/30 text-xs">
+                    Choose either one-time or recurring — not both
                   </p>
                 </div>
 
@@ -779,7 +802,7 @@ export default function CustomerAccountPage() {
                     </Badge>
                     {profile.referral_commission_type === "one_time" ? (
                       <span className="text-white/30 text-xs">
-                        💰 50% one-time + 10% recurring
+                        💰 50% one-time only
                       </span>
                     ) : (
                       <span className="text-white/30 text-xs">

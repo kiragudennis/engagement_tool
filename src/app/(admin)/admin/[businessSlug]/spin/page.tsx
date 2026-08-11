@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect, JSX } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -284,6 +284,7 @@ const BUSINESS_TYPE_PRIZE_SUGGESTIONS: Record<
 };
 
 export default function SpinningWheelAdmin() {
+  const { businessSlug } = useParams<{ businessSlug: string }>();
   const { supabase, business } = useAuth();
   const router = useRouter();
   const [games, setGames] = useState<SpinGame[]>([]);
@@ -668,7 +669,10 @@ export default function SpinningWheelAdmin() {
                     toggleGameStatus(game.id, game.is_active)
                   }
                   onLiveView={() =>
-                    window.open(`/spin/live/${game.id}`, "_blank")
+                    window.open(
+                      `/${businessSlug}/spin/live/${game.id}`,
+                      "_blank",
+                    )
                   }
                   getGameTypeIcon={getGameTypeIcon}
                 />

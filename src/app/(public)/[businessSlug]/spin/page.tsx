@@ -33,6 +33,12 @@ export default function BusinessSpinLanding() {
     if (!businessSlug || !supabase) return;
 
     try {
+      // Check for business in the state (from AuthContext). If not present, redirect to business landing page where they can later go to redeem code.
+      if (!business) {
+        router.push(`/${businessSlug}`);
+        return;
+      }
+
       // Check if user is active with this business
       if (profile?.id) {
         const { data: activation } = await supabase
@@ -145,14 +151,14 @@ export default function BusinessSpinLanding() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-             {games.map((game) => (
-               <GameCard
-                 key={game.id}
-                 game={game}
-                 businessSlug={businessSlug}
-                 userActivated={userActivated}
-                 enrolledGameId={enrolledGameId}
-               />
+            {games.map((game) => (
+              <GameCard
+                key={game.id}
+                game={game}
+                businessSlug={businessSlug}
+                userActivated={userActivated}
+                enrolledGameId={enrolledGameId}
+              />
             ))}
           </div>
         )}

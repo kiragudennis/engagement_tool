@@ -157,7 +157,7 @@ const FAQ = [
     a: "They don't browse. You give them a code or QR link. No code, no access. Your customers stay yours.",
   },
   {
-    q: "Can I run all three—spins, trivia, and draws?",
+    q: "Can I run all three; spins, trivia, and draws?",
     a: "Yes. They work together. Spins build daily habits. Trivia builds community. Draws drive purchases. Use one or all three.",
   },
 ];
@@ -552,9 +552,6 @@ export default function LandingPage() {
                       <span className="text-gray-400 dark:text-white/40 text-lg">
                         /mo
                       </span>
-                      <p className="text-sm text-gray-400 dark:text-white/30 mt-1">
-                        ≈ ... KES
-                      </p>
                     </div>
                     <p className="text-gray-500 dark:text-white/40 text-sm mt-1">
                       {plan.desc}
@@ -592,6 +589,22 @@ export default function LandingPage() {
             ))}
           </div>
         </div>
+        <div className="container mx-auto px-4 mt-8 text-center">
+          <p className="text-gray-600 dark:text-white/60 text-base leading-relaxed mb-4">
+            Turn your business into a live game show. Spin wheels, trivia
+            nights, and live events.
+          </p>
+          <p className="text-gray-400 dark:text-white/30 text-sm">
+            Need a custom plan for high-volume businesses?{" "}
+            <Link
+              href="/contact"
+              className="text-purple-600 dark:text-purple-400 font-medium underline"
+            >
+              Contact us
+            </Link>
+            .
+          </p>
+        </div>
       </section>
       {/* ─── DATA OWNERSHIP ──────────────────────────── */}
       <section className="border-t border-gray-100 dark:border-white/5 py-24 bg-gray-50/50 dark:bg-transparent">
@@ -603,9 +616,9 @@ export default function LandingPage() {
             Your customers. Your data.
           </h2>
           <p className="text-gray-500 dark:text-white/50 leading-relaxed mb-8 max-w-xl mx-auto">
-            Every email captured through spins, trivia, and draws belongs to
-            you—not us. Export your customer list anytime. We never email your
-            customers or sell their data.
+            Every email and phone captured through spins, trivia, and draws
+            belongs to you. Not us. Export your customer list anytime. We never
+            email your customers or sell their data.
             <span className="text-gray-700 dark:text-white/70">
               {" "}
               They're your customers, period.

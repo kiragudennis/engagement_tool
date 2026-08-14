@@ -245,6 +245,22 @@ export default function EarlyBirdsPricingPage() {
             </motion.div>
           ))}
         </div>
+        <div className="container mx-auto px-4 mt-8 text-center">
+          <p className="text-gray-600 dark:text-white/60 text-base leading-relaxed mb-4">
+            Turn your business into a live game show. Spin wheels, trivia
+            nights, and live events.
+          </p>
+          <p className="text-gray-400 dark:text-white/30 text-sm">
+            Need a custom plan for high-volume businesses?{" "}
+            <Link
+              href="/contact"
+              className="text-purple-600 dark:text-purple-400 font-medium underline"
+            >
+              Contact us
+            </Link>
+            .
+          </p>
+        </div>
       </div>
 
       {/* Comparison Table */}

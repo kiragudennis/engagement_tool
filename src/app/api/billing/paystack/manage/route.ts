@@ -1,13 +1,14 @@
 // app/api/billing/manage/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { requireBusinessAdmin } from "@/lib/auth/server";
 import {
   paystackGetSubscription,
   paystackEnableSubscription,
   paystackDisableSubscription,
   paystackGetCustomer,
   activateBusinessSubscription,
+  paystackInitializeTransaction,
+  paystackVerifyTransaction,
 } from "@/lib/services/paystack";
 import { EARLY_ACCESS_PLANS, PLANS } from "@/lib/config/plans";
 import { headers } from "next/headers";
@@ -271,8 +272,6 @@ export async function POST(req: NextRequest) {
         }
 
         // Generate payment link for manual payment
-        const { paystackInitializeTransaction } =
-          await import("@/lib/services/paystack");
         const initRes = await paystackInitializeTransaction({
           email,
           amount,
@@ -333,8 +332,6 @@ export async function POST(req: NextRequest) {
         }
 
         try {
-          const { paystackVerifyTransaction } =
-            await import("@/lib/services/paystack");
           const verifyResult = await paystackVerifyTransaction(
             payment.payment_reference,
           );

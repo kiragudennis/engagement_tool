@@ -8,15 +8,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import {
   Store,
-  Users,
   Gift,
-  Shield,
-  Smartphone,
   Radio,
   ArrowRight,
-  Sparkles,
-  Star,
-  Heart,
+  ScrollText,
+  Wrench,
 } from "lucide-react";
 
 const VALUES = [
@@ -27,7 +23,7 @@ const VALUES = [
       "Every email, every spin, every trivia answer belongs to you. We don't market to your customers. We don't sell their data. They're yours.",
   },
   {
-    icon: Shield,
+    icon: Wrench,
     title: "Tool, Not a Platform",
     description:
       "Engage isn't a marketplace where customers browse businesses. It's a tool businesses use to engage their own audience. No code = no access.",
@@ -75,7 +71,7 @@ const HOW_IT_WORKS = [
     step: "5",
     title: "Export your customer data",
     description:
-      "Every email collected is yours. Export to CSV anytime. Use it for your own marketing. We never touch it.",
+      "Every email and phone collected is yours. Export to CSV anytime. Use it for your own marketing. We never touch it.",
   },
 ];
 
@@ -98,10 +94,10 @@ export default function AboutPage() {
               a live game show
             </span>
           </h1>
-          <p className="text-lg text-white/60 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-sm text-white/60 max-w-2xl mx-auto leading-relaxed">
             Engage is a retention tool that helps local businesses create
-            gamified experiences—spin wheels, trivia nights, and live
-            events—that customers play from their phones. No app download. No
+            gamified experiences: spin wheels, trivia nights, and live events;
+            that customers play from their phones. No app download. No
             marketplace. Just you and your customers.
           </p>
         </motion.div>
@@ -119,12 +115,12 @@ export default function AboutPage() {
             <h2 className="text-3xl font-bold text-white mb-4">
               Why We Built This
             </h2>
-            <p className="text-white/50 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-sm text-white/50 max-w-2xl mx-auto leading-relaxed">
               Local businesses have a retention problem. Punch cards get lost.
               Social media reach keeps dropping. Email lists are hard to grow.
               We wanted to give businesses a way to make customer engagement
-              <span className="text-white/70"> fun, social, and live</span>
-              —without needing a tech team.
+              <span className="text-white/70"> fun, social, and live;</span>
+              &nbsp;and to do it without needing a tech team.
             </p>
           </motion.div>
 
@@ -138,7 +134,7 @@ export default function AboutPage() {
                 transition={{ delay: i * 0.1 }}
               >
                 <Card className="bg-white/5 border-white/10 h-full">
-                  <CardContent className="p-6">
+                  <CardContent>
                     <value.icon className="h-8 w-8 text-purple-400 mb-4" />
                     <h3 className="text-white font-semibold text-lg mb-2">
                       {value.title}
@@ -198,11 +194,11 @@ export default function AboutPage() {
             viewport={{ once: true }}
             className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-2xl p-8 text-center"
           >
-            <Shield className="h-12 w-12 text-purple-400 mx-auto mb-4" />
+            <ScrollText className="h-12 w-12 text-purple-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-white mb-4">
               Your Customer Data Belongs to You
             </h2>
-            <p className="text-white/60 leading-relaxed mb-6">
+            <p className="text-sm text-white/60 leading-relaxed mb-6">
               When a customer activates their account with your business code,
               their email and engagement history becomes part of{" "}
               <span className="text-white/80">your</span> customer list. You can
@@ -214,15 +210,15 @@ export default function AboutPage() {
             </p>
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
-                <p className="text-white font-bold text-lg">✅</p>
+                <p className="text-white font-bold text-lg">✔</p>
                 <p className="text-white/50 text-sm">You own the data</p>
               </div>
               <div>
-                <p className="text-white font-bold text-lg">✅</p>
+                <p className="text-white font-bold text-lg">✔</p>
                 <p className="text-white/50 text-sm">You export anytime</p>
               </div>
               <div>
-                <p className="text-white font-bold text-lg">✅</p>
+                <p className="text-white font-bold text-lg">✔</p>
                 <p className="text-white/50 text-sm">We never market to them</p>
               </div>
             </div>

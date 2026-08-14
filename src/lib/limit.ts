@@ -3,6 +3,7 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { Resend } from "resend";
 import { getPaystackPlanCode } from "./config/plans";
+const MPESA_API = "https://api.safaricom.co.ke";
 
 // ✅ Shared Redis instance
 export const redis = new Redis({
@@ -130,7 +131,7 @@ export const generateToken = async () => {
   const auth = Buffer.from(key + ":" + secret).toString("base64");
   try {
     const response = await fetch(
-      "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials",
+      `${MPESA_API}/oauth/v1/generate?grant_type=client_credentials`,
       {
         method: "GET",
         headers: {
@@ -149,3 +150,137 @@ export const generateToken = async () => {
     throw error; // Re-throw the error to handle it in the calling function
   }
 };
+
+export async function mpesaSTKPush(
+  amountUSD: number,
+  phoneNumber: string,
+  paymentId: string | null,
+  serviceId: string | null,
+  plan: string,
+  token: string,
+) {
+  // Convert USD to KES for M-Pesa
+  let amountKES: number;
+
+  if (plan === "consultation") {
+    // For consultation, we assume the amount is already in KES
+    amountKES = amountUSD;
+  } else {
+    try {
+      const access_key = process.env.EXCHANGE_API_KEY;
+      const endpoint = process.env.ENDPOINT;
+
+      const res = await fetch(
+        `https://api.exchangerate.host/${endpoint}?access_key=${access_key}&from=USD&to=KES&amount=${amountUSD}`,
+        { next: { revalidate: 3600 * 12 } },
+      );
+      const json = await res.json();
+      const rate = json.result;
+
+      if (!rate) throw new Error("Rate missing");
+      amountKES = Math.round(rate);
+    } catch (err) {
+      console.error("Exchange rate fetch failed, using fallback rate", err);
+      amountKES = Math.round(amountUSD * 131); // fallback rate
+    }
+  }
+
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[-:T.]/g, "")
+    .slice(0, 14);
+  const password = Buffer.from(
+    `${process.env.MPESA_SHORTCODE}${process.env.MPESA_PASSKEY}${timestamp}`,
+  ).toString("base64");
+
+  const formattedPhone = phoneNumber
+    .replace(/\s/g, "")
+    .replace(/^0/, "254")
+    .replace(/^\+/, "");
+
+  const stkRes = await fetch(`${MPESA_API}/mpesa/stkpush/v1/processrequest`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      BusinessShortCode: process.env.MPESA_SHORTCODE,
+      Password: password,
+      Timestamp: timestamp,
+      TransactionType: "CustomerBuyGoodsOnline",
+      Amount: Math.ceil(amountKES),
+      PartyA: formattedPhone,
+      PartyB: process.env.MPESA_TILL!,
+      PhoneNumber: formattedPhone,
+      CallBackURL: `${process.env.NEXT_PUBLIC_SITE_URL}/api/webhooks/mpesa/subscription?callback-secret=${process.env.MPESA_CALLBACK_SECRET}&paymentId=${paymentId}&serviceId=${serviceId}`,
+      AccountReference: `ENGAGE-${plan}`,
+      TransactionDesc: `Engage ${plan} subscription`,
+    }),
+  });
+
+  return {
+    response: await stkRes.json(),
+    formattedPhone,
+    amountKES,
+  };
+}
+
+export async function querySTKStatus(checkoutRequestId: string, token: string) {
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[-:T.]/g, "")
+    .slice(0, 14);
+
+  const password = Buffer.from(
+    `${process.env.MPESA_SHORTCODE}${process.env.MPESA_PASSKEY}${timestamp}`,
+  ).toString("base64");
+
+  const res = await fetch(`${MPESA_API}/mpesa/stkpushquery/v1/query`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      BusinessShortCode: process.env.MPESA_SHORTCODE,
+      Password: password,
+      Timestamp: timestamp,
+      CheckoutRequestID: checkoutRequestId,
+    }),
+  });
+
+  return res.json();
+}
+
+// Querying by receipt number
+export async function queryTransactionStatus(
+  receiptNumber: string,
+  token: string,
+) {
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[-:T.]/g, "")
+    .slice(0, 14);
+
+  const password = Buffer.from(
+    `${process.env.MPESA_SHORTCODE}${process.env.MPESA_PASSKEY}${timestamp}`,
+  ).toString("base64");
+
+  const res = await fetch(`${MPESA_API}/mpesa/transactionstatus/v1/query`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      BusinessShortCode: process.env.MPESA_SHORTCODE,
+      Password: password,
+      Timestamp: timestamp,
+      // Use either TransactionID or OriginalConversationID
+      TransactionID: receiptNumber,
+    }),
+  });
+
+  return res.json();
+}

@@ -6,7 +6,6 @@ import {
   CartItem,
   ShippingCalculationResult,
 } from "@/types/store";
-import axios from "axios";
 import z from "zod";
 
 export function cn(...inputs: ClassValue[]) {
@@ -160,19 +159,6 @@ export function determineShippingZone(
   return "KENYA";
 }
 
-// Belt level options
-export const beltLevels = [
-  { id: "all", name: "All Levels" },
-  { id: "white", name: "White Belt" },
-  { id: "yellow", name: "Yellow Belt" },
-  { id: "orange", name: "Orange Belt" },
-  { id: "green", name: "Green Belt" },
-  { id: "blue", name: "Blue Belt" },
-  { id: "purple", name: "Purple Belt" },
-  { id: "brown", name: "Brown Belt" },
-  { id: "black", name: "Black Belt" },
-];
-
 export const getCurrencyOptions = () => {
   const formatter = new Intl.DisplayNames(["en"], { type: "currency" });
 
@@ -186,84 +172,13 @@ export const getCurrencyOptions = () => {
   }));
 };
 
-export const generateToken = async () => {
-  const secret = process.env.MPESA_CONSUMER_SECRET;
-  const key = process.env.MPESA_CONSUMER_KEY;
-  const auth = Buffer.from(key + ":" + secret).toString("base64");
-  try {
-    const response = await axios.get(
-      "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials",
-      {
-        headers: {
-          Authorization: `Basic ${auth}`,
-        },
-      },
-    );
-    const token = response.data.access_token; // No need for await here
-
-    return token;
-  } catch (error) {
-    console.log("Token Error generated", error);
-    throw error; // Re-throw the error to handle it in the calling function
-  }
-};
-
-// utils/tag-filters.ts
-export const getAvailableTagsForCategory = (categoryId: string) => {
-  const tagCategoryMap: Record<string, string[]> = {
-    // Martial Arts specific
-    uniforms: [
-      "premium",
-      "competition",
-      "training",
-      "beginner",
-      "intermediate",
-      "advanced",
-    ],
-    gear: ["protective", "competition", "training", "essential"],
-    belts: [
-      "premium",
-      "competition",
-      "training",
-      "beginner",
-      "intermediate",
-      "advanced",
-    ],
-    equipment: [
-      "training",
-      "essential",
-      "beginner",
-      "intermediate",
-      "advanced",
-    ],
-
-    // General categories
-    electronics: ["premium", "essential"],
-    furniture: ["premium", "essential"],
-    beauty: ["premium", "essential"],
-    "sports-fitness": ["training", "beginner", "intermediate", "advanced"],
-    groceries: ["essential"],
-    automotive: ["premium", "essential"],
-
-    // Default for uncategorized
-    default: ["premium", "essential", "beginner", "intermediate", "advanced"],
+export function escapeHtml(text: string): string {
+  const map: Record<string, string> = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
   };
-
-  return tagCategoryMap[categoryId] || tagCategoryMap["default"];
-};
-
-// Group tags by type
-export const groupedTagOptions = [
-  {
-    group: "Quality Level",
-    tags: ["premium", "essential"],
-  },
-  {
-    group: "Skill Level",
-    tags: ["beginner", "intermediate", "advanced"],
-  },
-  {
-    group: "Purpose",
-    tags: ["training", "competition", "protective"],
-  },
-];
+  return text.replace(/[&<>"']/g, (m) => map[m] || m);
+}

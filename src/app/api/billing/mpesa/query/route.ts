@@ -2,67 +2,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireBusinessAdmin } from "@/lib/auth/server";
-import { generateToken, secureRatelimit } from "@/lib/limit";
+import {
+  generateToken,
+  querySTKStatus,
+  queryTransactionStatus,
+  secureRatelimit,
+} from "@/lib/limit";
 import { activateBusinessSubscription } from "@/lib/services/paystack";
 import { checkBotId } from "botid/server";
-
-const MPESA_API = "https://api.safaricom.co.ke";
-
-async function querySTKStatus(checkoutRequestId: string, token: string) {
-  const timestamp = new Date()
-    .toISOString()
-    .replace(/[-:T.]/g, "")
-    .slice(0, 14);
-
-  const password = Buffer.from(
-    `${process.env.MPESA_SHORTCODE}${process.env.MPESA_PASSKEY}${timestamp}`,
-  ).toString("base64");
-
-  const res = await fetch(`${MPESA_API}/mpesa/stkpushquery/v1/query`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      BusinessShortCode: process.env.MPESA_SHORTCODE,
-      Password: password,
-      Timestamp: timestamp,
-      CheckoutRequestID: checkoutRequestId,
-    }),
-  });
-
-  return res.json();
-}
-
-// Querying by receipt number
-async function queryTransactionStatus(receiptNumber: string, token: string) {
-  const timestamp = new Date()
-    .toISOString()
-    .replace(/[-:T.]/g, "")
-    .slice(0, 14);
-
-  const password = Buffer.from(
-    `${process.env.MPESA_SHORTCODE}${process.env.MPESA_PASSKEY}${timestamp}`,
-  ).toString("base64");
-
-  const res = await fetch(`${MPESA_API}/mpesa/transactionstatus/v1/query`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      BusinessShortCode: process.env.MPESA_SHORTCODE,
-      Password: password,
-      Timestamp: timestamp,
-      // Use either TransactionID or OriginalConversationID
-      TransactionID: receiptNumber,
-    }),
-  });
-
-  return res.json();
-}
 
 export async function POST(req: NextRequest) {
   const verification = await checkBotId();

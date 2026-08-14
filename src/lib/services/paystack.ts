@@ -79,6 +79,9 @@ export async function paystackInitializeTransaction(params: {
   paymentId: string;
   callbackUrl: string;
   isEarlyBird?: boolean;
+  currency?: string;
+  consultationId?: string;
+  serviceId?: string;
 }) {
   const res = await fetch(`${PAYSTACK_API}/transaction/initialize`, {
     method: "POST",
@@ -86,7 +89,7 @@ export async function paystackInitializeTransaction(params: {
     body: JSON.stringify({
       email: params.email,
       amount: params.amount * 100, // Paystack expects cents
-      currency: "USD",
+      currency: params.currency || "USD",
       callback_url: params.callbackUrl,
       metadata: {
         business_id: params.businessId,
@@ -95,6 +98,8 @@ export async function paystackInitializeTransaction(params: {
         payment_id: params.paymentId,
         type: params.isEarlyBird ? "one_time" : "subscription",
         is_early_bird: params.isEarlyBird ? "true" : "false",
+        consultation_id: params.consultationId || null,
+        service_id: params.serviceId || null,
       },
     }),
   });

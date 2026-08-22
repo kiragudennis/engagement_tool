@@ -8,6 +8,7 @@ import { Trophy, Clock, Users, ArrowRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { Draw } from "@/types/draws";
+import { cn } from "@/lib/utils";
 
 interface DrawsSectionProps {
   draws: Draw[];
@@ -15,7 +16,11 @@ interface DrawsSectionProps {
   brandColor?: string | null;
 }
 
-export function DrawsSection({ draws, businessSlug, brandColor }: DrawsSectionProps) {
+export function DrawsSection({
+  draws,
+  businessSlug,
+  brandColor,
+}: DrawsSectionProps) {
   return (
     <section className="mb-10">
       <div className="flex items-center gap-2 mb-4">
@@ -65,11 +70,17 @@ export function DrawsSection({ draws, businessSlug, brandColor }: DrawsSectionPr
                       )}
                     >
                       <Clock className="h-3.5 w-3.5" />
-                      {isEndingSoon ? "Ends soon" : formatDistanceToNow(endsAt, { addSuffix: true })}
+                      {isEndingSoon
+                        ? "Ends soon"
+                        : formatDistanceToNow(endsAt, { addSuffix: true })}
                     </span>
                   </div>
 
-                  <Button asChild className="w-full mt-auto" variant="secondary">
+                  <Button
+                    asChild
+                    className="w-full mt-auto"
+                    variant="secondary"
+                  >
                     <Link href={`/${businessSlug}/draw/${draw.id}`}>
                       View Draw <ArrowRight className="h-4 w-4 ml-1" />
                     </Link>

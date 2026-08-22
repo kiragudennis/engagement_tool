@@ -9,7 +9,6 @@ import { TriviaSection } from "@/components/business/TriviaSection";
 import { ResultsSection } from "@/components/business/ResultsSection";
 import { PublicCodesSection } from "@/components/business/PublicCodesSection";
 import { PointsValueSection } from "@/components/business/PointsValueSection";
-import { Footer } from "@/components/business/Footer";
 import { Business } from "@/types/business";
 import { SpinGame } from "@/types/spinning-wheel";
 import { Draw } from "@/types/draws";
@@ -184,8 +183,6 @@ export default async function BusinessLandingPage({
             pointsPerRedemption={biz?.points_per_redemption || 10}
             pointsValue={biz?.points_value || 0.001}
           />
-
-          <Footer businessSlug={businessSlug} />
         </div>
       </div>
     </div>

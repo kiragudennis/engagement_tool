@@ -38,6 +38,7 @@ import {
   Timer,
   BicepsFlexed,
   Puzzle,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -55,6 +56,7 @@ const SECTIONS = [
   { id: "engagement", label: "Engagement", icon: FunnelPlus },
   { id: "limits", label: "limits", icon: CirclePause },
   { id: "referral-program", label: "Referral Program", icon: BadgeDollarSign },
+  { id: "consultations", label: "Consultations", icon: MessageCircle },
   { id: "faq", label: "FAQ", icon: Shield },
 ];
 
@@ -3231,6 +3233,195 @@ export default function DocsPage() {
                     </Button>
                   </CardContent>
                 </Card>
+              </section>
+
+              {/* ─── CONSULTATIONS ────────────────────────────── */}
+              <section id="consultations" className="scroll-mt-20">
+                <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                  <MessageCircle className="h-6 w-6 text-purple-400" />{" "}
+                  Consultations
+                </h2>
+
+                <div className="space-y-6">
+                  <Card className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20">
+                    <CardContent className="space-y-4">
+                      <h3 className="text-white font-semibold text-lg">
+                        Hey there👋, we see you, and we get it.
+                      </h3>
+                      <p className="text-white/60 text-sm leading-relaxed">
+                        Every business is beautifully unique. Your staff, your
+                        systems, your customers, your rhythm; none of it is
+                        one-size-fits-all. And honestly? That is exactly why
+                        Engage exists. Not to force you into a box, but to meet
+                        you right where you are.
+                      </p>
+                      <p className="text-white/60 text-sm leading-relaxed">
+                        Not every feature, plan, or setup works for every
+                        business; and that is completely okay. Before you even
+                        pick a plan or worry about connecting your existing
+                        systems to your Engage business account, we want to sit
+                        down virtually and really understand your world. This is
+                        not a sales call. This is a{" "}
+                        <span className="text-purple-400">
+                          let us help you succeed
+                        </span>{" "}
+                        call.
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="space-y-4">
+                      <h3 className="text-white font-semibold text-lg">
+                        What to Expect in Your Consultation Call
+                      </h3>
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        When you book a consultation, here is exactly what
+                        happens; no surprises, no pressure, just a real
+                        conversation:
+                      </p>
+                      <div className="space-y-4">
+                        {[
+                          {
+                            step: "1",
+                            title: "We Ask Great Questions",
+                            desc: "We will learn about your business model, your team's technical comfort level, your current tools, and what success looks like for you. No question is too small or too big.",
+                          },
+                          {
+                            step: "2",
+                            title: "We Assess Together",
+                            desc: "Together we will walk through your existing setup; your POS, your receipt system, your sticker workflow, whatever you have. We will look at what is working, what could be smoother, and where Engage fits in.",
+                          },
+                          {
+                            step: "3",
+                            title: "We Explain Engage 101",
+                            desc: "We will break down exactly how Engage works, tailored to your staff's level. Whether your team is super technical or just getting started, we will meet you there and build your confidence from the ground up.",
+                          },
+                          {
+                            step: "4",
+                            title: "You Leave With Clarity",
+                            desc: "By the end of the call, you will know exactly what is possible, what makes sense for your business, and what your next steps look like. No fine print, no confusion. A clear path forward.",
+                          },
+                        ].map((item) => (
+                          <div
+                            key={item.step}
+                            className="flex gap-4 p-4 rounded-lg bg-white/5 border border-white/10"
+                          >
+                            <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                              <span className="text-purple-400 font-bold text-sm">
+                                {item.step}
+                              </span>
+                            </div>
+                            <div>
+                              <h4 className="text-white font-medium text-sm mb-1">
+                                {item.title}
+                              </h4>
+                              <p className="text-white/50 text-xs leading-relaxed">
+                                {item.desc}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="p-4 rounded-lg bg-green-500/5 border border-green-500/20">
+                        <p className="text-green-400 text-sm">
+                          <strong>Why we recommend this:</strong> Consultations
+                          are the sweet spot for getting the most out of Engage.
+                          When we understand your business from the inside out,
+                          we can set you up for success, technically and
+                          strategically. Your team gains confidence, your setup
+                          actually fits your workflow, and you avoid the
+                          frustrating trial-and-error that can come with diving
+                          in blind.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-blue-500/20 text-blue-400 border-0">
+                          Consultation + Integration Plan
+                        </Badge>
+                      </div>
+                      <h3 className="text-white font-semibold text-lg">
+                        Need Someone to Handle the Heavy Lifting?
+                      </h3>
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        If your business needs hands-on help connecting your
+                        existing systems: your POS, your e-commerce platform,
+                        your receipt printers, your custom code, whatever you
+                        are working with, our{" "}
+                        <span className="text-blue-400">
+                          Consultation + Integration plan
+                        </span>{" "}
+                        is where the magic happens.
+                      </p>
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        Here is how it works:
+                      </p>
+                      <div className="space-y-3">
+                        {[
+                          "You choose the Consultation + Integration plan during signup.",
+                          "During your consultation call, we assess your existing systems and understand exactly what needs to connect to Engage.",
+                          "We reach out to our trusted network of experienced Engage developers; real humans who know the platform inside and out.",
+                          "One of our developers is assigned to your project and becomes your dedicated point of contact.",
+                          "They will work directly with you and your team to handle the full integration; including reviewing and working with your existing codebase, systems, and workflows.",
+                          "Your business is in safe hands. We treat your systems with the same care we would our own.",
+                        ].map((item, i) => (
+                          <div
+                            key={i}
+                            className="flex items-start gap-2 text-white/50 text-sm"
+                          >
+                            <Check className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="p-4 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                        <h4 className="text-amber-400 font-medium text-sm mb-2 flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4" /> What to Prepare
+                        </h4>
+                        <p className="text-amber-300/80 text-xs leading-relaxed">
+                          If you have existing systems, code, or integrations
+                          you would like us to work with, please have them
+                          ready. Access to your codebase, API keys, or system
+                          documentation helps our developers hit the ground
+                          running. Rest assured, everything shared is handled
+                          with strict confidentiality and security.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-white/5 border-white/10">
+                    <CardContent className="space-y-4">
+                      <h3 className="text-white font-semibold text-lg">
+                        Real Talk: Why This Matters
+                      </h3>
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        We have seen businesses jump into new platforms without
+                        the right support, and it rarely ends well. Time gets
+                        wasted, integrations break, and frustration grows. Our
+                        consultation process is designed to prevent all of that.
+                      </p>
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        Think of it this way: you would not build a house
+                        without talking to an architect first. Your business
+                        systems are no different. A quick chat with our team can
+                        save you hours of headaches and set you up with a setup
+                        that actually feels like <em>yours</em>.
+                      </p>
+                      <p className="text-white/50 text-sm leading-relaxed">
+                        Whether you are a tiny coffee shop with a simple receipt
+                        printer, or a growing retail chain with custom POS
+                        software; we will meet you where you are, and help you
+                        get where you want to go.
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
               </section>
 
               {/* ─── FAQ ───────────────────────────────────── */}
